@@ -32,6 +32,19 @@ export async function token(): Promise<string | undefined> {
   return (await cookies()).get(TOKEN_COOKIE)?.value;
 }
 
+// Keep the API's token in an httpOnly cookie the page's scripts cannot read. Secure whenever the
+// browser reached us over HTTPS (directly or through a proxy); plain HTTP on localhost would
+// otherwise drop the cookie in some browsers.
+export async function setToken(req: Request, token: string, ttlHours: number): Promise<void> {
+  (await cookies()).set(TOKEN_COOKIE, token, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: new URL(req.url).protocol === "https:" || req.headers.get("x-forwarded-proto") === "https",
+    path: "/",
+    maxAge: ttlHours * 3600,
+  });
+}
+
 export async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const headers = new Headers(init.headers);
   const t = await token();

@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 from sse_starlette.sse import EventSourceResponse
 
 from groundwork import __version__
-from groundwork.api.auth import Identity
+from groundwork.api.auth import Identity, TokenError, verify
 from groundwork.api.deps import db, identity
 from groundwork.config import get_settings, hosted_problems
 from groundwork.db import models as m
@@ -35,7 +35,7 @@ from groundwork.schemas.views import (
     SiteView,
 )
 from groundwork.service import actions as actions_svc
-from groundwork.service import mandates, reset, runs, views
+from groundwork.service import mandates, reset, runs, sandboxes, views
 from groundwork.service.attestation import attestation
 from groundwork.service.scorecard import scorecard
 
@@ -78,6 +78,8 @@ class MeView(BaseModel):
     kid: str
     dry_run: bool
     hosted: bool
+    # A hosted-demo sandbox: when this visitor's private copy of the demo is deleted.
+    sandbox_expires_at: str | None = None
 
 
 class PlayEvent(BaseModel):
@@ -114,6 +116,7 @@ def health() -> dict[str, Any]:
         "live_planner": bool(s.anthropic_api_key),
         "planner_model": s.groundwork_planner_model,
         "demo_login": s.groundwork_demo_login,
+        "sandboxes": s.groundwork_demo_login and s.groundwork_sandboxes,
     }
 
 
@@ -134,6 +137,7 @@ def me(who: Identity = Depends(identity), s: Session = Depends(db)) -> MeView:
         kid=who.kid,
         dry_run=cfg.dry_run,
         hosted=cfg.groundwork_hosted,
+        sandbox_expires_at=org.expires_at.isoformat() if org.expires_at else None,
     )
 
 
@@ -467,9 +471,11 @@ def replay_run(run_id: uuid.UUID, s: Session = Depends(db)) -> dict[str, Any]:
 
 class DemoLogin(BaseModel):
     person: str
+    # With sandboxes: start over in a new sandbox (the current one is deleted).
+    fresh: bool = False
 
 
-def _demo_people() -> list[m.Person]:
+def _demo_org_id() -> uuid.UUID:
     cfg = get_settings()
     if not cfg.groundwork_demo_login:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "demo login is disabled")
@@ -477,17 +483,38 @@ def _demo_people() -> list[m.Person]:
         org = s.execute(select(m.Org).where(m.Org.name == cfg.groundwork_demo_org)).scalar_one_or_none()
         if org is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "demo org not seeded")
-        # Only the principal's own people are users; counterparties' contacts never sign in.
+        return org.id
+
+
+def _principal_people(org_id: uuid.UUID) -> list[m.Person]:
+    """Only the principal's own people are users; counterparties' contacts never sign in."""
+    with owner_session() as s:
         principals = {
-            x for (x,) in s.execute(select(m.Site.principal_party_id).where(m.Site.org_id == org.id))
+            x for (x,) in s.execute(select(m.Site.principal_party_id).where(m.Site.org_id == org_id))
         }
         return list(
             s.execute(
                 select(m.Person)
-                .where(m.Person.org_id == org.id, m.Person.party_id.in_(principals))
+                .where(m.Person.org_id == org_id, m.Person.party_id.in_(principals))
                 .order_by(m.Person.key)
             ).scalars()
         )
+
+
+def _demo_people() -> list[m.Person]:
+    return _principal_people(_demo_org_id())
+
+
+def _bearer(authorization: str | None) -> Identity | None:
+    """The caller's identity if they sent a valid token, else None (never an error)."""
+    if not authorization or not authorization.lower().startswith("bearer "):
+        return None
+    try:
+        return verify(
+            authorization.split(" ", 1)[1].strip(), secret=get_settings().groundwork_dev_hmac_secret
+        )
+    except TokenError:
+        return None
 
 
 @app.get("/auth/personas")
@@ -508,13 +535,29 @@ def personas() -> list[dict[str, Any]]:
 
 
 @app.post("/auth/demo-login")
-def demo_login(body: DemoLogin) -> dict[str, Any]:
+def demo_login(body: DemoLogin, authorization: str | None = Header(default=None)) -> dict[str, Any]:
+    """Log in as a demo persona. With sandboxes on, a visitor without a live sandbox gets a new one;
+    a visitor who has one (their current token) stays in it when switching persona; `fresh` starts
+    over in a new sandbox and deletes the old one."""
     from groundwork.api.auth import mint
 
-    person = next((p for p in _demo_people() if p.key == body.person), None)
-    if person is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "no such persona")
     cfg = get_settings()
+    if body.person not in {p.key for p in _demo_people()}:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "no such persona")
+    org_id = _demo_org_id()
+    if cfg.groundwork_sandboxes:
+        who = _bearer(authorization)
+        current = who.org_id if who and sandboxes.live(who.org_id) else None
+        if current is None or body.fresh:
+            try:
+                org_id = sandboxes.create()
+            except sandboxes.SandboxLimit as exc:
+                raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, str(exc)) from exc
+            if current is not None:
+                sandboxes.discard(current)
+        else:
+            org_id = current
+    person = next(p for p in _principal_people(org_id) if p.key == body.person)
     return {
         "token": mint(
             person.id, person.org_id, secret=cfg.groundwork_dev_hmac_secret, ttl_hours=cfg.token_ttl_hours
@@ -522,6 +565,7 @@ def demo_login(body: DemoLogin) -> dict[str, Any]:
         "person": person.key,
         "name": person.name,
         "ttl_hours": cfg.token_ttl_hours,
+        "sandbox": cfg.groundwork_sandboxes,
     }
 
 
@@ -543,17 +587,24 @@ def get_evidence(site: str, key: str, s: Session = Depends(db)) -> dict[str, Any
 
 
 @app.post("/admin/tamper")
-def admin_tamper(x_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
-    """Local demo only: edit one decision in the demo org's ledger the way someone holding owner
-    credentials could (trigger disabled, row edited, trigger re-enabled). Verification then fails.
-    Refused in the hosted profile. `POST /admin/reset` restores a clean chain."""
+def admin_tamper(
+    x_admin_token: str | None = Header(default=None), authorization: str | None = Header(default=None)
+) -> dict[str, Any]:
+    """Local demo only: edit one decision in a ledger the way someone holding owner credentials
+    could (trigger disabled, row edited, trigger re-enabled). Verification then fails. It edits the
+    caller's org when a valid token comes with the admin token, else the demo org. Refused in the
+    hosted profile. `POST /admin/reset` restores a clean chain."""
     cfg = get_settings()
     if cfg.groundwork_hosted or not cfg.groundwork_admin_token or x_admin_token != cfg.groundwork_admin_token:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "admin token required; never available when hosted")
     from sqlalchemy import text
 
+    who = _bearer(authorization)
     with owner_session() as s:
-        org = s.execute(select(m.Org).where(m.Org.name == cfg.groundwork_demo_org)).scalar_one_or_none()
+        if who is not None:
+            org = s.get(m.Org, who.org_id)
+        else:
+            org = s.execute(select(m.Org).where(m.Org.name == cfg.groundwork_demo_org)).scalar_one_or_none()
         if org is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "demo org not seeded")
         seq = s.execute(

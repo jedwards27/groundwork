@@ -24,6 +24,9 @@ primary_region = "iad"  # Ashburn, next to Neon's aws-us-east-1
   GROUNDWORK_DAILY_RUN_CAP = "300"      # every run, per day
   GROUNDWORK_DAILY_LIVE_RUN_CAP = "30"  # runs that call Claude, per day; then the simulated planner
   GROUNDWORK_NIGHTLY_RESET_UTC_HOUR = "8"  # 3 or 4 a.m. Eastern
+  GROUNDWORK_SANDBOXES = "true"         # every visitor gets a private copy of the demo
+  GROUNDWORK_SANDBOX_TTL_HOURS = "12"   # then it is deleted, ledger and all
+  GROUNDWORK_SANDBOX_DAILY_CAP = "200"  # new sandboxes per day, across all visitors
 
 [processes]
   app = "groundwork serve --host :: --port 8000"

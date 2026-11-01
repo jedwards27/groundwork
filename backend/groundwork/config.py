@@ -41,6 +41,11 @@ class Settings(BaseSettings):
     groundwork_db_nullpool: bool = False
     # Reload every fixture site at this UTC hour each day (0-23); -1 turns it off. Hosted only.
     groundwork_nightly_reset_utc_hour: int = -1
+    # Hosted demo: each visitor's demo login gets a private copy of the demo org (a sandbox org),
+    # kept apart from every other visitor by row-level security and deleted after the TTL.
+    groundwork_sandboxes: bool = False
+    groundwork_sandbox_ttl_hours: int = 12
+    groundwork_sandbox_daily_cap: int = 200
     groundwork_admin_token: str = ""
     # Demo personas: lets the web app's server log in as a seeded person without a password.
     # On by default for local use and the hosted demo; off for any real deployment.
@@ -88,4 +93,8 @@ def hosted_problems(cfg: Settings) -> list[str]:
         problems.append("GROUNDWORK_DAILY_RUN_CAP must be a positive number on a public demo")
     if not 0 <= cfg.groundwork_daily_live_run_cap <= 200:
         problems.append("GROUNDWORK_DAILY_LIVE_RUN_CAP must be between 0 and 200")
+    if cfg.groundwork_sandboxes and not 0 < cfg.groundwork_sandbox_daily_cap <= 2000:
+        problems.append("GROUNDWORK_SANDBOX_DAILY_CAP must be between 1 and 2000")
+    if cfg.groundwork_sandboxes and not 1 <= cfg.groundwork_sandbox_ttl_hours <= 72:
+        problems.append("GROUNDWORK_SANDBOX_TTL_HOURS must be between 1 and 72")
     return problems

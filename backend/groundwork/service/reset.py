@@ -16,21 +16,24 @@ from groundwork.db import models as m
 from groundwork.db import repo
 from groundwork.db.session import owner_session
 from groundwork.ingest import load_site
+from groundwork.service import sandboxes
 
 log = structlog.get_logger()
 
 
 def reset_fixtures() -> dict[str, Any]:
-    """Reseed every site folder under the fixtures directory (owner role). Each person gets a new
-    id, so every token issued before the reset stops working."""
+    """Reseed every site folder under the fixtures directory (owner role) and delete expired
+    sandboxes. Each person gets a new id, so every token issued before the reset stops working."""
     cfg = get_settings()
     loaded: list[str] = []
     with owner_session() as s:
         for folder in sorted(p for p in cfg.groundwork_fixtures_dir.iterdir() if (p / "site.yaml").exists()):
             repo.seed_bundle(s, load_site(folder))
             loaded.append(folder.name)
-        orgs = [o.name for o in s.execute(select(m.Org)).scalars()]
-    return {"reloaded": loaded, "orgs": orgs}
+    removed = sandboxes.sweep()
+    with owner_session() as s:
+        orgs = [o.name for o in s.execute(select(m.Org).where(m.Org.expires_at.is_(None))).scalars()]
+    return {"reloaded": loaded, "orgs": orgs, "sandboxes_removed": removed}
 
 
 def seconds_until(hour_utc: int, now: datetime) -> float:

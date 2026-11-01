@@ -40,7 +40,7 @@ docker compose --profile full up --build
 
 Every port binds to 127.0.0.1, so nothing is reachable from your network.
 
-**Hosted demo.** Two Fly.io machines and a free Neon Postgres, for about $7 a month; `docs/HOSTING.md` has every step. `make rehearse-hosted` runs the hosted profile on your machine first, against a throwaway Postgres set up the way Neon's is. Not yet deployed: it needs your Fly and Neon accounts.
+**Hosted demo.** Two Fly.io machines and a free Neon Postgres, for about $7 a month. Every visitor gets a private sandbox copy of the demo, kept apart by the same org isolation that separates customers. `docs/HOSTING.md` has every step. `make rehearse-hosted` runs the hosted profile on your machine first, against a throwaway Postgres set up the way Neon's is. Not yet deployed: it needs your Fly and Neon accounts.
 
 ```bash
 make hosted-bootstrap
@@ -162,9 +162,14 @@ Lint (ruff), types (pyright), six import boundaries (import-linter: the planner 
 - the Claude planner, classifier and reporter against a fake client;
 - the eval harness, row-level security, and a check that the generic engine contains no data-center vocabulary;
 - that `web/openapi.json` matches the API, so the web app's generated types cannot drift;
-- the hosted profile: the startup preflight that refuses development secrets, the daily run cap, connection-per-request mode and the nightly reset schedule, and that no database role needs BYPASSRLS.
+- the hosted profile:
+  - the startup preflight that refuses development secrets;
+  - daily caps that count across orgs;
+  - connection-per-request mode and the nightly reset schedule;
+  - that no database role needs BYPASSRLS;
+- sandboxes: two visitors cannot see each other's work, switching persona keeps a sandbox, "Start over" replaces it, and expired sandboxes are deleted with their ledgers.
 
-`make e2e` is the browser walkthrough (Playwright, `web/e2e/`): sign in as a persona, play event A, check that the countdown and the did/asked/refused counts on the page equal what the API returns, play the auto-reply and see nothing change, approve the held action as Dana, check that a viewer cannot approve (in the page and at the API), then tamper, watch verification fail, and reset. It uses your installed Google Chrome and starts the API and web app if they are not running. `make web-build` type-checks and builds the production web app.
+`make e2e` is the browser walkthrough (Playwright, `web/e2e/`): sign in as a persona, play event A, check that the countdown and the did/asked/refused counts on the page equal what the API returns, play the auto-reply and see nothing change, approve the held action as Dana, check that a viewer cannot approve (in the page and at the API), then tamper, watch verification fail, and reset. With sandboxes on, as in the hosted profile, a second browser checks that two visitors cannot see each other's work. It uses your installed Google Chrome and starts the API and web app if they are not running. `make web-build` type-checks and builds the production web app.
 
 ## Docs
 

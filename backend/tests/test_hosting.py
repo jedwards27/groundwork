@@ -7,7 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.pool import NullPool
 
-from groundwork.config import Settings, get_settings, hosted_problems
+from groundwork.config import Settings, hosted_problems
 from groundwork.db.session import engine_for
 from groundwork.service.reset import seconds_until
 
@@ -23,21 +23,6 @@ STRONG = {
 
 def _settings(**over) -> Settings:
     return Settings(_env_file=None, **{**STRONG, **over})  # type: ignore[call-arg]
-
-
-@pytest.fixture()
-def env(monkeypatch):
-    """Set environment variables for one test, with settings and engines rebuilt around it."""
-
-    def set_(**values: str) -> None:
-        for k, v in values.items():
-            monkeypatch.setenv(k, v)
-        get_settings.cache_clear()
-        engine_for.cache_clear()
-
-    yield set_
-    get_settings.cache_clear()
-    engine_for.cache_clear()
 
 
 def test_a_strong_configuration_passes():
@@ -102,13 +87,23 @@ def test_the_nightly_reset_waits_for_the_next_hour(now, hour, seconds):
 
 
 @pytest.mark.db
-def test_the_daily_run_cap_returns_429(seeded, env):
+def test_the_daily_run_cap_counts_across_orgs(seeded, env):
+    """Each hosted visitor has their own org, so a per-org cap would bound nothing."""
     env(GROUNDWORK_DAILY_RUN_CAP="1")
     from groundwork.api.app import app
     from tests.test_api import _token
 
     with TestClient(app) as c:
-        c.headers["Authorization"] = f"Bearer {_token(seeded['org_a'])}"
-        assert c.post("/sites/lake-mariner/events", json={"event": "event-a"}).status_code == 202
-        r = c.post("/sites/lake-mariner/events", json={"event": "event-b"})
+        a = {"Authorization": f"Bearer {_token(seeded['org_a'])}"}
+        b = {"Authorization": f"Bearer {_token(seeded['org_b'])}"}
+        assert c.post("/sites/lake-mariner/events", json={"event": "event-a"}, headers=a).status_code == 202
+        r = c.post("/sites/lake-mariner/events", json={"event": "event-a"}, headers=b)
         assert r.status_code == 429 and "runs a day" in r.json()["detail"]
+
+
+@pytest.mark.db
+def test_claims_count_up_to_the_cap(seeded):
+    from groundwork.db.repo import claim_daily
+
+    assert [claim_daily("probe", 2) for _ in range(3)] == [True, True, False]
+    assert claim_daily("other", 1) is True

@@ -11,7 +11,7 @@ from sqlalchemy import delete, select, text, update
 from sqlalchemy.orm import Session
 
 from groundwork.db import models as m
-from groundwork.db.session import require_org
+from groundwork.db.session import app_engine, require_org
 from groundwork.ingest.site_loader import (
     EventRow,
     FactRow,
@@ -44,6 +44,20 @@ _ORG_DELETE_ORDER = (
     m.SiteParty,
     m.Person,
 )
+
+
+def claim_daily(metric: str, cap: int) -> bool:
+    """Count one use of `metric` today (UTC) across every org, and say whether the count is still
+    within `cap`. Runs in its own short transaction, so concurrent runs never wait on each other."""
+    with Session(app_engine()) as s, s.begin():
+        n = s.execute(
+            text(
+                "INSERT INTO daily_usage (day, metric, n) VALUES (:d, :m, 1) "
+                "ON CONFLICT (day, metric) DO UPDATE SET n = daily_usage.n + 1 RETURNING n"
+            ),
+            {"d": datetime.now(UTC).date(), "m": metric},
+        ).scalar_one()
+    return n <= cap
 
 
 def delete_org_data(s: Session, org_id: uuid.UUID) -> None:

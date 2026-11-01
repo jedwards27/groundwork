@@ -1,7 +1,7 @@
-// Demo personas. GET: who am I (or 401). POST {person}: log in as a seeded persona. The API only
-// allows this when GROUNDWORK_DEMO_LOGIN is on; the token is kept in an httpOnly cookie.
-import { cookies } from "next/headers";
-import { API, TOKEN_COOKIE, apiFetch } from "@/lib/server";
+// Demo personas. GET: who am I (or 401). POST {person, fresh?}: log in as a seeded persona. The API
+// only allows this when GROUNDWORK_DEMO_LOGIN is on. The current token goes along, so with sandboxes
+// on a visitor switching persona stays in their own sandbox; `fresh` starts over in a new one.
+import { API, apiFetch, setToken } from "@/lib/server";
 
 export const dynamic = "force-dynamic";
 
@@ -23,23 +23,10 @@ export async function GET(): Promise<Response> {
 }
 
 export async function POST(req: Request): Promise<Response> {
-  const { person } = (await req.json()) as { person: string };
-  const res = await fetch(`${API}/auth/demo-login`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ person }),
-    cache: "no-store",
-  });
+  const { person, fresh } = (await req.json()) as { person: string; fresh?: boolean };
+  const res = await apiFetch("auth/demo-login", { method: "POST", body: JSON.stringify({ person, fresh: !!fresh }) });
   if (!res.ok) return Response.json(await res.json().catch(() => ({})), { status: res.status });
   const data = (await res.json()) as { token: string; ttl_hours: number; name: string; person: string };
-  (await cookies()).set(TOKEN_COOKIE, data.token, {
-    httpOnly: true,
-    sameSite: "lax",
-    // Secure whenever the browser reached us over HTTPS (directly or through a proxy); plain HTTP
-    // on localhost would otherwise drop the cookie in some browsers.
-    secure: new URL(req.url).protocol === "https:" || req.headers.get("x-forwarded-proto") === "https",
-    path: "/",
-    maxAge: data.ttl_hours * 3600,
-  });
+  await setToken(req, data.token, data.ttl_hours);
   return Response.json({ person: data.person, name: data.name });
 }

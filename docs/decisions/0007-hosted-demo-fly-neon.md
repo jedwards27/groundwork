@@ -20,8 +20,9 @@
 - **Hosted mode.**
   - The API opens a connection per request (`GROUNDWORK_DB_NULLPOOL`), so Neon can scale to zero.
   - The API refuses to start if a secret is weak, missing or a dev default.
-  - It caps all runs per day as well as live planning.
-  - It reseeds the fixture nightly from inside the API process.
+  - Every visitor's demo login gets a **sandbox**: a private copy of the demo org, stored as an org of its own (migration 0004 adds `org.expires_at`). Row-level security keeps visitors apart exactly as it keeps customers apart. Switching persona keeps the visitor's sandbox, "Start over" replaces it, and it is deleted, ledger and all, after 12 hours.
+  - It caps runs, live planner calls and new sandboxes per day across all visitors. The counts live in `daily_usage`, a counters-only table, so deleting a sandbox never resets a cap.
+  - It sweeps expired sandboxes and reseeds the shared fixture nightly from inside the API process.
   - Dry run is forced on, tokens live one hour, and the tamper endpoint is refused.
 
 **Consequences.**
@@ -29,5 +30,6 @@
 - **Owner role semantics.** Dropping BYPASSRLS changes nothing in practice. The owner always bypassed row-level security, and FORCE only binds an owner that lacks BYPASSRLS. The app role's isolation is untouched, and `tests/test_db_rls.py` asserts both roles' attributes.
 - **Credentials in the API.** The API process holds the owner credentials, which the nightly reset and the admin reset need. A production deployment would keep them in a release or cron process only.
 - **No high availability.** One API machine, on purpose. Runs are in-process background tasks, and a second machine's startup sweep could mark the first machine's runs as interrupted.
-- **Shared personas.** Visitors share the demo personas and one org, so two people clicking at once see each other's runs. The nightly reseed bounds the mess. A sandbox org per visitor is the real fix and the next step if the link is shared widely.
-- **Verification.** The hosted profile was exercised locally against a throwaway Postgres cluster. Its admin role had only CREATEROLE and CREATEDB, no superuser and no BYPASSRLS, to stand in for Neon's admin. Bootstrap, migrations, seeding, the hosted API and the browser walkthrough all ran against it. Fly and Neon themselves are untested until the first real deploy (`docs/HOSTING.md`).
+- **Sandboxes.** Two people clicking at once never see each other's runs, approvals or ledger, and the demo shows the product's org isolation working on itself. A sandbox costs one fixture load, a few hundred rows, when a visitor first signs in. At most 200 are created a day, and the nightly sweep bounds the database. Deleting a sandbox disables the ledger's append-only trigger for that org's rows, the same owner-only move a reset makes. A token is the only link to a sandbox, so a visitor who returns after the one-hour token expires starts a fresh one.
+- **Caps span orgs.** Before sandboxes, the live-planner cap counted only the caller's org, which with one org per visitor would have bounded nothing. Both caps now count across orgs.
+- **Verification.** The hosted profile was exercised locally against a throwaway Postgres cluster. Its admin role had only CREATEROLE and CREATEDB, no superuser and no BYPASSRLS, to stand in for Neon's admin. Bootstrap, migrations, seeding, the hosted API and the browser walkthrough all ran against it, including two simultaneous visitors in separate sandboxes. Fly and Neon themselves are untested until the first real deploy (`docs/HOSTING.md`).

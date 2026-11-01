@@ -40,4 +40,4 @@ The hosted demo holds only the synthetic and public Lake Mariner fixture. Where 
 - **Secrets:** stored as Fly secrets. The API machine holds the database URLs, the signing secret, the admin token and, if set, the Anthropic API key. The web machine holds only the admin token. They are generated into a gitignored `.env.hosted` and never printed.
 - **Anthropic's API:** receives what is listed above, only when a key is set, and capped per day. After the cap the simulated planner runs with its banner.
 
-Dry run is forced on regardless of configuration. The API refuses to start on development secrets or passwords. The fixture is reloaded every night at 08:00 UTC, which also ends every session.
+Dry run is forced on regardless of configuration. The API refuses to start on development secrets or passwords. Each visitor works in a private sandbox copy of the fixture, deleted with its ledger 12 hours after it was created. Expired sandboxes are swept and the shared fixture is reloaded every night at 08:00 UTC.

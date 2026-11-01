@@ -16,6 +16,11 @@ import { PlanPanel } from "./PlanPanel";
 import { Roadmap } from "./Roadmap";
 import { AttestationPanel, LedgerPanel, Scorecard } from "./Trust";
 
+function expiry(iso: string): string {
+  const d = new Date(iso);
+  return `${d.toLocaleDateString("en-US", { weekday: "long" })} at ${d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`;
+}
+
 export function MissionControl({ site }: { site: string }) {
   const qc = useQueryClient();
   const session = useQuery({ queryKey: ["session"], queryFn: () => local<Session>("/api/session") });
@@ -124,7 +129,11 @@ export function MissionControl({ site }: { site: string }) {
     <>
       <Header site={siteQ.data} me={me} health={health} plan={p} onPersona={() => setPersonaOpen(true)} onReset={reset} resetting={resetting} />
       {health?.hosted && (
-        <p className="banner info">Hosted demo: synthetic and public Lake Mariner fixtures only. Personas are shared; anyone with the link can act as them.</p>
+        <p className="banner info" data-testid="hosted-banner">
+          {me.sandbox_expires_at
+            ? `Hosted demo: this is your own copy of the synthetic and public Lake Mariner fixture. Nobody else sees what you do here, and it will be deleted on ${expiry(me.sandbox_expires_at)}.`
+            : "Hosted demo: synthetic and public Lake Mariner fixtures only. Personas are shared; anyone with the link can act as them."}
+        </p>
       )}
       {health?.live_planner && (
         <p className="banner info small">

@@ -43,13 +43,16 @@ cd "$ROOT/backend"
 GROUNDWORK_DB_ADMIN_URL="postgresql://rehearsal_admin:$ADMIN_PW@localhost:$PGPORT/postgres" \
   uv run groundwork hosted-bootstrap --out "$WORK/env.hosted" --sslmode disable
 
-# The hosted environment: the secrets file plus fly.toml's [env]. Read line by line, never sourced.
-while IFS= read -r line; do
-  case "$line" in [A-Z]*=*) export "$line" ;; esac
-done < "$WORK/env.hosted"
-export GROUNDWORK_HOSTED=true EXECUTORS_DRY_RUN=true GROUNDWORK_DEMO_LOGIN=true GROUNDWORK_DB_NULLPOOL=true \
-  GROUNDWORK_DAILY_RUN_CAP=300 GROUNDWORK_DAILY_LIVE_RUN_CAP=30 GROUNDWORK_NIGHTLY_RESET_UTC_HOUR=8 \
-  ANTHROPIC_API_KEY=""
+# The hosted environment: fly.toml's [env] (read from the file, so the rehearsal cannot drift from
+# what Fly runs) plus the secrets file. Read line by line, never sourced.
+uv run python -c 'import sys, tomllib; [print(f"{k}={v}") for k, v in tomllib.load(open(sys.argv[1], "rb"))["env"].items()]' \
+  "$ROOT/fly.toml" > "$WORK/fly.env"
+for f in "$WORK/fly.env" "$WORK/env.hosted"; do
+  while IFS= read -r line; do
+    case "$line" in [A-Z]*=*) export "$line" ;; esac
+  done < "$f"
+done
+export ANTHROPIC_API_KEY=""
 
 echo "3/5 preflight"
 uv run groundwork preflight

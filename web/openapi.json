@@ -1468,16 +1468,35 @@
   "/auth/demo-login": {
    "post": {
     "summary": "Demo Login",
+    "description": "Log in as a demo persona. With sandboxes on, a visitor without a live sandbox gets a new one;\na visitor who has one (their current token) stays in it when switching persona; `fresh` starts\nover in a new sandbox and deletes the old one.",
     "operationId": "demo_login_auth_demo_login_post",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
     "requestBody": {
+     "required": true,
      "content": {
       "application/json": {
        "schema": {
         "$ref": "#/components/schemas/DemoLogin"
        }
       }
-     },
-     "required": true
+     }
     },
     "responses": {
      "200": {
@@ -1485,8 +1504,8 @@
       "content": {
        "application/json": {
         "schema": {
-         "additionalProperties": true,
          "type": "object",
+         "additionalProperties": true,
          "title": "Response Demo Login Auth Demo Login Post"
         }
        }
@@ -1574,7 +1593,7 @@
   "/admin/tamper": {
    "post": {
     "summary": "Admin Tamper",
-    "description": "Local demo only: edit one decision in the demo org's ledger the way someone holding owner\ncredentials could (trigger disabled, row edited, trigger re-enabled). Verification then fails.\nRefused in the hosted profile. `POST /admin/reset` restores a clean chain.",
+    "description": "Local demo only: edit one decision in a ledger the way someone holding owner credentials\ncould (trigger disabled, row edited, trigger re-enabled). Verification then fails. It edits the\ncaller's org when a valid token comes with the admin token, else the demo org. Refused in the\nhosted profile. `POST /admin/reset` restores a clean chain.",
     "operationId": "admin_tamper_admin_tamper_post",
     "parameters": [
      {
@@ -1591,6 +1610,22 @@
         }
        ],
        "title": "X-Admin-Token"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
       }
      }
     ],
@@ -1850,6 +1885,11 @@
      "person": {
       "type": "string",
       "title": "Person"
+     },
+     "fresh": {
+      "type": "boolean",
+      "title": "Fresh",
+      "default": false
      }
     },
     "type": "object",
@@ -2388,6 +2428,17 @@
      "hosted": {
       "type": "boolean",
       "title": "Hosted"
+     },
+     "sandbox_expires_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Sandbox Expires At"
      }
     },
     "type": "object",

@@ -61,6 +61,8 @@ def seeded(migrated_db):
     """A freshly seeded org for the Lake Mariner fixture, plus a second org with a copy of it."""
     import dataclasses
 
+    from sqlalchemy import text
+
     from groundwork.db import repo
     from groundwork.db.session import owner_session
     from groundwork.ingest import load_site
@@ -70,4 +72,22 @@ def seeded(migrated_db):
     with owner_session() as s:
         org_a = repo.seed_bundle(s, bundle)
         org_b = repo.seed_bundle(s, other)
+        s.execute(text("DELETE FROM daily_usage"))  # caps start from zero in every test
     return {"org_a": org_a, "org_b": org_b, "bundle": bundle}
+
+
+@pytest.fixture()
+def env(monkeypatch):
+    """Set environment variables for one test, with settings and engines rebuilt around it."""
+    from groundwork.db.session import engine_for
+
+    def set_(**values: str) -> None:
+        for k, v in values.items():
+            monkeypatch.setenv(k, v)
+        get_settings.cache_clear()
+        engine_for.cache_clear()
+
+    yield set_
+    monkeypatch.undo()
+    get_settings.cache_clear()
+    engine_for.cache_clear()

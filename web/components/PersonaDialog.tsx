@@ -29,6 +29,8 @@ export function PersonaDialog({ session, open, onOpenChange }: { session: Sessio
             These are fictional people seeded with the Lake Mariner fixture. Anyone with access to this app can act as
             any of them; approvals are recorded under the persona&apos;s name. A real deployment uses the
             organization&apos;s sign-in instead.
+            {session.health?.sandboxes &&
+              " Here you get your own copy of the demo: nobody else sees what you do, and switching persona keeps your copy."}
           </p>
           {disabled ? (
             <p className="banner crit">Demo login is off. Set GROUNDWORK_DEMO_LOGIN=true in .env and restart the API.</p>

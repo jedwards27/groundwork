@@ -1,6 +1,6 @@
 # Hosting the demo
 
-The hosted demo is Mission Control on a public HTTPS link, running the Lake Mariner fixture: synthetic and public data only, dry run forced on, live planning capped per day, and a fresh copy of the fixture every night. ADR 0007 explains the choices.
+The hosted demo is Mission Control on a public HTTPS link, running the Lake Mariner fixture: synthetic and public data only, dry run forced on, and live planning capped per day. Every visitor gets a private sandbox, their own copy of the demo that nobody else sees, deleted after 12 hours. ADR 0007 explains the choices.
 
 ```
 browser ──HTTPS──▶ Mission Control (Fly machine, public)
@@ -39,7 +39,8 @@ browser ──HTTPS──▶ Mission Control (Fly machine, public)
 
 ## Check it
 
-- **The page.** Open the link and choose Dana Ortiz. A blue banner says this is the hosted demo, and there is no "Tamper with one entry" button. The ledger says "Chain verified".
+- **The page.** Open the link and choose Dana Ortiz. A blue banner says this is your own copy of the demo and when it will be deleted. There is no "Tamper with one entry" button, and the ledger says "Chain verified".
+- **Sandboxes.** Open the link in a private window too and play event A in one window. The other window's countdown does not move.
 - **The API is private.** Expect no addresses to be listed:
 
   ```bash
@@ -60,8 +61,9 @@ browser ──HTTPS──▶ Mission Control (Fly machine, public)
 
 ## Run it
 
-- **Nightly reset.** At 08:00 UTC (3 or 4 a.m. Eastern) the API reloads the fixture. Every person gets a new id, so every session ends. A deploy also reloads it. To reset at once, choose an approver persona and press "Reset site".
-- **Caps.** Up to 300 runs a day and 30 that call Claude; after that the simulated planner takes over, with its banner. They are set in `fly.toml`; redeploy after changing them.
+- **Sandboxes.** A visitor's first demo login creates their sandbox. Switching persona keeps it, and "Start over" replaces it with a fresh copy. It is deleted 12 hours after it was created; a visitor who returns after their one-hour session gets a new one.
+- **Nightly sweep.** At 08:00 UTC (3 or 4 a.m. Eastern) the API deletes expired sandboxes and reloads the shared fixture that sandboxes are copied from. A deploy also reloads it.
+- **Caps, across all visitors.** Up to 200 new sandboxes, 300 runs and 30 runs that call Claude a day. After the Claude cap, the simulated planner takes over with its banner. They are set in `fly.toml`; redeploy after changing them.
 - **Rotate every secret.** This rotates both database passwords, the signing secret (every token stops working) and the admin token.
 
   ```bash
@@ -94,12 +96,16 @@ E2E_BASE_URL=http://localhost:3200 make e2e
 
 ## Safety rails, and what they do not cover
 
-- **Preflight.** The API will not start in the hosted profile while the signing secret or admin token is missing or short, either database URL uses a development password, both URLs use the same role, or there is no daily run cap (`groundwork preflight --hosted` shows the same list).
+- **Preflight.** The API will not start in the hosted profile while any of these holds (`groundwork preflight --hosted` shows the same list):
+  - the signing secret or admin token is missing or short;
+  - either database URL uses a development password;
+  - both URLs use the same role;
+  - the daily caps are missing or out of range.
 - **Hosted profile.** Dry run is forced on whatever the configuration says, tokens last one hour, and the API refuses the tamper endpoint.
-- **Who holds what.** The web machine holds only the admin token. Reset requires a signed-in approver persona.
+- **Isolation.** Each visitor's sandbox is a separate org, so row-level security keeps visitors apart, as it does customers.
+- **Who holds what.** The web machine holds only the admin token.
 - **Not covered:**
-  - Personas and the demo org are shared, so visitors see each other's runs until the nightly reset. A sandbox org per visitor is the fix if the link is shared widely.
-  - There is no rate limit per visitor beyond the daily caps.
+  - There is no rate limit per visitor beyond the daily caps, so one visitor could use up the day's sandboxes.
   - The API holds the owner credentials, because the nightly reset needs them.
   - One API machine means a deploy interrupts a running event; the run is marked interrupted.
 

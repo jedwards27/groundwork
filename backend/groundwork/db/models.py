@@ -49,6 +49,19 @@ class Org(Base):
     name: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
     timezone: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = _created()
+    # Set only on a hosted-demo sandbox: the org and everything in it is deleted after this time.
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class DailyUsage(Base):
+    """How many times something happened today, across every org: the hosted demo's caps (runs,
+    live planner calls, new sandboxes). Counters only, no org data, so no row-level security; a
+    sandbox's deletion never resets a cap."""
+
+    __tablename__ = "daily_usage"
+    day: Mapped[date] = mapped_column(Date, primary_key=True)
+    metric: Mapped[str] = mapped_column(Text, primary_key=True)
+    n: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
 
 
 class Party(Base):

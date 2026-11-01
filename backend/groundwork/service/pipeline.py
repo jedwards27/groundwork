@@ -19,7 +19,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from groundwork.agent.base import PlannerError, PlannerResult
@@ -111,18 +111,6 @@ def spent_today(s: Session, tz_name: str) -> int:
     return total
 
 
-def live_runs_today(s: Session) -> int:
-    start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
-    return int(
-        s.execute(
-            select(func.count())
-            .select_from(m.Plan)
-            .where(m.Plan.planner.like("claude%"), m.Plan.created_at >= start)
-        ).scalar()
-        or 0
-    )
-
-
 # --- planner selection -------------------------------------------------------------------------
 class Tools:
     def __init__(self, site_key: str, live: bool, note: str):
@@ -148,7 +136,8 @@ def choose_tools(s: Session, site_key: str, force_simulated: bool = False) -> To
     cfg = get_settings()
     if force_simulated or not cfg.anthropic_api_key:
         return Tools(site_key, False, "No ANTHROPIC_API_KEY: the simulated planner wrote this plan by hand.")
-    if live_runs_today(s) >= cfg.groundwork_daily_live_run_cap:
+    # Counted across every org (each hosted visitor has their own), so the cap bounds total spend.
+    if not repo.claim_daily("live_runs", cfg.groundwork_daily_live_run_cap):
         return Tools(
             site_key,
             False,

@@ -35,19 +35,27 @@ function row(page: Page, ref: string) {
   return page.locator(`.item[data-ref="${ref}"]`);
 }
 
-// Reset is an approver's control, so sign in as Dana to reset, then start each test signed out.
+type Health = { hosted?: boolean; sandboxes?: boolean };
+
+async function health(page: Page): Promise<Health> {
+  const s = (await (await page.request.get("/api/session")).json()) as { health?: Health };
+  return s.health ?? {};
+}
+
+async function hosted(page: Page): Promise<boolean> {
+  return !!(await health(page)).hosted;
+}
+
+// Every test starts signed out on a clean copy of the demo. With sandboxes, signing in already gives
+// a fresh private copy. Without them, reset the shared fixture, which is an approver's control.
 test.beforeEach(async ({ page, context }) => {
   await context.clearCookies();
+  if ((await health(page)).sandboxes) return;
   expect((await page.request.post("/api/session", { data: { person: "dana" } })).ok(), "demo login is on").toBeTruthy();
   const res = await page.request.post("/api/admin/reset");
   expect(res.ok(), "reset needs GROUNDWORK_ADMIN_TOKEN on the web server").toBeTruthy();
   await context.clearCookies();
 });
-
-async function hosted(page: Page): Promise<boolean> {
-  const s = (await (await page.request.get("/api/session")).json()) as { health?: { hosted?: boolean } };
-  return !!s.health?.hosted;
-}
 
 test("event A: the gate moves, the gateway holds one action, an auto-reply changes nothing, a named person approves", async ({ page }) => {
   await signIn(page, "Dana Ortiz");
@@ -132,10 +140,33 @@ test("a viewer can see the queue but cannot approve", async ({ page }) => {
   expect(res.status()).toBeGreaterThanOrEqual(400);
 });
 
-test("a viewer cannot reset the site", async ({ page }) => {
+test("who may reset: a viewer cannot reset the shared site, but anyone may start their own sandbox over", async ({ page }) => {
   await signIn(page, "Sam Okafor");
   const res = await page.request.post("/api/admin/reset");
-  expect(res.status()).toBe(403);
+  expect(res.status()).toBe((await health(page)).sandboxes ? 200 : 403);
+});
+
+test("two visitors at once each get a private sandbox", async ({ page, browser }) => {
+  test.skip(!(await health(page)).sandboxes, "sandboxes are off (they are on in the hosted profile)");
+  const other = await browser.newContext();
+  const bob = await other.newPage();
+  try {
+    await signIn(page, "Dana Ortiz");
+    await signIn(bob, "Dana Ortiz");
+    if (await hosted(page)) await expect(page.getByTestId("hosted-banner")).toContainText("your own copy");
+    const start = await api<Chain>(bob, `sites/${SITE}/chain`);
+
+    await play(page, "event-a");
+    await expect(page.getByTestId("days-remaining")).not.toHaveText(String(start.milestone.days_remaining));
+
+    // Bob's copy has not moved: same countdown, no plan, a one-entry ledger.
+    await bob.reload();
+    await expect(bob.getByTestId("days-remaining")).toHaveText(String(start.milestone.days_remaining));
+    await expect(bob.getByText("No plan yet. Play an event from the inbox.")).toBeVisible();
+    await expect(bob.getByTestId("verify")).toContainText("Chain verified · 1 entries");
+  } finally {
+    await other.close();
+  }
 });
 
 test("tampering with one ledger entry fails verification; reset restores the fixture", async ({ page }) => {
@@ -150,7 +181,7 @@ test("tampering with one ledger entry fails verification; reset restores the fix
   await expect(page.getByTestId("verify")).toContainText("contents do not match its hash");
   await expect(page.getByTestId("attested-chain")).toContainText("FAILED");
 
-  await page.getByRole("button", { name: "Reset site" }).click();
+  await page.getByRole("button", { name: /^(Reset site|Start over)$/ }).click();
   await expect(page.getByTestId("days-remaining")).toHaveText(String(start.milestone.days_remaining));
   await expect(page.getByTestId("verify")).toContainText("Chain verified · 1 entries");
   await expect(page.getByText("No plan yet. Play an event from the inbox.")).toBeVisible();

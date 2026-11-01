@@ -424,7 +424,12 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Demo Login */
+        /**
+         * Demo Login
+         * @description Log in as a demo persona. With sandboxes on, a visitor without a live sandbox gets a new one;
+         *     a visitor who has one (their current token) stays in it when switching persona; `fresh` starts
+         *     over in a new sandbox and deletes the old one.
+         */
         post: operations["demo_login_auth_demo_login_post"];
         delete?: never;
         options?: never;
@@ -460,9 +465,10 @@ export interface paths {
         put?: never;
         /**
          * Admin Tamper
-         * @description Local demo only: edit one decision in the demo org's ledger the way someone holding owner
-         *     credentials could (trigger disabled, row edited, trigger re-enabled). Verification then fails.
-         *     Refused in the hosted profile. `POST /admin/reset` restores a clean chain.
+         * @description Local demo only: edit one decision in a ledger the way someone holding owner credentials
+         *     could (trigger disabled, row edited, trigger re-enabled). Verification then fails. It edits the
+         *     caller's org when a valid token comes with the admin token, else the demo org. Refused in the
+         *     hosted profile. `POST /admin/reset` restores a clean chain.
          */
         post: operations["admin_tamper_admin_tamper_post"];
         delete?: never;
@@ -553,6 +559,11 @@ export interface components {
         DemoLogin: {
             /** Person */
             person: string;
+            /**
+             * Fresh
+             * @default false
+             */
+            fresh: boolean;
         };
         /** EventView */
         EventView: {
@@ -775,6 +786,8 @@ export interface components {
             dry_run: boolean;
             /** Hosted */
             hosted: boolean;
+            /** Sandbox Expires At */
+            sandbox_expires_at?: string | null;
         };
         /** MilestoneView */
         MilestoneView: {
@@ -1878,7 +1891,9 @@ export interface operations {
     demo_login_auth_demo_login_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                authorization?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -1951,6 +1966,7 @@ export interface operations {
             query?: never;
             header?: {
                 "x-admin-token"?: string | null;
+                authorization?: string | null;
             };
             path?: never;
             cookie?: never;

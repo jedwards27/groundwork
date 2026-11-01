@@ -173,16 +173,7 @@ export interface Attestation {
   signature: { alg: string; value: string };
 }
 
-export interface Me {
-  person: string;
-  name: string;
-  party: string;
-  approver: boolean;
-  org: string;
-  kid: string;
-  dry_run: boolean;
-  hosted: boolean;
-}
+export type Me = components["schemas"]["MeView"];
 
 export interface Persona {
   key: string;
@@ -200,6 +191,7 @@ export interface Health {
   live_planner: boolean;
   planner_model: string;
   demo_login: boolean;
+  sandboxes?: boolean;
 }
 
 export interface Session {

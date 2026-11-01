@@ -29,9 +29,9 @@ export function Header({ site, me, health, plan, onPersona, onReset, resetting }
         <button className="badge" onClick={onPersona} data-testid="persona">
           {me.name} · {me.approver ? "approver" : "viewer"} <span className="dim">(demo persona)</span>
         </button>
-        {me.approver && (
+        {(me.approver || health?.sandboxes) && (
           <button className="badge crit" onClick={onReset} disabled={resetting}>
-            {resetting ? "Resetting…" : "Reset site"}
+            {resetting ? "Resetting…" : health?.sandboxes ? "Start over" : "Reset site"}
           </button>
         )}
       </div>
