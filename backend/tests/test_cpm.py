@@ -172,3 +172,25 @@ def test_calendar_loss_on_critical_lag():
     )
     assert s.calendar_losses[0].pred == "a"
     assert s.calendar_losses[0].holidays == (date(2026, 11, 26), date(2026, 11, 27))
+
+
+def test_floor_limits_how_early_a_reduction_can_land():
+    tasks = [Task("x", "in_progress", date(2026, 11, 30), date(2026, 10, 1))]
+    plain = schedule(tasks, [], as_of=AS_OF, calendar=CAL, adjustments=[Adjustment("duration_reduction", "x", 10)])
+    floored = schedule(tasks, [], as_of=AS_OF, calendar=CAL,
+                       adjustments=[Adjustment("duration_reduction", "x", 10, floor=date(2026, 11, 25))])
+    assert plain.tasks["x"].early_finish == date(2026, 11, 16)
+    assert floored.tasks["x"].early_finish == date(2026, 11, 25)
+    late_floor = schedule(tasks, [], as_of=AS_OF, calendar=CAL,
+                          adjustments=[Adjustment("duration_reduction", "x", 10, floor=date(2026, 12, 15))])
+    assert late_floor.tasks["x"].early_finish == date(2026, 11, 30)  # a floor never pushes a date later
+
+
+def test_floor_on_overlap_caps_the_earlier_start():
+    tasks, links = chain()
+    target = Target("c", date(2026, 11, 24))
+    overlap = schedule(tasks, links, as_of=AS_OF, calendar=CAL, target=target, delays=[Delay("a", 14)],
+                       adjustments=[Adjustment("parallelize", "b", 5, pred="a", floor=date(2026, 11, 18))])
+    base = schedule(tasks, links, as_of=AS_OF, calendar=CAL, target=target, delays=[Delay("a", 14)])
+    assert overlap.tasks["b"].work_start == date(2026, 11, 18)
+    assert base.tasks["b"].work_start == date(2026, 11, 23)

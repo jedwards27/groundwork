@@ -197,6 +197,15 @@ class ReferenceRowIn:
     note: str
 
 
+@dataclass(frozen=True)
+class MandateSpec:
+    preset: str = "standard"
+    approvers: tuple[str, ...] = ()
+    legal_approvers: tuple[str, ...] = ()
+    sla_hours: int = 24
+    owner_goals: tuple[str, ...] = ()
+
+
 @dataclass
 class SiteBundle:
     root: Path
@@ -224,6 +233,7 @@ class SiteBundle:
     facts: list[FactRow]
     reference_rows: list[ReferenceRowIn]
     envelopes: list[Envelope] = field(default_factory=list)
+    mandate: MandateSpec = field(default_factory=MandateSpec)
 
     def item(self, key: str) -> ItemRow:
         return next(i for i in self.items if i.key == key)
@@ -560,6 +570,18 @@ def load_site(root: Path | str) -> SiteBundle:
     holidays = tuple(d for d in (_date(h, "calendar", problems) for h in cal.get("holidays", [])) if d)
     as_of = _date(site.get("as_of"), "site.as_of", problems)
 
+    md = site_doc.get("mandate") or {}
+    person_keys = {x.key for x in people}
+    approvers = tuple(md.get("approvers", []))
+    legal = tuple(md.get("legal_approvers", []))
+    for who in approvers + legal:
+        if who not in person_keys:
+            problems.append(f"site.yaml mandate: approver {who!r} is not a person")
+    if md.get("preset", "standard") not in ("supervised", "standard", "autonomous"):
+        problems.append("site.yaml mandate: preset must be supervised, standard or autonomous")
+    mandate = MandateSpec(md.get("preset", "standard"), approvers, legal, int(md.get("sla_hours", 24)),
+                          tuple(md.get("owner_goals", [])))
+
     if problems:
         raise LoadError(problems)
     assert as_of is not None
@@ -589,4 +611,5 @@ def load_site(root: Path | str) -> SiteBundle:
         facts=facts,
         reference_rows=reference_rows,
         envelopes=envelopes,
+        mandate=mandate,
     )

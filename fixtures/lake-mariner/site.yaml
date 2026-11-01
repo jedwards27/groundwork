@@ -163,6 +163,20 @@ parties:
     provenance: assumption_to_verify
     note: Assumes the end user has a direct relationship with the state economic-development agency. Any message is record-bearing.
 
+# The grant of authority. `preset` picks a template from the policy package (supervised | standard |
+# autonomous); approvers are person keys below; owner_goals are what the blind planner arm sees
+# instead of the mandate. Approver routing for legal and notice kinds goes to counsel.
+mandate:
+  preset: standard
+  approvers: [dana, priya]
+  legal_approvers: [priya]
+  sla_hours: 24
+  owner_goals:
+    - Protect the CB-5 delivery date (L4) and the dates downstream of it (fit-out, compute delivery).
+    - Keep the end user's rights under the colocation agreement intact; never waive them by accident.
+    - Work through the lessee; the end user has no direct contract with the landlord or the utility.
+    - Prefer actions that recover days without new commitments; spend only against a written quote.
+
 # Demo personas only. Names are fictional; addresses use the reserved .example domain.
 people:
   - key: dana

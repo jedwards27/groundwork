@@ -6,6 +6,7 @@ from groundwork.schemas.action import (
     EXECUTOR_CHANNEL,
     EXECUTOR_EFFECT_CLASS,
     NEVER_EXECUTORS,
+    OUTBOUND_CLASSIFIED,
     OUTBOUND_EXECUTORS,
     ActionParams,
     Autonomy,

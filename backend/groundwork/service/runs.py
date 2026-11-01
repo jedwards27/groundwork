@@ -61,59 +61,10 @@ def _append(s: Session, run_id: uuid.UUID, kind: str, text: str, **extra: Any) -
 
 
 def execute_run(org_id: uuid.UUID, run_id: uuid.UUID) -> None:
-    """Background entry point. Each phase commits, so a crash leaves a truthful partial record."""
-    try:
-        with org_session(org_id) as s:
-            run = s.get(m.Run, run_id)
-            assert run is not None
-            run.status, run.started_at = "running", datetime.now(UTC)
-            _append(s, run_id, "running", "Recomputing the critical path")
-        with org_session(org_id) as s:
-            run = s.get(m.Run, run_id)
-            assert run is not None
-            event = s.get(m.Event, run.event_id)
-            site = s.get(m.Site, run.site_id)
-            assert event is not None and site is not None
-            before = views.chain_view(repo.load_state(s, site.key))
-            repo.set_event_status(s, site.id, event.key, "applied")
-            after_state = repo.load_state(s, site.key)
-            after = views.chain_view(after_state)
-            fc = views.forecast_view(after_state)
-            ms_b, ms_a = before.milestone, after.milestone
-            _append(
-                s,
-                run_id,
-                "forecast",
-                f"{ms_a.label}: {ms_b.forecast_finish} -> {ms_a.forecast_finish} "
-                f"(range {ms_a.forecast_low} to {ms_a.forecast_high}); gate {after.gate}",
-                before={"finish": str(ms_b.forecast_finish), "delta": ms_b.delta_days, "gate": before.gate},
-                after={
-                    "finish": str(ms_a.forecast_finish),
-                    "low": str(ms_a.forecast_low),
-                    "high": str(ms_a.forecast_high),
-                    "delta": ms_a.delta_days,
-                    "gate": after.gate,
-                    "critical_path": after.critical_path,
-                },
-            )
-            run = s.get(m.Run, run_id)
-            assert run is not None
-            summary = dict(run.summary or {})
-            summary["milestone_before"] = ms_b.model_dump(mode="json")
-            summary["milestone_after"] = fc.milestone.model_dump(mode="json")
-            run.summary = summary
-        with org_session(org_id) as s:
-            run = s.get(m.Run, run_id)
-            assert run is not None
-            run.status, run.finished_at = "done", datetime.now(UTC)
-            _append(s, run_id, "done", "Run complete")
-    except Exception as exc:  # noqa: BLE001 - any failure must land on the run row
-        with org_session(org_id) as s:
-            run = s.get(m.Run, run_id)
-            if run is not None:
-                message = f"{type(exc).__name__}: {exc}"
-                run.status, run.finished_at, run.error = "failed", datetime.now(UTC), message
-                _append(s, run_id, "failed", message, trace=traceback.format_exc()[-2000:])
+    """Background entry point; see groundwork.service.pipeline."""
+    from groundwork.service.pipeline import execute_run as run_pipeline
+
+    run_pipeline(org_id, run_id)
 
 
 def sweep_interrupted(now: datetime | None = None) -> int:

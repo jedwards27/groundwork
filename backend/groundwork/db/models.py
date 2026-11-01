@@ -11,7 +11,7 @@ import uuid
 from datetime import date, datetime
 from typing import Any
 
-from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Integer, Text, UniqueConstraint, func
+from sqlalchemy import BigInteger, Boolean, Date, DateTime, Float, ForeignKey, Integer, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -269,18 +269,110 @@ class ReferenceProject(Base):
     note: Mapped[str] = mapped_column(Text, nullable=False)
 
 
+class MandateVersion(Base):
+    """One row per version of a site's grant of authority. Versions are never edited."""
+
+    __tablename__ = "mandate"
+    __table_args__ = (UniqueConstraint("site_id", "version", name="uq_mandate_site_version"),)
+    id: Mapped[uuid.UUID] = _pk()
+    org_id: Mapped[uuid.UUID] = _org()
+    site_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("site.id"), nullable=False)
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    preset: Mapped[str] = mapped_column(Text, nullable=False)
+    doc: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    created_by_person_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("person.id"))
+    created_at: Mapped[datetime] = _created()
+
+
+class Action(Base):
+    """A proposed action, immutable once written. Its state is derived from decisions, approvals
+    and ledger entries; nothing updates this row."""
+
+    __tablename__ = "action"
+    __table_args__ = (UniqueConstraint("plan_id", "ref", name="uq_action_plan_ref"),)
+    id: Mapped[uuid.UUID] = _pk()
+    org_id: Mapped[uuid.UUID] = _org()
+    run_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("run.id"), nullable=False)
+    plan_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("plan.id"), nullable=False)
+    arm: Mapped[str] = mapped_column(Text, nullable=False)
+    ref: Mapped[str] = mapped_column(Text, nullable=False)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    executor: Mapped[str] = mapped_column(Text, nullable=False)
+    recipient: Mapped[str | None] = mapped_column(Text)
+    asks_party: Mapped[str | None] = mapped_column(Text)
+    params: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    effect: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    proposed_autonomy: Mapped[str] = mapped_column(Text, nullable=False)
+    rationale: Mapped[str] = mapped_column(Text, nullable=False)
+    evidence: Mapped[list[str]] = mapped_column(JSONB, nullable=False)
+    action_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = _created()
+
+
+class Decision(Base):
+    """The gateway's decision on an action under one mandate version. Re-decisions add rows."""
+
+    __tablename__ = "decision"
+    id: Mapped[uuid.UUID] = _pk()
+    org_id: Mapped[uuid.UUID] = _org()
+    action_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("action.id"), nullable=False)
+    mandate_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    decision: Mapped[str] = mapped_column(Text, nullable=False)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    rule: Mapped[str] = mapped_column(Text, nullable=False)
+    delta: Mapped[str] = mapped_column(Text, nullable=False)
+    kind: Mapped[str] = mapped_column(Text, nullable=False)
+    effect_class: Mapped[str] = mapped_column(Text, nullable=False)
+    channel: Mapped[str] = mapped_column(Text, nullable=False)
+    record_bearing: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    content_class: Mapped[str | None] = mapped_column(Text)
+    classifier: Mapped[str] = mapped_column(Text, nullable=False)
+    amount_cents: Mapped[int | None] = mapped_column(BigInteger)
+    context: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    created_at: Mapped[datetime] = _created()
+
+
+class Approval(Base):
+    """A typed approval or decline by a named person, bound to the exact action and mandate version.
+    The only writer is POST /actions/{id}/approvals; no inbound message can create one."""
+
+    __tablename__ = "approval"
+    __table_args__ = (UniqueConstraint("action_id", "person_id", name="uq_approval_action_person"),)
+    id: Mapped[uuid.UUID] = _pk()
+    org_id: Mapped[uuid.UUID] = _org()
+    action_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("action.id"), nullable=False)
+    action_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    mandate_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    person_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("person.id"), nullable=False)
+    kid: Mapped[str] = mapped_column(Text, nullable=False)
+    verdict: Mapped[str] = mapped_column(Text, nullable=False)
+    note: Mapped[str] = mapped_column(Text, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    idempotency_key: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    created_at: Mapped[datetime] = _created()
+
+
+class LedgerEntry(Base):
+    """Append-only, hash-chained per org. ``recorded_at`` is the exact RFC 3339 string that was
+    hashed; ``seq`` is contiguous from 1. A trigger rejects UPDATE, DELETE and TRUNCATE, and the
+    app role has only SELECT and INSERT."""
+
+    __tablename__ = "ledger_entry"
+    __table_args__ = (UniqueConstraint("org_id", "seq", name="uq_ledger_org_seq"),)
+    id: Mapped[uuid.UUID] = _pk()
+    org_id: Mapped[uuid.UUID] = _org()
+    seq: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    prev_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    hash: Mapped[str] = mapped_column(Text, nullable=False)
+    entry_type: Mapped[str] = mapped_column(Text, nullable=False)
+    run_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    action_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    arm: Mapped[str | None] = mapped_column(Text)
+    recorded_at: Mapped[str] = mapped_column(Text, nullable=False)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+
+
 ORG_SCOPED_TABLES: tuple[str, ...] = (
-    "party",
-    "site",
-    "site_party",
-    "person",
-    "asset",
-    "item",
-    "milestone",
-    "dependency",
-    "evidence",
-    "item_evidence",
-    "event",
-    "run",
-    "plan",
+    "party", "site", "site_party", "person", "asset", "item", "milestone", "dependency", "evidence",
+    "item_evidence", "event", "run", "plan", "mandate", "action", "decision", "approval", "ledger_entry",
 )

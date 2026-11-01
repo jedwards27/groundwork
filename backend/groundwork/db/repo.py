@@ -28,22 +28,21 @@ from groundwork.service.state import EvidenceLite, SiteState
 
 # Children first, so deletes respect foreign keys.
 _ORG_DELETE_ORDER = (
-    m.Plan,
-    m.Run,
-    m.Event,
-    m.ItemEvidence,
-    m.Evidence,
-    m.Milestone,
-    m.Dependency,
-    m.Item,
-    m.Asset,
-    m.SiteParty,
-    m.Person,
+    m.Approval, m.Decision, m.Action, m.MandateVersion, m.Plan, m.Run, m.Event, m.ItemEvidence, m.Evidence,
+    m.Milestone, m.Dependency, m.Item, m.Asset, m.SiteParty, m.Person,
 )
 
 
 def delete_org_data(s: Session, org_id: uuid.UUID) -> None:
-    """Owner role only. Deletes everything an org owns (used by reseed and demo reset)."""
+    """Owner role only. Deletes everything an org owns (reseed and demo reset).
+
+    The ledger's append-only trigger is disabled for the length of this transaction and re-enabled
+    before commit. That is exactly the move an operator with owner credentials could make to rewrite
+    history, which is why the attestation exports the head hash: a reset is visible as a new chain.
+    """
+    s.execute(text("ALTER TABLE ledger_entry DISABLE TRIGGER ledger_no_update_delete"))
+    s.execute(delete(m.LedgerEntry).where(m.LedgerEntry.org_id == org_id))
+    s.execute(text("ALTER TABLE ledger_entry ENABLE TRIGGER ledger_no_update_delete"))
     for model in _ORG_DELETE_ORDER:
         s.execute(delete(model).where(model.org_id == org_id))
     s.execute(text("DELETE FROM site WHERE org_id = :o"), {"o": org_id})
@@ -207,6 +206,15 @@ def seed_bundle(s: Session, b: SiteBundle, *, replace: bool = True) -> uuid.UUID
                 status="available",
             )
         )
+    state_mandate = _initial_mandate(b)
+    s.add(m.MandateVersion(org_id=oid, site_id=site.id, version=1, preset=state_mandate.preset,
+                           doc=state_mandate.model_dump(mode="json")))
+    s.flush()
+    from groundwork.ledger import append
+
+    append(s, "mandate_issued", {"site": b.site_key, "version": 1, "preset": state_mandate.preset,
+                                 "issuer": state_mandate.issuer, "approvers": state_mandate.ask.approvers,
+                                 "summary": state_mandate.plain_lines()}, org_id=oid)
     for r in b.reference_rows:
         existing = s.execute(
             select(m.ReferenceProject).where(m.ReferenceProject.key == r.key)
@@ -229,6 +237,15 @@ def seed_bundle(s: Session, b: SiteBundle, *, replace: bool = True) -> uuid.UUID
                 setattr(existing, k, v)
     s.flush()
     return oid
+
+
+def _initial_mandate(b: SiteBundle):  # type: ignore[no-untyped-def]
+    from groundwork.policy import build_preset
+
+    spec = b.mandate
+    return build_preset(spec.preset, issuer=b.principal, approvers=list(spec.approvers),
+                        legal_approvers=list(spec.legal_approvers), sla_hours=spec.sla_hours,
+                        owner_goals=list(spec.owner_goals), valid_from=b.as_of)
 
 
 def _jsonable(v: object) -> object:
@@ -414,3 +431,15 @@ def set_event_status(s: Session, site_id: uuid.UUID, event_key: str, status: str
         .where(m.Event.site_id == site_id, m.Event.key == event_key)
         .values(status=status, applied_at=datetime.now(UTC) if status == "applied" else None)
     )
+
+
+def active_mandate(s: Session, site_id: uuid.UUID):  # type: ignore[no-untyped-def]
+    """The latest mandate version for a site, as a Mandate model."""
+    from groundwork.policy import Mandate
+
+    require_org(s)
+    row = s.execute(select(m.MandateVersion).where(m.MandateVersion.site_id == site_id)
+                    .order_by(m.MandateVersion.version.desc())).scalars().first()
+    if row is None:
+        raise KeyError("no mandate for site")
+    return Mandate.model_validate(row.doc)

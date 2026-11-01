@@ -79,6 +79,9 @@ class Adjustment:
     pred: str | None = None
     on: date | None = None
     label: str = ""
+    # A reduction, lag reduction or overlap with a floor cannot move a date earlier than the floor
+    # (e.g. the day a counterparty can first respond). It never moves a date later.
+    floor: date | None = None
 
 
 @dataclass(frozen=True)
@@ -181,31 +184,46 @@ def schedule(
         if d.key not in task_map:
             raise ValueError(f"delay targets unknown item {d.key!r}")
         (extra_cal if d.calendar == "calendar" else extra_bd)[d.key] += d.days
-    reduction: dict[str, int] = defaultdict(int)
-    lag_delta: dict[tuple[str, str], int] = defaultdict(int)
-    overlap_links: set[tuple[str, str]] = set()
+    reductions: dict[str, list[tuple[int, date | None]]] = defaultdict(list)
+    lag_adj: dict[tuple[str, str], list[tuple[int, date | None, bool]]] = defaultdict(list)
     not_before: dict[str, date] = {}
     for a in adj:
         if a.item not in task_map:
             raise ValueError(f"adjustment targets unknown item {a.item!r}")
         if a.kind == "duration_reduction":
-            reduction[a.item] += a.days
+            reductions[a.item].append((a.days, a.floor))
         elif a.kind in ("lag_reduction", "parallelize"):
             if a.pred is None or not g.has_edge(a.pred, a.item):
                 raise ValueError(f"{a.kind} needs an existing link into {a.item!r}")
-            lag_delta[(a.pred, a.item)] -= a.days
-            if a.kind == "parallelize":
-                overlap_links.add((a.pred, a.item))
+            lag_adj[(a.pred, a.item)].append((-a.days, a.floor, a.kind == "parallelize"))
         elif a.kind == "not_before":
             if a.on is None:
                 raise ValueError("not_before adjustment needs a date")
             not_before[a.item] = max(not_before.get(a.item, a.on), a.on)
 
     def eff_lag(ln: Link) -> int:
-        lag = ln.lag + lag_delta.get((ln.pred, ln.succ), 0)
-        if (ln.pred, ln.succ) not in overlap_links:
-            lag = max(lag, min(ln.lag, 0))  # a plain lag reduction never creates overlap
+        lag = ln.lag
+        for delta, _floor, overlap in lag_adj.get((ln.pred, ln.succ), []):
+            lag = lag + delta if overlap else max(lag + delta, min(ln.lag, 0))
         return lag
+
+    def link_constraint(ln: Link, anchor: date) -> date:
+        """Successor start allowed by one FS/SS link, applying lag adjustments and their floors."""
+
+        def at(lag: int) -> date:
+            if ln.kind == "FS":
+                return calendar.next_start(anchor, lag, ln.lag_calendar)
+            return calendar.offset(anchor, lag, ln.lag_calendar)
+
+        lag = ln.lag
+        c = at(lag)
+        for delta, floor, overlap in lag_adj.get((ln.pred, ln.succ), []):
+            lag = lag + delta if overlap else max(lag + delta, min(ln.lag, 0))
+            c_new = at(lag)
+            if floor is not None:
+                c_new = max(c_new, min(c, floor))
+            c = c_new
+        return c
 
     as_of_w = calendar.roll_forward(as_of)
     es_: dict[str, date] = {}
@@ -239,11 +257,10 @@ def schedule(
             cons.append((t.planned_finish if t.is_point else t.planned_start, "@planned"))  # type: ignore[arg-type]
             cons.append((as_of if t.is_point else as_of_w, "@as_of"))
         for p, ln in preds:
-            lag = eff_lag(ln)
             if ln.kind == "FS":
-                cons.append((calendar.next_start(ef_[p], lag, ln.lag_calendar), p))
+                cons.append((link_constraint(ln, ef_[p]), p))
             elif ln.kind == "SS":
-                cons.append((calendar.offset(ws_[p], lag, ln.lag_calendar), p))
+                cons.append((link_constraint(ln, ws_[p]), p))
         if k in not_before:
             cons.append((not_before[k], "@not_before"))
         ws = max(c[0] for c in cons)
@@ -256,8 +273,11 @@ def schedule(
             ef = calendar.roll_forward(ef + timedelta(days=extra_cal[k]), kind)
         if extra_bd[k]:
             ef = calendar.offset(ef, extra_bd[k], "business")
-        if reduction[k]:
-            ef = max(ws, calendar.offset(ef, -reduction[k], kind))
+        for days, floor in reductions.get(k, []):
+            reduced = max(ws, calendar.offset(ef, -days, kind))
+            if floor is not None:
+                reduced = max(reduced, min(ef, floor))
+            ef = reduced
         ff = [
             (calendar.offset(ef_[p], eff_lag(ln), ln.lag_calendar), p) for p, ln in preds if ln.kind == "FF"
         ]

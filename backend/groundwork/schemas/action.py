@@ -128,8 +128,12 @@ OUTBOUND_EXECUTORS: frozenset[Executor] = frozenset(
     }
 )
 
-# Executors whose text is read by the content classifier.
-CLASSIFIED_EXECUTORS: frozenset[Executor] = frozenset({Executor.send_email, Executor.request_meeting})
+# Executors whose text is read by the content classifier. Outbound text can only lower autonomy;
+# a draft's classification decides whether it is a legal draft (which always asks).
+CLASSIFIED_EXECUTORS: frozenset[Executor] = frozenset(
+    {Executor.send_email, Executor.request_meeting, Executor.draft_document}
+)
+OUTBOUND_CLASSIFIED: frozenset[Executor] = frozenset({Executor.send_email, Executor.request_meeting})
 
 REQUIRED_PARAMS: dict[Executor, tuple[str, ...]] = {
     Executor.send_email: ("subject", "body"),

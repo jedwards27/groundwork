@@ -9,6 +9,7 @@ from typing import Any
 
 from groundwork.ingest.site_loader import (
     EventRow,
+    MandateSpec,
     FactRow,
     ItemRow,
     LinkRow,
@@ -56,6 +57,7 @@ class SiteState:
     facts: list[FactRow]
     reference_rows: list[ReferenceRowIn]
     timezone: str = "UTC"
+    mandate_spec: MandateSpec = field(default_factory=MandateSpec)
     org_id: uuid.UUID | None = None
     site_id: uuid.UUID | None = None
     ids: dict[str, uuid.UUID] = field(default_factory=dict)  # "party:key" / "item:key" / "person:key" -> id
@@ -88,8 +90,17 @@ class SiteState:
             ],
             facts=list(b.facts),
             reference_rows=list(b.reference_rows),
-            timezone=b.timezone,
+            timezone=b.timezone, mandate_spec=b.mandate,
         )
+
+    def initial_mandate(self):  # type: ignore[no-untyped-def]
+        """Version 1 of the mandate, built from the site folder's mandate section."""
+        from groundwork.policy import build_preset
+
+        spec = self.mandate_spec
+        return build_preset(spec.preset, issuer=self.principal, approvers=list(spec.approvers),
+                            legal_approvers=list(spec.legal_approvers), sla_hours=spec.sla_hours,
+                            owner_goals=list(spec.owner_goals), valid_from=self.as_of)
 
     def item(self, key: str) -> ItemRow:
         return next(i for i in self.items if i.key == key)

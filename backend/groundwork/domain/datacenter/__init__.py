@@ -68,7 +68,9 @@ PROFILE = DomainProfile(
         "lender": "counterparty_binding",
         "investor": "counterparty_binding",
         "offtaker": "counterparty_binding",
-        "ie": "counterparty_binding",
+        # The principal's own independent engineer is a contractor it engages directly. A lender's
+        # independent engineer is modeled with role "lender" and is record-bearing.
+        "ie": "counterparty_routine",
         "lessee": "counterparty_routine",
         "developer": "counterparty_routine",
         "vendor": "counterparty_routine",
@@ -102,7 +104,7 @@ PROFILE = DomainProfile(
         "hipot": "High-potential test: a high-voltage insulation test.",
         "LD": "Liquidated damages: a contractually fixed payment for lateness.",
         "TCO": "Temporary certificate of occupancy for a hall.",
-        "IE": "Independent engineer: a technical reviewer who witnesses tests on the owner's behalf.",
+        "IE": "Independent engineer: a technical reviewer who witnesses tests on the owner's behalf. A lender's IE is a different party, modeled with the lender role.",
         "HLF": "NYPA's high-load-factor economic-development power program: an allocation of market power, not grid capacity.",
         "EO 62": "New York Executive Order 62 (July 2026): holds DEC permits for data centers of 50 MW or more in abeyance unless the application was complete before the order.",
     },
