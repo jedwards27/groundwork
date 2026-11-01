@@ -10,9 +10,10 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from groundwork.config import get_settings
 from groundwork.db import models as m
 from groundwork.db import repo
 from groundwork.db.session import owner_session, require_org
@@ -24,6 +25,10 @@ class RunConflict(ValueError):
     pass
 
 
+class RunLimit(RuntimeError):
+    """The org has used today's run allowance (GROUNDWORK_DAILY_RUN_CAP)."""
+
+
 def start_run(s: Session, site_key: str, event_key: str, person_id: uuid.UUID | None) -> uuid.UUID:
     org_id = require_org(s)
     state = repo.load_state(s, site_key)
@@ -31,6 +36,16 @@ def start_run(s: Session, site_key: str, event_key: str, person_id: uuid.UUID | 
         raise KeyError(event_key)
     if state.event_status[event_key] == "applied":
         raise RunConflict(f"event {event_key!r} has already been played; reset the site to play it again")
+    cap = get_settings().groundwork_daily_run_cap
+    if cap > 0:
+        midnight = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+        today = s.execute(
+            select(func.count()).select_from(m.Run).where(m.Run.created_at >= midnight)
+        ).scalar()
+        if (today or 0) >= cap:
+            raise RunLimit(
+                f"this demo allows {cap} runs a day and they are used up; try again after midnight UTC"
+            )
     run = m.Run(
         org_id=org_id,
         site_id=state.site_id,

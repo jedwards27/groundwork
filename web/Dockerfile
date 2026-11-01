@@ -15,10 +15,12 @@ RUN npm run build
 
 FROM node:22-alpine
 WORKDIR /app
-ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0
+ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000
 RUN addgroup -S app && adduser -S app -G app
 COPY --from=build --chown=app:app /app/.next/standalone ./
 COPY --from=build --chown=app:app /app/.next/static ./.next/static
 USER app
 EXPOSE 3000
-CMD ["node", "server.js"]
+# Bind every interface. Set here, not with ENV, because hosts such as Fly overwrite HOSTNAME with the
+# machine's name, and Next's server would then listen on that address only.
+CMD ["sh", "-c", "HOSTNAME=0.0.0.0 exec node server.js"]

@@ -20,6 +20,38 @@ def test_app_role_is_not_the_owner(seeded):
     assert role == "groundwork_app" and bypass is False and owner != role
 
 
+def test_no_role_needs_bypassrls(seeded):
+    """Managed Postgres will not grant BYPASSRLS (ADR 0007). The owner gets past row-level security
+    by owning the tables, so no table may FORCE it, and every org-scoped table must enable it."""
+    with owner_session() as s:
+        assert (
+            s.execute(text("select rolbypassrls from pg_roles where rolname = current_user")).scalar()
+            is False
+        )
+        forced = (
+            s.execute(
+                text(
+                    "select relname from pg_class where relnamespace = 'public'::regnamespace and relforcerowsecurity"
+                )
+            )
+            .scalars()
+            .all()
+        )
+        assert forced == []
+        unprotected = (
+            s.execute(
+                text(
+                    "select c.relname from pg_class c join pg_attribute a on a.attrelid = c.oid "
+                    "where c.relnamespace = 'public'::regnamespace and c.relkind = 'r' "
+                    "and a.attname = 'org_id' and not c.relrowsecurity"
+                )
+            )
+            .scalars()
+            .all()
+        )
+        assert unprotected == []
+
+
 def test_without_org_the_app_role_sees_nothing(seeded):
     with app_engine().connect() as c:
         assert c.execute(text("select count(*) from item")).scalar() == 0

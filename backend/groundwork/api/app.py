@@ -20,7 +20,7 @@ from sse_starlette.sse import EventSourceResponse
 from groundwork import __version__
 from groundwork.api.auth import Identity
 from groundwork.api.deps import db, identity
-from groundwork.config import get_settings
+from groundwork.config import get_settings, hosted_problems
 from groundwork.db import models as m
 from groundwork.db import repo
 from groundwork.db.session import org_session, owner_session
@@ -35,7 +35,7 @@ from groundwork.schemas.views import (
     SiteView,
 )
 from groundwork.service import actions as actions_svc
-from groundwork.service import mandates, runs, views
+from groundwork.service import mandates, reset, runs, views
 from groundwork.service.attestation import attestation
 from groundwork.service.scorecard import scorecard
 
@@ -44,13 +44,21 @@ log = structlog.get_logger()
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    cfg = get_settings()
+    if cfg.groundwork_hosted and (problems := hosted_problems(cfg)):
+        raise RuntimeError("refusing to serve the hosted profile: " + "; ".join(problems))
     try:
         n = await run_in_threadpool(runs.sweep_interrupted)
         if n:
             log.warning("startup_sweep", interrupted_runs=n)
     except Exception as exc:  # noqa: BLE001 - a missing owner role must not stop the API from serving reads
         log.error("startup_sweep_failed", error=str(exc))
+    nightly = None
+    if 0 <= cfg.groundwork_nightly_reset_utc_hour <= 23:
+        nightly = asyncio.create_task(reset.nightly(cfg.groundwork_nightly_reset_utc_hour))
     yield
+    if nightly:
+        nightly.cancel()
 
 
 app = FastAPI(
@@ -190,6 +198,8 @@ def play_event(
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"no event {body.event!r} at {site!r}") from exc
     except runs.RunConflict as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+    except runs.RunLimit as exc:
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, str(exc)) from exc
     background.add_task(runs.execute_run, who.org_id, run_id)
     return RunStarted(run_id=str(run_id), stream=f"/runs/{run_id}/stream")
 
@@ -570,12 +580,4 @@ def admin_reset(x_admin_token: str | None = Header(default=None)) -> dict[str, A
     cfg = get_settings()
     if not cfg.groundwork_admin_token or x_admin_token != cfg.groundwork_admin_token:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "admin token required")
-    from groundwork.ingest import load_site
-
-    loaded = []
-    with owner_session() as s:
-        for folder in sorted(p for p in cfg.groundwork_fixtures_dir.iterdir() if (p / "site.yaml").exists()):
-            repo.seed_bundle(s, load_site(folder))
-            loaded.append(folder.name)
-        orgs = [o.name for o in s.execute(select(m.Org)).scalars()]
-    return {"reloaded": loaded, "orgs": orgs}
+    return reset.reset_fixtures()

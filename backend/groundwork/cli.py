@@ -72,6 +72,156 @@ def seed(
 
 
 @app.command()
+def release() -> None:
+    """Migrate the database to the latest schema, then load the Lake Mariner fixture. Runs once per
+    hosted deploy (Fly's release command) with the owner role."""
+    from alembic import command
+    from alembic.config import Config
+
+    from groundwork.config import REPO_ROOT
+
+    cfg = Config(str(REPO_ROOT / "backend" / "alembic.ini"))
+    command.upgrade(cfg, "head")
+    console.print("[green]Migrated[/] to the latest schema.")
+    seed(DEFAULT_SITE, test=False)
+
+
+@app.command()
+def preflight(
+    hosted: bool = typer.Option(False, help="Check as if GROUNDWORK_HOSTED were true"),
+) -> None:
+    """Say whether this configuration may serve the public hosted demo. The API runs the same check
+    at startup in the hosted profile and refuses to serve if anything is listed."""
+    from groundwork.config import hosted_problems
+
+    cfg = get_settings()
+    if not (hosted or cfg.groundwork_hosted):
+        console.print("Not the hosted profile; nothing to check. Use --hosted to check anyway.")
+        return
+    problems = hosted_problems(cfg)
+    for p in problems:
+        console.print(f"[red]✗[/] {p}")
+    if problems:
+        raise typer.Exit(1)
+    console.print("[green]✓[/] fit to serve the hosted demo")
+
+
+@app.command("hosted-bootstrap")
+def hosted_bootstrap(
+    admin_url: str = typer.Option(
+        ...,
+        envvar="GROUNDWORK_DB_ADMIN_URL",
+        prompt="Database admin connection string (for Neon: the neondb_owner string from the console)",
+        hide_input=True,
+        help="Used once to create the roles and database; never stored.",
+    ),
+    out: Path = typer.Option(
+        None, help="Where to write the hosted secrets (default: .env.hosted at the repo root)"
+    ),
+    database: str = typer.Option("groundwork", help="Database to create for the demo"),
+    sslmode: str = typer.Option(
+        "", help="sslmode for the app's URLs (default: the admin URL's, else require)"
+    ),
+    force: bool = typer.Option(
+        False, help="Overwrite an existing secrets file (rotates both database passwords)"
+    ),
+) -> None:
+    """Prepare a managed Postgres for the hosted demo and write its secrets to a file, never the
+    screen: two roles with random passwords (neither gets BYPASSRLS), a database the owner role owns,
+    a fresh signing secret and admin token. `scripts/deploy-fly.sh` imports the file into Fly."""
+    import os
+    import secrets
+    from datetime import datetime
+
+    import psycopg
+    from psycopg import sql
+    from sqlalchemy.engine import make_url
+
+    from groundwork.config import REPO_ROOT
+
+    target = out or REPO_ROOT / ".env.hosted"
+    if target.exists() and not force:
+        console.print(
+            f"[red]{target} exists.[/] Re-running rotates both database passwords; pass --force to do that."
+        )
+        raise typer.Exit(1)
+    admin = make_url(admin_url).set(drivername="postgresql")
+    mode = sslmode or admin.query.get("sslmode") or "require"
+    mode = mode if isinstance(mode, str) else mode[0]
+    passwords = {"groundwork_owner": secrets.token_urlsafe(32), "groundwork_app": secrets.token_urlsafe(32)}
+
+    def conninfo(url) -> str:  # noqa: ANN001 - sqlalchemy URL
+        return url.render_as_string(hide_password=False)
+
+    with psycopg.connect(conninfo(admin), autocommit=True, connect_timeout=15) as c:
+        for role, password in passwords.items():
+            exists = c.execute("select 1 from pg_roles where rolname = %s", [role]).fetchone()
+            verb = "ALTER" if exists else "CREATE"
+            c.execute(
+                sql.SQL(verb + " ROLE {} WITH LOGIN PASSWORD {}").format(
+                    sql.Identifier(role), sql.Literal(password)
+                )
+            )
+            console.print(f"{'updated' if exists else 'created'} role [bold]{role}[/]")
+        bypass = c.execute("select rolbypassrls from pg_roles where rolname = 'groundwork_app'").fetchone()
+        if bypass and bypass[0]:
+            console.print("[red]groundwork_app has BYPASSRLS[/]; remove it before serving anything.")
+            raise typer.Exit(1)
+        # Creating a database owned by another role needs membership in that role.
+        c.execute(sql.SQL("GRANT {} TO CURRENT_USER").format(sql.Identifier("groundwork_owner")))
+        if not c.execute("select 1 from pg_database where datname = %s", [database]).fetchone():
+            c.execute(
+                sql.SQL("CREATE DATABASE {} OWNER {} ENCODING 'UTF8' TEMPLATE template0").format(
+                    sql.Identifier(database), sql.Identifier("groundwork_owner")
+                )
+            )
+            console.print(f"created database [bold]{database}[/] owned by groundwork_owner")
+        else:
+            c.execute(
+                sql.SQL("ALTER DATABASE {} OWNER TO {}").format(
+                    sql.Identifier(database), sql.Identifier("groundwork_owner")
+                )
+            )
+            console.print(f"database [bold]{database}[/] exists; owner set to groundwork_owner")
+
+    def role_url(role: str):  # noqa: ANN202
+        query = {**dict(admin.query), "sslmode": mode}
+        return admin.set(
+            drivername="postgresql+psycopg",
+            username=role,
+            password=passwords[role],
+            database=database,
+            query=query,
+        )
+
+    for role in passwords:  # prove each new login works before writing anything
+        with psycopg.connect(conninfo(role_url(role).set(drivername="postgresql")), connect_timeout=15) as c:
+            row = c.execute(
+                "select current_user::text, pg_encoding_to_char(encoding) from pg_database "
+                "where datname = current_database()"
+            ).fetchone()
+            if not row or row[0] != role or row[1] != "UTF8":
+                console.print(f"[red]Could not verify the new login for {role}[/] (got {row}).")
+                raise typer.Exit(1)
+    lines = [
+        f"# Hosted secrets for Groundwork, written by `groundwork hosted-bootstrap` on {datetime.now():%Y-%m-%d %H:%M}.",
+        "# Never commit or paste this file. scripts/deploy-fly.sh imports it into Fly: the API gets every",
+        "# line, the web app only GROUNDWORK_ADMIN_TOKEN. Add ANTHROPIC_API_KEY=... here to enable the live planner.",
+        f"DATABASE_URL={conninfo(role_url('groundwork_app'))}",
+        f"DATABASE_OWNER_URL={conninfo(role_url('groundwork_owner'))}",
+        f"GROUNDWORK_DEV_HMAC_SECRET={secrets.token_urlsafe(48)}",
+        f"GROUNDWORK_ADMIN_TOKEN={secrets.token_urlsafe(24)}",
+    ]
+    fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
+        f.write("\n".join(lines) + "\n")
+    console.print(
+        f"[green]Wrote[/] {target} (database URLs for {admin.host}/{database}, signing secret, admin token; "
+        "values not shown). Next: scripts/deploy-fly.sh"
+    )
+
+
+@app.command()
 def token(
     person: str = typer.Argument(..., help="Person key, e.g. dana"),
     hours: int = typer.Option(0, help="Lifetime in hours (default from settings)"),

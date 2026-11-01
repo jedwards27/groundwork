@@ -1,0 +1,42 @@
+# Groundwork API on Fly.io, for the hosted demo. This file deploys the API only; Mission Control has
+# its own web/fly.toml. scripts/deploy-fly.sh deploys both (docs/HOSTING.md, ADR 0007).
+#
+# There is no [http_service] or [[services]] section on purpose: the API has no public address. The
+# web app reaches it at http://<this app>.internal:8000 over Fly's private network, which is why it
+# listens on IPv6 (::). Secrets (database URLs, signing secret, admin token, optional Anthropic key)
+# come from .env.hosted through `fly secrets import`; nothing secret is in this file.
+app = "groundwork-api"
+primary_region = "iad"  # Ashburn, next to Neon's aws-us-east-1
+
+[build]
+  dockerfile = "backend/Dockerfile"
+
+[deploy]
+  # Once per deploy, in a temporary machine with the app's secrets: migrate, then reload the Lake
+  # Mariner fixture. A deploy therefore also resets the demo.
+  release_command = "groundwork release"
+
+[env]
+  GROUNDWORK_HOSTED = "true"            # dry run forced, 1-hour tokens, tamper refused, preflight enforced
+  EXECUTORS_DRY_RUN = "true"
+  GROUNDWORK_DEMO_LOGIN = "true"        # fictional personas over synthetic data only
+  GROUNDWORK_DB_NULLPOOL = "true"       # let Neon's free compute scale to zero between visits
+  GROUNDWORK_DAILY_RUN_CAP = "300"      # every run, per day
+  GROUNDWORK_DAILY_LIVE_RUN_CAP = "30"  # runs that call Claude, per day; then the simulated planner
+  GROUNDWORK_NIGHTLY_RESET_UTC_HOUR = "8"  # 3 or 4 a.m. Eastern
+
+[processes]
+  app = "groundwork serve --host :: --port 8000"
+
+[checks]
+  [checks.health]
+    type = "http"
+    port = 8000
+    path = "/health"
+    interval = "15s"
+    timeout = "5s"
+    grace_period = "20s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

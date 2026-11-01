@@ -33,4 +33,11 @@ Without an API key nothing is sent; the hand-written simulated planner runs inst
 
 ## Hosted demo (separate profile)
 
-The hosted demo holds only the synthetic and public Lake Mariner fixture. Its API runs on one small paid host with a free Neon Postgres. The API key lives server-side only. Dry run is forced on regardless of configuration. Live planning calls are capped per day, after which the simulated planner runs with its banner. The demo database is reset nightly.
+The hosted demo holds only the synthetic and public Lake Mariner fixture. Where things live (docs/HOSTING.md, ADR 0007):
+
+- **Fly.io, Ashburn (`iad`):** two machines. Mission Control is the only public one. The API has no public address and is reached over Fly's private network. Fly keeps the request logs.
+- **Neon, AWS US East 1:** the database. Connections use TLS.
+- **Secrets:** stored as Fly secrets. The API machine holds the database URLs, the signing secret, the admin token and, if set, the Anthropic API key. The web machine holds only the admin token. They are generated into a gitignored `.env.hosted` and never printed.
+- **Anthropic's API:** receives what is listed above, only when a key is set, and capped per day. After the cap the simulated planner runs with its banner.
+
+Dry run is forced on regardless of configuration. The API refuses to start on development secrets or passwords. The fixture is reloaded every night at 08:00 UTC, which also ends every session.

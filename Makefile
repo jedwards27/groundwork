@@ -52,6 +52,18 @@ web-build: ## Production build of Mission Control (also type-checks it)
 e2e: ## Browser walkthrough of the demo against the real API (starts servers if needed; uses installed Chrome)
 	cd web && $(NPM) run e2e
 
+preflight: ## Check whether the current settings may serve the public hosted demo
+	cd $(BACKEND) && $(UV) run groundwork preflight --hosted
+
+hosted-bootstrap: ## Create the hosted database roles and write .env.hosted (prompts for the admin URL)
+	cd $(BACKEND) && $(UV) run groundwork hosted-bootstrap
+
+rehearse-hosted: web-build ## Run the hosted profile locally against a throwaway Postgres (API :8100, web :3200)
+	sh scripts/rehearse-hosted.sh
+
+deploy: ## Deploy the hosted demo to Fly.io (needs fly auth login and .env.hosted; docs/HOSTING.md)
+	sh scripts/deploy-fly.sh
+
 types: ## Regenerate web/openapi.json and the web client's types from the API
 	cd $(BACKEND) && $(UV) run python -c "import json; from groundwork.api.app import app; print(json.dumps(app.openapi(), indent=1))" > ../web/openapi.json
 	cd web && $(NPM) run types
@@ -72,4 +84,4 @@ inspect: ## Validate a site folder: make inspect SITE=path/to/your-site
 test: ## Lint, types, import boundaries and the test suite
 	cd $(BACKEND) && $(UV) run ruff check groundwork tests evals migrations && $(UV) run pyright && $(UV) run lint-imports && $(UV) run pytest
 
-.PHONY: help doctor setup db-setup migrate seed api web web-install web-build e2e types dev demo demo-offline inspect test
+.PHONY: help doctor setup db-setup migrate seed api web web-install web-build e2e types dev demo demo-offline inspect test preflight hosted-bootstrap rehearse-hosted deploy

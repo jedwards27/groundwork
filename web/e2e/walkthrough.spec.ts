@@ -35,11 +35,19 @@ function row(page: Page, ref: string) {
   return page.locator(`.item[data-ref="${ref}"]`);
 }
 
+// Reset is an approver's control, so sign in as Dana to reset, then start each test signed out.
 test.beforeEach(async ({ page, context }) => {
   await context.clearCookies();
+  expect((await page.request.post("/api/session", { data: { person: "dana" } })).ok(), "demo login is on").toBeTruthy();
   const res = await page.request.post("/api/admin/reset");
-  expect(res.ok(), "reset needs GROUNDWORK_ADMIN_TOKEN in .env and the local (not hosted) API").toBeTruthy();
+  expect(res.ok(), "reset needs GROUNDWORK_ADMIN_TOKEN on the web server").toBeTruthy();
+  await context.clearCookies();
 });
+
+async function hosted(page: Page): Promise<boolean> {
+  const s = (await (await page.request.get("/api/session")).json()) as { health?: { hosted?: boolean } };
+  return !!s.health?.hosted;
+}
 
 test("event A: the gate moves, the gateway holds one action, an auto-reply changes nothing, a named person approves", async ({ page }) => {
   await signIn(page, "Dana Ortiz");
@@ -124,7 +132,14 @@ test("a viewer can see the queue but cannot approve", async ({ page }) => {
   expect(res.status()).toBeGreaterThanOrEqual(400);
 });
 
+test("a viewer cannot reset the site", async ({ page }) => {
+  await signIn(page, "Sam Okafor");
+  const res = await page.request.post("/api/admin/reset");
+  expect(res.status()).toBe(403);
+});
+
 test("tampering with one ledger entry fails verification; reset restores the fixture", async ({ page }) => {
+  test.skip(await hosted(page), "the hosted profile refuses the tamper endpoint");
   await signIn(page, "Dana Ortiz");
   const start = await api<Chain>(page, `sites/${SITE}/chain`);
   await play(page, "event-a");

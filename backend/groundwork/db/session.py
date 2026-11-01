@@ -15,6 +15,7 @@ from functools import lru_cache
 
 from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.orm import Session
+from sqlalchemy.pool import NullPool
 
 from groundwork.config import get_settings
 
@@ -25,6 +26,9 @@ class OrgScopeError(RuntimeError):
 
 @lru_cache
 def engine_for(url: str) -> Engine:
+    if get_settings().groundwork_db_nullpool:
+        # Hosted on a scale-to-zero Postgres: hold no idle connections between requests.
+        return create_engine(url, poolclass=NullPool)
     return create_engine(url, pool_pre_ping=True)
 
 
@@ -45,7 +49,8 @@ def org_session(org_id: uuid.UUID | str, *, engine: Engine | None = None) -> Ite
 
 @contextmanager
 def owner_session(*, engine: Engine | None = None) -> Iterator[Session]:
-    """Owner role: bypasses row-level security. Seeding, reset and admin only."""
+    """Owner role: owns the tables, so row-level security does not apply to it (ADR 0007).
+    Migrations, seeding, reset and admin only."""
     with Session(engine or owner_engine(), expire_on_commit=False) as s, s.begin():
         yield s
 

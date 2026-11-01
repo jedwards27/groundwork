@@ -13,6 +13,7 @@ Start with `CLAUDE.md` (the brief), then `docs/ARCHITECTURE.md`, `docs/TECH-DESI
 | 1 | Schema, fixture, critical-path and forecast engine, API, CLI demo | **Done** |
 | 2 | Mandate, gateway, ledger, approvals, planners (informed and blind arms), reports, evals | **Done** (live Claude path tested against a fake client only) |
 | 3 | Mission Control web app ported from `prototype/index.html`, browser walkthrough, web container | **Done** (Docker profile not yet run: no Docker on the author's machine) |
+| Hosting | Fly.io and Neon config, bootstrap, preflight, nightly reset, local rehearsal | **Ready to deploy** (not yet deployed: needs your Fly and Neon accounts) |
 | 4+ | Email and PDF connectors with extraction, approvals UX, notifications, second site | Later |
 
 ## Run it
@@ -38,6 +39,15 @@ docker compose --profile full up --build
 ```
 
 Every port binds to 127.0.0.1, so nothing is reachable from your network.
+
+**Hosted demo.** Two Fly.io machines and a free Neon Postgres, for about $7 a month; `docs/HOSTING.md` has every step. `make rehearse-hosted` runs the hosted profile on your machine first, against a throwaway Postgres set up the way Neon's is. Not yet deployed: it needs your Fly and Neon accounts.
+
+```bash
+make hosted-bootstrap
+```
+```bash
+make deploy
+```
 
 Set `ANTHROPIC_API_KEY` in `.env` to use the live planner (Opus 5.5 plans, Haiku 5.5 classifies outbound text and writes the post-execution report). Without it, everything runs on the hand-written simulated planner, under a banner that says so. Live planning is capped per day (`GROUNDWORK_DAILY_LIVE_RUN_CAP`). `docs/DATA-BOUNDARY.md` lists what is sent.
 
@@ -151,13 +161,15 @@ Lint (ruff), types (pyright), six import boundaries (import-linter: the planner 
 - mandate re-decision, and blind-arm isolation;
 - the Claude planner, classifier and reporter against a fake client;
 - the eval harness, row-level security, and a check that the generic engine contains no data-center vocabulary;
-- that `web/openapi.json` matches the API, so the web app's generated types cannot drift.
+- that `web/openapi.json` matches the API, so the web app's generated types cannot drift;
+- the hosted profile: the startup preflight that refuses development secrets, the daily run cap, connection-per-request mode and the nightly reset schedule, and that no database role needs BYPASSRLS.
 
 `make e2e` is the browser walkthrough (Playwright, `web/e2e/`): sign in as a persona, play event A, check that the countdown and the did/asked/refused counts on the page equal what the API returns, play the auto-reply and see nothing change, approve the held action as Dana, check that a viewer cannot approve (in the page and at the API), then tamper, watch verification fail, and reset. It uses your installed Google Chrome and starts the API and web app if they are not running. `make web-build` type-checks and builds the production web app.
 
 ## Docs
 
-- `docs/decisions/`: ADRs 0001 to 0006.
+- `docs/decisions/`: ADRs 0001 to 0007.
+- `docs/HOSTING.md`: deploying, checking and running the hosted demo.
 - `docs/LEDGER.md`: the ledger's hash format, a test vector, and what verification does and does not catch.
 - `docs/PRACTITIONER-QUESTIONS.md`: the 20 questions that confirm or correct the fixture's assumptions.
 - `docs/DATA-BOUNDARY.md`: exactly what leaves your machine.

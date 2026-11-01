@@ -1,0 +1,29 @@
+# Mission Control on Fly.io, for the hosted demo: the only public machine. scripts/deploy-fly.sh
+# deploys it and sets GROUNDWORK_API_URL to the API's private address; the admin token arrives as a
+# Fly secret. Everything else the browser needs is in the image (docs/HOSTING.md, ADR 0007).
+app = "groundwork-web"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  NEXT_TELEMETRY_DISABLED = "1"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = "off"  # one small machine, always warm for a live demo
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    method = "GET"
+    path = "/"
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "10s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

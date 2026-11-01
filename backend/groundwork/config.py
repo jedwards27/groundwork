@@ -34,6 +34,13 @@ class Settings(BaseSettings):
     executors_dry_run: bool = True
     groundwork_hosted: bool = False
     groundwork_daily_live_run_cap: int = 50
+    # Every run (simulated or live) per org per UTC day; 0 means no cap. The hosted demo sets one.
+    groundwork_daily_run_cap: int = 0
+    # Open a database connection per request instead of keeping a pool, so a scale-to-zero
+    # Postgres (Neon's free plan) can suspend between visits. Hosted only.
+    groundwork_db_nullpool: bool = False
+    # Reload every fixture site at this UTC hour each day (0-23); -1 turns it off. Hosted only.
+    groundwork_nightly_reset_utc_hour: int = -1
     groundwork_admin_token: str = ""
     # Demo personas: lets the web app's server log in as a seeded person without a password.
     # On by default for local use and the hosted demo; off for any real deployment.
@@ -54,3 +61,31 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
+
+DEV_PASSWORDS = ("groundwork_app_dev", "groundwork_owner_dev")
+
+
+def hosted_problems(cfg: Settings) -> list[str]:
+    """Why this configuration must not serve the public hosted demo; empty when it may.
+
+    The API refuses to start in the hosted profile while any of these holds, so a deploy can never
+    run on the development secrets or database passwords (the stop-ship list in the README).
+    """
+    problems: list[str] = []
+    if len(cfg.groundwork_dev_hmac_secret) < 32:
+        problems.append("GROUNDWORK_DEV_HMAC_SECRET is missing or shorter than 32 characters")
+    if len(cfg.groundwork_admin_token) < 20:
+        problems.append("GROUNDWORK_ADMIN_TOKEN is missing or shorter than 20 characters")
+    if cfg.groundwork_admin_token and cfg.groundwork_admin_token == cfg.groundwork_dev_hmac_secret:
+        problems.append("GROUNDWORK_ADMIN_TOKEN must differ from the signing secret")
+    for name, url in (("DATABASE_URL", cfg.database_url), ("DATABASE_OWNER_URL", cfg.database_owner_url)):
+        if any(p in url for p in DEV_PASSWORDS):
+            problems.append(f"{name} uses a development password")
+    if cfg.database_url == cfg.database_owner_url:
+        problems.append("DATABASE_URL and DATABASE_OWNER_URL must use different roles")
+    if cfg.groundwork_daily_run_cap <= 0:
+        problems.append("GROUNDWORK_DAILY_RUN_CAP must be a positive number on a public demo")
+    if not 0 <= cfg.groundwork_daily_live_run_cap <= 200:
+        problems.append("GROUNDWORK_DAILY_LIVE_RUN_CAP must be between 0 and 200")
+    return problems
