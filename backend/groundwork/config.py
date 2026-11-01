@@ -35,6 +35,10 @@ class Settings(BaseSettings):
     groundwork_hosted: bool = False
     groundwork_daily_live_run_cap: int = 50
     groundwork_admin_token: str = ""
+    # Demo personas: lets the web app's server log in as a seeded person without a password.
+    # On by default for local use and the hosted demo; off for any real deployment.
+    groundwork_demo_login: bool = False
+    groundwork_demo_org: str = "Groundwork demo org (end-user posture)"
     groundwork_fixtures_dir: Path = REPO_ROOT / "fixtures"
 
     @property

@@ -16,6 +16,7 @@ os.environ["DATABASE_OWNER_URL"] = _cfg.test_database_owner_url
 # Tests never call the live API unless a test opts in explicitly (marker `live`).
 _LIVE_KEY = _cfg.anthropic_api_key
 os.environ["ANTHROPIC_API_KEY"] = ""
+os.environ["GROUNDWORK_DEMO_LOGIN"] = "false"
 get_settings.cache_clear()
 
 FIXTURE = REPO_ROOT / "fixtures" / "lake-mariner"

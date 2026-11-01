@@ -22,13 +22,14 @@ Without an API key nothing is sent; the hand-written simulated planner runs inst
 
 ## Install-time network (no project data)
 
-- Python packages from PyPI (`uv sync`), the npm registry (web app, slice 3), and Python itself if uv downloads it.
-- Docker image pulls from Docker Hub (`postgres:16`, `python:3.12-slim`) and the uv image from GitHub's container registry, if you use the Docker profile.
-- Homebrew, if `make doctor` suggests installing Postgres or Node.
+- Python packages from PyPI (`uv sync`), the web app's packages from the npm registry (`npm ci`), and Python itself if uv downloads it.
+- Docker image pulls from Docker Hub (`postgres:16`, `python:3.13-slim`, `node:22-alpine`) and the uv image from GitHub's container registry, if you use the Docker profile.
+- Homebrew or nodejs.org, if `make doctor` suggests installing Postgres or Node.
+- Nothing for the browser tests by default: they use your installed Google Chrome. Playwright's own Chromium is downloaded only if you choose it (`npx playwright install chromium`).
 
 ## Run-time network other than Anthropic
 
-- **None.** Next.js anonymous telemetry is turned off with `NEXT_TELEMETRY_DISABLED=1` in `.env.example` and both run profiles, and a test checks it. Fonts are self-hosted (slice 3). Executors run in dry run, so no email, calendar or filing leaves the system.
+- **None.** The browser loads everything from the web app's own address: scripts, styles and fonts are bundled, so there is no font or analytics request to a third party. The web app's server talks only to the API. Next.js anonymous telemetry is turned off with `NEXT_TELEMETRY_DISABLED=1` in `.env.example`, `next.config.ts`, both run profiles and the web container, and a test checks it. Executors run in dry run, so no email, calendar or filing leaves the system.
 
 ## Hosted demo (separate profile)
 

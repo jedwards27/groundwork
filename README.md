@@ -12,12 +12,12 @@ Start with `CLAUDE.md` (the brief), then `docs/ARCHITECTURE.md`, `docs/TECH-DESI
 |---|---|---|
 | 1 | Schema, fixture, critical-path and forecast engine, API, CLI demo | **Done** |
 | 2 | Mandate, gateway, ledger, approvals, planners (informed and blind arms), reports, evals | **Done** (live Claude path tested against a fake client only) |
-| 3 | Mission Control web app ported from `prototype/index.html` | Next |
+| 3 | Mission Control web app ported from `prototype/index.html`, browser walkthrough, web container | **Done** (Docker profile not yet run: no Docker on the author's machine) |
 | 4+ | Email and PDF connectors with extraction, approvals UX, notifications, second site | Later |
 
 ## Run it
 
-**Prerequisites:** Postgres 14+ running locally, and [uv](https://docs.astral.sh/uv/). `make doctor` checks and prints install commands. Node 22 is needed only for the web app (slice 3).
+**Prerequisites:** Postgres 14+ running locally, [uv](https://docs.astral.sh/uv/), and Node 20 or newer (22 LTS recommended, from nodejs.org or `nvm install 22`) for the web app. `make doctor` checks all three and prints install commands.
 
 ```bash
 make doctor
@@ -26,23 +26,40 @@ make doctor
 make dev
 ```
 
-`make dev` creates `.env` with fresh dev secrets, creates the two database roles and databases (`scripts/db-setup.sql`, run as your local Postgres superuser), applies migrations, seeds Lake Mariner and serves the API on http://localhost:8000 (OpenAPI docs at `/docs`).
+`make dev` creates `.env` with fresh dev secrets, creates the two database roles and databases (`scripts/db-setup.sql`, run as your local Postgres superuser), applies migrations, seeds Lake Mariner, installs the web app's packages, and serves the API on http://localhost:8000 (OpenAPI docs at `/docs`) and **Mission Control on http://localhost:3000**. Ctrl-C stops both.
 
-**Docker only** (not yet exercised on the author's machine, which has no Docker):
+**Docker only.** The first command writes `.env` with fresh secrets and needs only a shell. The containers are written but not yet run, because the author's machine has no Docker; the same production server passes the browser walkthrough outside Docker.
 
 ```bash
-docker compose --profile full up
+sh scripts/new-env.sh
 ```
+```bash
+docker compose --profile full up --build
+```
+
+Every port binds to 127.0.0.1, so nothing is reachable from your network.
 
 Set `ANTHROPIC_API_KEY` in `.env` to use the live planner (Opus 5.5 plans, Haiku 5.5 classifies outbound text and writes the post-execution report). Without it, everything runs on the hand-written simulated planner, under a banner that says so. Live planning is capped per day (`GROUNDWORK_DAILY_LIVE_RUN_CAP`). `docs/DATA-BOUNDARY.md` lists what is sent.
 
-## The slice-1 demo
+## Mission Control
+
+Open http://localhost:3000 and pick a demo persona: Dana Ortiz (delivery lead, approver), Priya Raman (counsel, approver) or Sam Okafor (commissioning, viewer). Personas are fictional people seeded with the fixture; anyone using the app can act as any of them, which is why demo login is a switch (`GROUNDWORK_DEMO_LOGIN`) and off for real data. Then:
+
+1. **Read the top of the page.** The countdown, the gating item with its owner and float, and the holidays hidden inside critical-path waits. "Open the status report" shows the source document.
+2. **Play event A** from the inbox. Steps stream in as the run works. The countdown moves, and the differential shows four bars: unmitigated, with what ran, if you approve the queue, and the hatched "if the landlord agrees" bar.
+3. **Read the plan.** What the agent did alone, what it asked a person, what it refused. One row says "Gateway held this": the agent wanted to act alone and the mandate said ask.
+4. **Play the auto-reply** ("approved, please proceed"). The held action stays pending.
+5. **Approve it as Dana.** The dialog shows exactly what is being approved and the hash it binds to. It runs in dry run, and the row records who approved it and when.
+6. **Move the authority dial.** The compare table shows the same plan under each preset; issuing a new mandate re-decides only open actions.
+7. **Check the ledger.** "Chain verified". Then "Tamper with one entry" (local only) and watch verification and the attestation fail. "Reset site" restores the fixture.
+
+## The CLI demo
 
 ```bash
 make demo
 ```
 
-It reseeds the site, then prints:
+It reseeds the site, then prints the same story as text:
 
 1. **The countdown.** CB-5 delivers in 66 days (forecast Thu Jan 7, 2027, against the Jan 12 target), with 3 business days of float.
 2. **The gating item, computed.** NYSEG's acceptance of the protection settings, due Nov 13. Critical path: settings acceptance, witness test, L3 start-up, L4 functional test.
@@ -119,6 +136,9 @@ It validates the folder, lists every problem at once if there are any, and other
 ```bash
 make test
 ```
+```bash
+make e2e
+```
 
 Lint (ruff), types (pyright), six import boundaries (import-linter: the planner cannot reach executors, approvals, the ledger or the database; ingestion cannot create approvals) and the test suite. It covers:
 
@@ -130,7 +150,10 @@ Lint (ruff), types (pyright), six import boundaries (import-linter: the planner 
 - a property test that no inbound message changes any action's state;
 - mandate re-decision, and blind-arm isolation;
 - the Claude planner, classifier and reporter against a fake client;
-- the eval harness, row-level security, and a check that the generic engine contains no data-center vocabulary.
+- the eval harness, row-level security, and a check that the generic engine contains no data-center vocabulary;
+- that `web/openapi.json` matches the API, so the web app's generated types cannot drift.
+
+`make e2e` is the browser walkthrough (Playwright, `web/e2e/`): sign in as a persona, play event A, check that the countdown and the did/asked/refused counts on the page equal what the API returns, play the auto-reply and see nothing change, approve the held action as Dana, check that a viewer cannot approve (in the page and at the API), then tamper, watch verification fail, and reset. It uses your installed Google Chrome and starts the API and web app if they are not running. `make web-build` type-checks and builds the production web app.
 
 ## Docs
 

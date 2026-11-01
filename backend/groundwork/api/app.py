@@ -98,7 +98,15 @@ def _check_scenario(state, scenario: list[str]) -> list[str]:  # type: ignore[no
 @app.get("/health")
 def health() -> dict[str, Any]:
     s = get_settings()
-    return {"ok": True, "version": __version__, "dry_run": s.dry_run, "hosted": s.groundwork_hosted}
+    return {
+        "ok": True,
+        "version": __version__,
+        "dry_run": s.dry_run,
+        "hosted": s.groundwork_hosted,
+        "live_planner": bool(s.anthropic_api_key),
+        "planner_model": s.groundwork_planner_model,
+        "demo_login": s.groundwork_demo_login,
+    }
 
 
 @app.get("/me", response_model=MeView)
@@ -445,6 +453,115 @@ def replay_run(run_id: uuid.UUID, s: Session = Depends(db)) -> dict[str, Any]:
         "run": runs.run_view(s, run_id).model_dump(mode="json"),
         "ledger": _ledger_rows(s, arm=None, run_id=run_id),
     }
+
+
+class DemoLogin(BaseModel):
+    person: str
+
+
+def _demo_people() -> list[m.Person]:
+    cfg = get_settings()
+    if not cfg.groundwork_demo_login:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "demo login is disabled")
+    with owner_session() as s:
+        org = s.execute(select(m.Org).where(m.Org.name == cfg.groundwork_demo_org)).scalar_one_or_none()
+        if org is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "demo org not seeded")
+        # Only the principal's own people are users; counterparties' contacts never sign in.
+        principals = {
+            x for (x,) in s.execute(select(m.Site.principal_party_id).where(m.Site.org_id == org.id))
+        }
+        return list(
+            s.execute(
+                select(m.Person)
+                .where(m.Person.org_id == org.id, m.Person.party_id.in_(principals))
+                .order_by(m.Person.key)
+            ).scalars()
+        )
+
+
+@app.get("/auth/personas")
+def personas() -> list[dict[str, Any]]:
+    """Demo personas only (anyone with the link can act as them). Disabled unless GROUNDWORK_DEMO_LOGIN."""
+    with owner_session() as s:
+        parties = {p.id: p for p in s.execute(select(m.Party)).scalars()}
+    return [
+        {
+            "key": p.key,
+            "name": p.name,
+            "title": p.title,
+            "party": parties[p.party_id].key,
+            "approver": p.approver,
+        }
+        for p in _demo_people()
+    ]
+
+
+@app.post("/auth/demo-login")
+def demo_login(body: DemoLogin) -> dict[str, Any]:
+    from groundwork.api.auth import mint
+
+    person = next((p for p in _demo_people() if p.key == body.person), None)
+    if person is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "no such persona")
+    cfg = get_settings()
+    return {
+        "token": mint(
+            person.id, person.org_id, secret=cfg.groundwork_dev_hmac_secret, ttl_hours=cfg.token_ttl_hours
+        ),
+        "person": person.key,
+        "name": person.name,
+        "ttl_hours": cfg.token_ttl_hours,
+    }
+
+
+@app.get("/sites/{site}/evidence/{key}")
+def get_evidence(site: str, key: str, s: Session = Depends(db)) -> dict[str, Any]:
+    state = _state(s, site)
+    ev = next((e for e in state.evidence if e.key == key), None)
+    if ev is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "no such evidence")
+    return {
+        "key": ev.key,
+        "kind": ev.kind,
+        "title": ev.title,
+        "party": ev.party,
+        "data": ev.data,
+        "provenance": ev.provenance,
+        "source": ev.source,
+    }
+
+
+@app.post("/admin/tamper")
+def admin_tamper(x_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
+    """Local demo only: edit one decision in the demo org's ledger the way someone holding owner
+    credentials could (trigger disabled, row edited, trigger re-enabled). Verification then fails.
+    Refused in the hosted profile. `POST /admin/reset` restores a clean chain."""
+    cfg = get_settings()
+    if cfg.groundwork_hosted or not cfg.groundwork_admin_token or x_admin_token != cfg.groundwork_admin_token:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "admin token required; never available when hosted")
+    from sqlalchemy import text
+
+    with owner_session() as s:
+        org = s.execute(select(m.Org).where(m.Org.name == cfg.groundwork_demo_org)).scalar_one_or_none()
+        if org is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "demo org not seeded")
+        seq = s.execute(
+            text("SELECT min(seq) FROM ledger_entry WHERE org_id = :o AND entry_type = 'decided'"),
+            {"o": org.id},
+        ).scalar()
+        if seq is None:
+            raise HTTPException(status.HTTP_409_CONFLICT, "play an event first: there is no decision to edit")
+        s.execute(text("ALTER TABLE ledger_entry DISABLE TRIGGER ledger_no_update_delete"))
+        s.execute(
+            text(
+                "UPDATE ledger_entry SET payload = jsonb_set(payload, '{reason}', '\"edited after the fact\"') "
+                "WHERE org_id = :o AND seq = :q"
+            ),
+            {"o": org.id, "q": seq},
+        )
+        s.execute(text("ALTER TABLE ledger_entry ENABLE TRIGGER ledger_no_update_delete"))
+    return {"edited_seq": seq}
 
 
 @app.post("/admin/reset")

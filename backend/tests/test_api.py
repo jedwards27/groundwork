@@ -77,3 +77,39 @@ def test_other_org_cannot_see_this_orgs_run(client, seeded):
 def test_admin_reset_needs_the_admin_token(seeded):
     with TestClient(app) as c:
         assert c.post("/admin/reset").status_code == 403
+
+
+def test_demo_login_is_off_by_default_and_works_when_on(seeded, monkeypatch):
+    from groundwork.config import get_settings as gs
+
+    with TestClient(app) as c:
+        assert c.get("/auth/personas").status_code == 404
+        monkeypatch.setenv("GROUNDWORK_DEMO_LOGIN", "true")
+        gs.cache_clear()
+        try:
+            people = c.get("/auth/personas").json()
+            assert {p["key"] for p in people} == {"dana", "priya", "sam"}  # the principal's people only
+            assert c.post("/auth/demo-login", json={"person": "morgan"}).status_code == 404
+            tok = c.post("/auth/demo-login", json={"person": "dana"}).json()["token"]
+            assert c.get("/me", headers={"Authorization": f"Bearer {tok}"}).json()["person"] == "dana"
+            assert c.post("/auth/demo-login", json={"person": "nobody"}).status_code == 404
+        finally:
+            monkeypatch.delenv("GROUNDWORK_DEMO_LOGIN")
+            gs.cache_clear()
+
+
+def test_tamper_is_admin_only_and_detected(client, seeded, monkeypatch):
+    from groundwork.config import get_settings as gs
+
+    assert client.post("/admin/tamper").status_code == 403
+    client.post("/sites/lake-mariner/events", json={"event": "event-a"})
+    token = gs().groundwork_admin_token
+    monkeypatch.setenv("GROUNDWORK_DEMO_ORG", seeded["bundle"].org_name)
+    gs.cache_clear()
+    try:
+        if token:
+            r = client.post("/admin/tamper", headers={"X-Admin-Token": token})
+            assert r.status_code == 200
+            assert client.get("/sites/lake-mariner/ledger/verify").json()["ok"] is False
+    finally:
+        gs.cache_clear()

@@ -561,7 +561,7 @@ def execute_run(org_id: uuid.UUID, run_id: uuid.UUID, *, force_simulated: bool =
                 run_id,
                 "forecast",
                 f"{after['label']}: {before['forecast_finish']} -> {after['forecast_finish']} "
-                f"(range {after['forecast_low']} to {after['forecast_high']}); gate {after['gate']}",
+                f"(range {after['forecast_low']} to {after['forecast_high']}); gating item: {after['gate_title']}",
                 before=before,
                 after=after,
             )
@@ -609,6 +609,7 @@ def _milestone(state: SiteState) -> dict[str, Any]:
         "forecast_high": str(ms.forecast_high),
         "delta": ms.delta_days,
         "gate": c.gate,
+        "gate_title": state.item(c.gate).title if c.gate else "none",
         "critical_path": c.critical_path,
     }
 

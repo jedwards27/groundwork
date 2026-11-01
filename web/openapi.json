@@ -1,0 +1,3117 @@
+{
+ "openapi": "3.1.0",
+ "info": {
+  "title": "Groundwork API",
+  "summary": "Paper critical path, slip forecasts, and bounded action under an explicit mandate.",
+  "version": "0.1.0"
+ },
+ "paths": {
+  "/health": {
+   "get": {
+    "summary": "Health",
+    "operationId": "health_health_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Health Health Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/me": {
+   "get": {
+    "summary": "Me",
+    "operationId": "me_me_get",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/MeView"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/sites": {
+   "get": {
+    "summary": "List Sites",
+    "operationId": "list_sites_sites_get",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/SiteSummary"
+         },
+         "title": "Response List Sites Sites Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/sites/{site}": {
+   "get": {
+    "summary": "Get Site",
+    "operationId": "get_site_sites__site__get",
+    "parameters": [
+     {
+      "name": "site",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Site"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SiteView"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/sites/{site}/chain": {
+   "get": {
+    "summary": "Get Chain",
+    "operationId": "get_chain_sites__site__chain_get",
+    "parameters": [
+     {
+      "name": "site",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Site"
+      }
+     },
+     {
+      "name": "scenario",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "default": [],
+       "title": "Scenario"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ChainView"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/sites/{site}/critical-path": {
+   "get": {
+    "summary": "Get Critical Path",
+    "operationId": "get_critical_path_sites__site__critical_path_get",
+    "parameters": [
+     {
+      "name": "site",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Site"
+      }
+     },
+     {
+      "name": "scenario",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "default": [],
+       "title": "Scenario"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Get Critical Path Sites  Site  Critical Path Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/sites/{site}/forecast": {
+   "get": {
+    "summary": "Get Forecast",
+    "operationId": "get_forecast_sites__site__forecast_get",
+    "parameters": [
+     {
+      "name": "site",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Site"
+      }
+     },
+     {
+      "name": "scenario",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "default": [],
+       "title": "Scenario"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ForecastView"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/sites/{site}/events": {
+   "get": {
+    "summary": "List Events",
+    "operationId": "list_events_sites__site__events_get",
+    "parameters": [
+     {
+      "name": "site",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Site"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/EventView"
+         },
+         "title": "Response List Events Sites  Site  Events Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "summary": "Play Event",
+    "operationId": "play_event_sites__site__events_post",
+    "parameters": [
+     {
+      "name": "site",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Site"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PlayEvent"
+       }
+      }
+     }
+    },
+    "responses": {
+     "202": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/RunStarted"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/runs/{run_id}": {
+   "get": {
+    "summary": "Get Run",
+    "operationId": "get_run_runs__run_id__get",
+    "parameters": [
+     {
+      "name": "run_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Run Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/RunView"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/runs/{run_id}/stream": {
+   "get": {
+    "summary": "Stream Run",
+    "description": "Server-sent events. Each step has an id; reconnect with Last-Event-ID to resume.",
+    "operationId": "stream_run_runs__run_id__stream_get",
+    "parameters": [
+     {
+      "name": "run_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Run Id"
+      }
+     },
+     {
+      "name": "last-event-id",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Last-Event-Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/sites/{site}/mandate": {
+   "get": {
+    "summary": "Get Mandate",
+    "operationId": "get_mandate_sites__site__mandate_get",
+    "parameters": [
+     {
+      "name": "site",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Site"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Get Mandate Sites  Site  Mandate Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "put": {
+    "summary": "Put Mandate",
+    "description": "Issue a new mandate version from a preset. Re-decides open actions; never re-plans.",
+    "operationId": "put_mandate_sites__site__mandate_put",
+    "parameters": [
+     {
+      "name": "site",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Site"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SetPreset"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Put Mandate Sites  Site  Mandate Put"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/sites/{site}/mandate/compare": {
+   "get": {
+    "summary": "Compare Mandates",
+    "description": "The latest plan under every preset, without writing anything (the dial preview).",
+    "operationId": "compare_mandates_sites__site__mandate_compare_get",
+    "parameters": [
+     {
+      "name": "site",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Site"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Compare Mandates Sites  Site  Mandate Compare Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/sites/{site}/ledger": {
+   "get": {
+    "summary": "Get Ledger",
+    "operationId": "get_ledger_sites__site__ledger_get",
+    "parameters": [
+     {
+      "name": "site",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Site"
+      }
+     },
+     {
+      "name": "arm",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": "informed",
+       "title": "Arm"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 5000,
+       "default": 500,
+       "title": "Limit"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Get Ledger Sites  Site  Ledger Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/sites/{site}/ledger/verify": {
+   "get": {
+    "summary": "Verify Ledger",
+    "operationId": "verify_ledger_sites__site__ledger_verify_get",
+    "parameters": [
+     {
+      "name": "site",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Site"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Verify Ledger Sites  Site  Ledger Verify Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/sites/{site}/runs": {
+   "get": {
+    "summary": "List Runs",
+    "operationId": "list_runs_sites__site__runs_get",
+    "parameters": [
+     {
+      "name": "site",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Site"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/RunView"
+         },
+         "title": "Response List Runs Sites  Site  Runs Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/runs/{run_id}/plans": {
+   "get": {
+    "summary": "Get Run Plans",
+    "operationId": "get_run_plans_runs__run_id__plans_get",
+    "parameters": [
+     {
+      "name": "run_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Run Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "additionalProperties": true
+         },
+         "title": "Response Get Run Plans Runs  Run Id  Plans Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/sites/{site}/latest-plan": {
+   "get": {
+    "summary": "Latest Plan",
+    "operationId": "latest_plan_sites__site__latest_plan_get",
+    "parameters": [
+     {
+      "name": "site",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Site"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "anyOf": [
+          {
+           "type": "object",
+           "additionalProperties": true
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Response Latest Plan Sites  Site  Latest Plan Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/sites/{site}/actions/pending": {
+   "get": {
+    "summary": "Pending Actions",
+    "operationId": "pending_actions_sites__site__actions_pending_get",
+    "parameters": [
+     {
+      "name": "site",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Site"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "additionalProperties": true
+         },
+         "title": "Response Pending Actions Sites  Site  Actions Pending Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/actions/{action_id}/approvals": {
+   "post": {
+    "summary": "Post Approval",
+    "description": "A typed approval or decline by the token's person. On approve, the action runs (dry run).",
+    "operationId": "post_approval_actions__action_id__approvals_post",
+    "parameters": [
+     {
+      "name": "action_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Action Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ApprovalIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Post Approval Actions  Action Id  Approvals Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/sites/{site}/scorecard": {
+   "get": {
+    "summary": "Get Scorecard",
+    "operationId": "get_scorecard_sites__site__scorecard_get",
+    "parameters": [
+     {
+      "name": "site",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Site"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Get Scorecard Sites  Site  Scorecard Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/sites/{site}/attestation": {
+   "get": {
+    "summary": "Get Attestation",
+    "operationId": "get_attestation_sites__site__attestation_get",
+    "parameters": [
+     {
+      "name": "site",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Site"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Get Attestation Sites  Site  Attestation Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/runs/{run_id}/replay": {
+   "get": {
+    "summary": "Replay Run",
+    "description": "A recorded run, step by step, from the run row and its ledger entries (for replay on stage).",
+    "operationId": "replay_run_runs__run_id__replay_get",
+    "parameters": [
+     {
+      "name": "run_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Run Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Replay Run Runs  Run Id  Replay Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/auth/personas": {
+   "get": {
+    "summary": "Personas",
+    "description": "Demo personas only (anyone with the link can act as them). Disabled unless GROUNDWORK_DEMO_LOGIN.",
+    "operationId": "personas_auth_personas_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "additionalProperties": true,
+          "type": "object"
+         },
+         "type": "array",
+         "title": "Response Personas Auth Personas Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/auth/demo-login": {
+   "post": {
+    "summary": "Demo Login",
+    "operationId": "demo_login_auth_demo_login_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/DemoLogin"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Demo Login Auth Demo Login Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/sites/{site}/evidence/{key}": {
+   "get": {
+    "summary": "Get Evidence",
+    "operationId": "get_evidence_sites__site__evidence__key__get",
+    "parameters": [
+     {
+      "name": "site",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Site"
+      }
+     },
+     {
+      "name": "key",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Key"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Get Evidence Sites  Site  Evidence  Key  Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/admin/tamper": {
+   "post": {
+    "summary": "Admin Tamper",
+    "description": "Local demo only: edit one decision in the demo org's ledger the way someone holding owner\ncredentials could (trigger disabled, row edited, trigger re-enabled). Verification then fails.\nRefused in the hosted profile. `POST /admin/reset` restores a clean chain.",
+    "operationId": "admin_tamper_admin_tamper_post",
+    "parameters": [
+     {
+      "name": "x-admin-token",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Admin-Token"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Admin Tamper Admin Tamper Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/admin/reset": {
+   "post": {
+    "summary": "Admin Reset",
+    "description": "Reload every site folder under the fixtures directory (owner role). Demo and test use only.",
+    "operationId": "admin_reset_admin_reset_post",
+    "parameters": [
+     {
+      "name": "x-admin-token",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Admin-Token"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Admin Reset Admin Reset Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ "components": {
+  "schemas": {
+   "ApprovalIn": {
+    "properties": {
+     "verdict": {
+      "type": "string",
+      "title": "Verdict"
+     },
+     "idempotency_key": {
+      "type": "string",
+      "title": "Idempotency Key"
+     },
+     "note": {
+      "type": "string",
+      "title": "Note",
+      "default": ""
+     }
+    },
+    "type": "object",
+    "required": [
+     "verdict",
+     "idempotency_key"
+    ],
+    "title": "ApprovalIn"
+   },
+   "CalendarLossView": {
+    "properties": {
+     "pred": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Pred"
+     },
+     "succ": {
+      "type": "string",
+      "title": "Succ"
+     },
+     "holidays": {
+      "items": {
+       "type": "string",
+       "format": "date"
+      },
+      "type": "array",
+      "title": "Holidays"
+     },
+     "sentence": {
+      "type": "string",
+      "title": "Sentence"
+     }
+    },
+    "type": "object",
+    "required": [
+     "pred",
+     "succ",
+     "holidays",
+     "sentence"
+    ],
+    "title": "CalendarLossView"
+   },
+   "ChainView": {
+    "properties": {
+     "site": {
+      "type": "string",
+      "title": "Site"
+     },
+     "as_of": {
+      "type": "string",
+      "format": "date",
+      "title": "As Of"
+     },
+     "lanes": {
+      "items": {
+       "$ref": "#/components/schemas/LaneView"
+      },
+      "type": "array",
+      "title": "Lanes"
+     },
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/ItemView"
+      },
+      "type": "array",
+      "title": "Items"
+     },
+     "links": {
+      "items": {
+       "$ref": "#/components/schemas/LinkView"
+      },
+      "type": "array",
+      "title": "Links"
+     },
+     "milestone": {
+      "$ref": "#/components/schemas/MilestoneView"
+     },
+     "gate": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Gate"
+     },
+     "critical_path": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Critical Path"
+     },
+     "near_critical": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Near Critical"
+     },
+     "min_float": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Min Float"
+     },
+     "calendar_losses": {
+      "items": {
+       "$ref": "#/components/schemas/CalendarLossView"
+      },
+      "type": "array",
+      "title": "Calendar Losses"
+     },
+     "applied_events": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Applied Events"
+     },
+     "scenario_events": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Scenario Events"
+     }
+    },
+    "type": "object",
+    "required": [
+     "site",
+     "as_of",
+     "lanes",
+     "items",
+     "links",
+     "milestone",
+     "gate",
+     "critical_path",
+     "near_critical",
+     "min_float",
+     "calendar_losses",
+     "applied_events",
+     "scenario_events"
+    ],
+    "title": "ChainView"
+   },
+   "DemoLogin": {
+    "properties": {
+     "person": {
+      "type": "string",
+      "title": "Person"
+     }
+    },
+    "type": "object",
+    "required": [
+     "person"
+    ],
+    "title": "DemoLogin"
+   },
+   "EventView": {
+    "properties": {
+     "key": {
+      "type": "string",
+      "title": "Key"
+     },
+     "kind": {
+      "type": "string",
+      "title": "Kind"
+     },
+     "title": {
+      "type": "string",
+      "title": "Title"
+     },
+     "from_party": {
+      "type": "string",
+      "title": "From Party"
+     },
+     "forwarded_from": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Forwarded From"
+     },
+     "received_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Received At"
+     },
+     "body": {
+      "type": "string",
+      "title": "Body"
+     },
+     "links": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Links"
+     },
+     "impacts": {
+      "items": {
+       "$ref": "#/components/schemas/ImpactView"
+      },
+      "type": "array",
+      "title": "Impacts"
+     },
+     "status": {
+      "type": "string",
+      "title": "Status"
+     },
+     "provenance": {
+      "type": "string",
+      "title": "Provenance"
+     },
+     "source": {
+      "type": "string",
+      "title": "Source",
+      "default": ""
+     },
+     "note": {
+      "type": "string",
+      "title": "Note",
+      "default": ""
+     }
+    },
+    "type": "object",
+    "required": [
+     "key",
+     "kind",
+     "title",
+     "from_party",
+     "forwarded_from",
+     "received_at",
+     "body",
+     "links",
+     "impacts",
+     "status",
+     "provenance"
+    ],
+    "title": "EventView"
+   },
+   "FactView": {
+    "properties": {
+     "label": {
+      "type": "string",
+      "title": "Label"
+     },
+     "value": {
+      "type": "string",
+      "title": "Value"
+     },
+     "provenance": {
+      "type": "string",
+      "title": "Provenance"
+     },
+     "source": {
+      "type": "string",
+      "title": "Source",
+      "default": ""
+     }
+    },
+    "type": "object",
+    "required": [
+     "label",
+     "value",
+     "provenance"
+    ],
+    "title": "FactView"
+   },
+   "ForecastView": {
+    "properties": {
+     "site": {
+      "type": "string",
+      "title": "Site"
+     },
+     "as_of": {
+      "type": "string",
+      "format": "date",
+      "title": "As Of"
+     },
+     "milestone": {
+      "$ref": "#/components/schemas/MilestoneView"
+     },
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/ItemForecastView"
+      },
+      "type": "array",
+      "title": "Items"
+     },
+     "applied_events": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Applied Events"
+     },
+     "scenario_events": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Scenario Events"
+     },
+     "method": {
+      "type": "string",
+      "title": "Method"
+     }
+    },
+    "type": "object",
+    "required": [
+     "site",
+     "as_of",
+     "milestone",
+     "items",
+     "applied_events",
+     "scenario_events",
+     "method"
+    ],
+    "title": "ForecastView"
+   },
+   "HTTPValidationError": {
+    "properties": {
+     "detail": {
+      "items": {
+       "$ref": "#/components/schemas/ValidationError"
+      },
+      "type": "array",
+      "title": "Detail"
+     }
+    },
+    "type": "object",
+    "title": "HTTPValidationError"
+   },
+   "ImpactView": {
+    "properties": {
+     "item": {
+      "type": "string",
+      "title": "Item"
+     },
+     "low": {
+      "type": "integer",
+      "title": "Low"
+     },
+     "high": {
+      "type": "integer",
+      "title": "High"
+     },
+     "calendar": {
+      "type": "string",
+      "title": "Calendar"
+     },
+     "leg": {
+      "type": "string",
+      "title": "Leg"
+     },
+     "owner": {
+      "type": "string",
+      "title": "Owner"
+     }
+    },
+    "type": "object",
+    "required": [
+     "item",
+     "low",
+     "high",
+     "calendar",
+     "leg",
+     "owner"
+    ],
+    "title": "ImpactView"
+   },
+   "ItemForecastView": {
+    "properties": {
+     "key": {
+      "type": "string",
+      "title": "Key"
+     },
+     "title": {
+      "type": "string",
+      "title": "Title"
+     },
+     "planned_finish": {
+      "type": "string",
+      "format": "date",
+      "title": "Planned Finish"
+     },
+     "expected_finish": {
+      "type": "string",
+      "format": "date",
+      "title": "Expected Finish"
+     },
+     "low_finish": {
+      "type": "string",
+      "format": "date",
+      "title": "Low Finish"
+     },
+     "high_finish": {
+      "type": "string",
+      "format": "date",
+      "title": "High Finish"
+     },
+     "reason": {
+      "type": "string",
+      "title": "Reason"
+     },
+     "reference": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ReferenceView"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    },
+    "type": "object",
+    "required": [
+     "key",
+     "title",
+     "planned_finish",
+     "expected_finish",
+     "low_finish",
+     "high_finish",
+     "reason",
+     "reference"
+    ],
+    "title": "ItemForecastView"
+   },
+   "ItemView": {
+    "properties": {
+     "key": {
+      "type": "string",
+      "title": "Key"
+     },
+     "code": {
+      "type": "string",
+      "title": "Code"
+     },
+     "title": {
+      "type": "string",
+      "title": "Title"
+     },
+     "kind": {
+      "type": "string",
+      "title": "Kind"
+     },
+     "owner": {
+      "type": "string",
+      "title": "Owner"
+     },
+     "performer": {
+      "type": "string",
+      "title": "Performer"
+     },
+     "lane": {
+      "type": "string",
+      "title": "Lane"
+     },
+     "status": {
+      "type": "string",
+      "title": "Status"
+     },
+     "planned_start": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Planned Start"
+     },
+     "planned_finish": {
+      "type": "string",
+      "format": "date",
+      "title": "Planned Finish"
+     },
+     "actual_finish": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Actual Finish"
+     },
+     "calendar": {
+      "type": "string",
+      "title": "Calendar"
+     },
+     "provenance": {
+      "type": "string",
+      "title": "Provenance"
+     },
+     "source": {
+      "type": "string",
+      "title": "Source"
+     },
+     "notes": {
+      "type": "string",
+      "title": "Notes"
+     },
+     "early_start": {
+      "type": "string",
+      "format": "date",
+      "title": "Early Start"
+     },
+     "early_finish": {
+      "type": "string",
+      "format": "date",
+      "title": "Early Finish"
+     },
+     "late_finish": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Late Finish"
+     },
+     "total_float": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Total Float"
+     },
+     "critical": {
+      "type": "boolean",
+      "title": "Critical"
+     },
+     "near_critical": {
+      "type": "boolean",
+      "title": "Near Critical"
+     },
+     "on_target_path": {
+      "type": "boolean",
+      "title": "On Target Path"
+     },
+     "finish_shift_days": {
+      "type": "integer",
+      "title": "Finish Shift Days"
+     },
+     "drivers": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Drivers"
+     }
+    },
+    "type": "object",
+    "required": [
+     "key",
+     "code",
+     "title",
+     "kind",
+     "owner",
+     "performer",
+     "lane",
+     "status",
+     "planned_start",
+     "planned_finish",
+     "actual_finish",
+     "calendar",
+     "provenance",
+     "source",
+     "notes",
+     "early_start",
+     "early_finish",
+     "late_finish",
+     "total_float",
+     "critical",
+     "near_critical",
+     "on_target_path",
+     "finish_shift_days",
+     "drivers"
+    ],
+    "title": "ItemView"
+   },
+   "LaneView": {
+    "properties": {
+     "key": {
+      "type": "string",
+      "title": "Key"
+     },
+     "label": {
+      "type": "string",
+      "title": "Label"
+     },
+     "role": {
+      "type": "string",
+      "title": "Role"
+     }
+    },
+    "type": "object",
+    "required": [
+     "key",
+     "label",
+     "role"
+    ],
+    "title": "LaneView"
+   },
+   "LinkView": {
+    "properties": {
+     "pred": {
+      "type": "string",
+      "title": "Pred"
+     },
+     "succ": {
+      "type": "string",
+      "title": "Succ"
+     },
+     "kind": {
+      "type": "string",
+      "title": "Kind"
+     },
+     "lag": {
+      "type": "integer",
+      "title": "Lag"
+     },
+     "lag_calendar": {
+      "type": "string",
+      "title": "Lag Calendar"
+     }
+    },
+    "type": "object",
+    "required": [
+     "pred",
+     "succ",
+     "kind",
+     "lag",
+     "lag_calendar"
+    ],
+    "title": "LinkView"
+   },
+   "MeView": {
+    "properties": {
+     "person": {
+      "type": "string",
+      "title": "Person"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "party": {
+      "type": "string",
+      "title": "Party"
+     },
+     "approver": {
+      "type": "boolean",
+      "title": "Approver"
+     },
+     "org": {
+      "type": "string",
+      "title": "Org"
+     },
+     "kid": {
+      "type": "string",
+      "title": "Kid"
+     },
+     "dry_run": {
+      "type": "boolean",
+      "title": "Dry Run"
+     },
+     "hosted": {
+      "type": "boolean",
+      "title": "Hosted"
+     }
+    },
+    "type": "object",
+    "required": [
+     "person",
+     "name",
+     "party",
+     "approver",
+     "org",
+     "kid",
+     "dry_run",
+     "hosted"
+    ],
+    "title": "MeView"
+   },
+   "MilestoneView": {
+    "properties": {
+     "kind": {
+      "type": "string",
+      "title": "Kind"
+     },
+     "label": {
+      "type": "string",
+      "title": "Label"
+     },
+     "headline": {
+      "type": "string",
+      "title": "Headline"
+     },
+     "item": {
+      "type": "string",
+      "title": "Item"
+     },
+     "target_date": {
+      "type": "string",
+      "format": "date",
+      "title": "Target Date"
+     },
+     "forecast_finish": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Forecast Finish"
+     },
+     "forecast_low": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Forecast Low"
+     },
+     "forecast_high": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Forecast High"
+     },
+     "delta_days": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Delta Days"
+     },
+     "days_remaining": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Days Remaining"
+     },
+     "binding_agreement": {
+      "type": "string",
+      "title": "Binding Agreement",
+      "default": ""
+     },
+     "provenance": {
+      "type": "string",
+      "title": "Provenance"
+     },
+     "source": {
+      "type": "string",
+      "title": "Source",
+      "default": ""
+     },
+     "note": {
+      "type": "string",
+      "title": "Note",
+      "default": ""
+     }
+    },
+    "type": "object",
+    "required": [
+     "kind",
+     "label",
+     "headline",
+     "item",
+     "target_date",
+     "forecast_finish",
+     "delta_days",
+     "days_remaining",
+     "provenance"
+    ],
+    "title": "MilestoneView"
+   },
+   "PartyView": {
+    "properties": {
+     "key": {
+      "type": "string",
+      "title": "Key"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "roles": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Roles"
+     },
+     "role_class": {
+      "type": "string",
+      "title": "Role Class"
+     },
+     "level": {
+      "type": "string",
+      "title": "Level"
+     },
+     "reached_via": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reached Via"
+     },
+     "path_from_principal": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Path From Principal"
+     },
+     "provenance": {
+      "type": "string",
+      "title": "Provenance"
+     },
+     "source": {
+      "type": "string",
+      "title": "Source",
+      "default": ""
+     },
+     "note": {
+      "type": "string",
+      "title": "Note",
+      "default": ""
+     }
+    },
+    "type": "object",
+    "required": [
+     "key",
+     "name",
+     "roles",
+     "role_class",
+     "level",
+     "reached_via",
+     "path_from_principal",
+     "provenance"
+    ],
+    "title": "PartyView"
+   },
+   "PersonView": {
+    "properties": {
+     "key": {
+      "type": "string",
+      "title": "Key"
+     },
+     "party": {
+      "type": "string",
+      "title": "Party"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "title": {
+      "type": "string",
+      "title": "Title"
+     },
+     "approver": {
+      "type": "boolean",
+      "title": "Approver"
+     }
+    },
+    "type": "object",
+    "required": [
+     "key",
+     "party",
+     "name",
+     "title",
+     "approver"
+    ],
+    "title": "PersonView"
+   },
+   "PlayEvent": {
+    "properties": {
+     "event": {
+      "type": "string",
+      "title": "Event"
+     }
+    },
+    "type": "object",
+    "required": [
+     "event"
+    ],
+    "title": "PlayEvent"
+   },
+   "ReferenceRowView": {
+    "properties": {
+     "key": {
+      "type": "string",
+      "title": "Key"
+     },
+     "label": {
+      "type": "string",
+      "title": "Label"
+     },
+     "measure": {
+      "type": "string",
+      "title": "Measure"
+     },
+     "value_days": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Value Days"
+     },
+     "value_days_high": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Value Days High"
+     },
+     "source_url": {
+      "type": "string",
+      "title": "Source Url"
+     },
+     "provenance": {
+      "type": "string",
+      "title": "Provenance"
+     },
+     "note": {
+      "type": "string",
+      "title": "Note"
+     }
+    },
+    "type": "object",
+    "required": [
+     "key",
+     "label",
+     "measure",
+     "value_days",
+     "value_days_high",
+     "source_url",
+     "provenance",
+     "note"
+    ],
+    "title": "ReferenceRowView"
+   },
+   "ReferenceView": {
+    "properties": {
+     "item_code": {
+      "type": "string",
+      "title": "Item Code"
+     },
+     "group": {
+      "additionalProperties": {
+       "type": "string"
+      },
+      "type": "object",
+      "title": "Group"
+     },
+     "n_points": {
+      "type": "integer",
+      "title": "N Points"
+     },
+     "median": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Median"
+     },
+     "q1": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Q1"
+     },
+     "q3": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Q3"
+     },
+     "illustrative": {
+      "type": "boolean",
+      "title": "Illustrative"
+     },
+     "applied": {
+      "type": "boolean",
+      "title": "Applied"
+     },
+     "headline": {
+      "type": "string",
+      "title": "Headline"
+     },
+     "rows": {
+      "items": {
+       "$ref": "#/components/schemas/ReferenceRowView"
+      },
+      "type": "array",
+      "title": "Rows"
+     }
+    },
+    "type": "object",
+    "required": [
+     "item_code",
+     "group",
+     "n_points",
+     "median",
+     "q1",
+     "q3",
+     "illustrative",
+     "applied",
+     "headline",
+     "rows"
+    ],
+    "title": "ReferenceView"
+   },
+   "RunStarted": {
+    "properties": {
+     "run_id": {
+      "type": "string",
+      "title": "Run Id"
+     },
+     "stream": {
+      "type": "string",
+      "title": "Stream"
+     }
+    },
+    "type": "object",
+    "required": [
+     "run_id",
+     "stream"
+    ],
+    "title": "RunStarted"
+   },
+   "RunView": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "site": {
+      "type": "string",
+      "title": "Site"
+     },
+     "event": {
+      "type": "string",
+      "title": "Event"
+     },
+     "status": {
+      "type": "string",
+      "title": "Status"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "started_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Started At"
+     },
+     "finished_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Finished At"
+     },
+     "error": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Error"
+     },
+     "summary": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Summary"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "site",
+     "event",
+     "status",
+     "created_at",
+     "started_at",
+     "finished_at",
+     "error",
+     "summary"
+    ],
+    "title": "RunView"
+   },
+   "SetPreset": {
+    "properties": {
+     "preset": {
+      "type": "string",
+      "title": "Preset"
+     }
+    },
+    "type": "object",
+    "required": [
+     "preset"
+    ],
+    "title": "SetPreset"
+   },
+   "SiteSummary": {
+    "properties": {
+     "key": {
+      "type": "string",
+      "title": "Key"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "location": {
+      "type": "string",
+      "title": "Location"
+     },
+     "asset": {
+      "type": "string",
+      "title": "Asset"
+     },
+     "milestone": {
+      "$ref": "#/components/schemas/MilestoneView"
+     },
+     "gate": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Gate"
+     },
+     "gate_title": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Gate Title"
+     }
+    },
+    "type": "object",
+    "required": [
+     "key",
+     "name",
+     "location",
+     "asset",
+     "milestone",
+     "gate",
+     "gate_title"
+    ],
+    "title": "SiteSummary"
+   },
+   "SiteView": {
+    "properties": {
+     "key": {
+      "type": "string",
+      "title": "Key"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "location": {
+      "type": "string",
+      "title": "Location"
+     },
+     "profile": {
+      "type": "string",
+      "title": "Profile"
+     },
+     "as_of": {
+      "type": "string",
+      "format": "date",
+      "title": "As Of"
+     },
+     "principal": {
+      "type": "string",
+      "title": "Principal"
+     },
+     "asset": {
+      "type": "string",
+      "title": "Asset"
+     },
+     "capacity_mw": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Capacity Mw"
+     },
+     "attrs": {
+      "additionalProperties": {
+       "type": "string"
+      },
+      "type": "object",
+      "title": "Attrs"
+     },
+     "calendar_note": {
+      "type": "string",
+      "title": "Calendar Note"
+     },
+     "holidays": {
+      "items": {
+       "type": "string",
+       "format": "date"
+      },
+      "type": "array",
+      "title": "Holidays"
+     },
+     "facts": {
+      "items": {
+       "$ref": "#/components/schemas/FactView"
+      },
+      "type": "array",
+      "title": "Facts"
+     },
+     "parties": {
+      "items": {
+       "$ref": "#/components/schemas/PartyView"
+      },
+      "type": "array",
+      "title": "Parties"
+     },
+     "people": {
+      "items": {
+       "$ref": "#/components/schemas/PersonView"
+      },
+      "type": "array",
+      "title": "People"
+     },
+     "milestones": {
+      "items": {
+       "$ref": "#/components/schemas/MilestoneView"
+      },
+      "type": "array",
+      "title": "Milestones"
+     },
+     "glossary": {
+      "additionalProperties": {
+       "type": "string"
+      },
+      "type": "object",
+      "title": "Glossary"
+     }
+    },
+    "type": "object",
+    "required": [
+     "key",
+     "name",
+     "location",
+     "profile",
+     "as_of",
+     "principal",
+     "asset",
+     "capacity_mw",
+     "attrs",
+     "calendar_note",
+     "holidays",
+     "facts",
+     "parties",
+     "people",
+     "milestones",
+     "glossary"
+    ],
+    "title": "SiteView"
+   },
+   "ValidationError": {
+    "properties": {
+     "loc": {
+      "items": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "integer"
+        }
+       ]
+      },
+      "type": "array",
+      "title": "Location"
+     },
+     "msg": {
+      "type": "string",
+      "title": "Message"
+     },
+     "type": {
+      "type": "string",
+      "title": "Error Type"
+     },
+     "input": {
+      "title": "Input"
+     },
+     "ctx": {
+      "type": "object",
+      "title": "Context"
+     }
+    },
+    "type": "object",
+    "required": [
+     "loc",
+     "msg",
+     "type"
+    ],
+    "title": "ValidationError"
+   }
+  }
+ }
+}

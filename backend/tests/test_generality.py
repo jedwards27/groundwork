@@ -66,7 +66,14 @@ def test_fixtures_contain_no_code():
 
 
 def test_telemetry_is_off_everywhere():
+    """Next.js telemetry is off in every way the web app can start: .env, the Next config itself,
+    the Makefile targets, the web container and compose."""
     assert "NEXT_TELEMETRY_DISABLED=1" in (REPO_ROOT / ".env.example").read_text()
-    compose = REPO_ROOT / "docker-compose.yml"
-    if compose.exists():
-        assert "NEXT_TELEMETRY_DISABLED" in compose.read_text()
+    assert 'NEXT_TELEMETRY_DISABLED = "1"' in (REPO_ROOT / "web" / "next.config.ts").read_text()
+    assert "NEXT_TELEMETRY_DISABLED=1" in (REPO_ROOT / "web" / "Dockerfile").read_text()
+    makefile = (REPO_ROOT / "Makefile").read_text()
+    for target in ("web:", "dev:", "web-build:"):
+        recipe = makefile.split(f"\n{target}", 1)[1].split("\n\n", 1)[0]
+        assert "NEXT_TELEMETRY_DISABLED=1" in recipe, target
+    compose = (REPO_ROOT / "docker-compose.yml").read_text()
+    assert compose.count('NEXT_TELEMETRY_DISABLED: "1"') >= 1
