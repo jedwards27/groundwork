@@ -1,0 +1,15 @@
+# 0006. One structured-output call per arm; two arms; two reports
+
+**Status:** accepted. Settles ARCHITECTURE §2.4 (own loop vs Agent SDK vs Managed Agents) for v1.
+
+**Context.** The planner must return a plan the gateway can type-check, the prompt must be cacheable, and the system must measure the capability it predicts (staying in scope, reporting truthfully) rather than only enforce it.
+
+**Options.** (a) A tool-use loop with read-only tools (own loop, or the SDK tool runner). (b) A forced tool call to get JSON (a 400 on Opus 5.5). (c) One call with structured outputs, the site state inlined. (d) Managed Agents.
+
+**Decision.** (c), with two arms and two reports.
+- **The call.** `client.beta.messages.parse(output_format=Plan, output_config={"effort": "high"})` on `claude-opus-5-5`, with the server-side refusal fallback (`fallbacks="default"`, beta `server-side-fallback-2026-07-01`). The plan is schema-valid by construction; `params` is a flat object so the grammar has no deep unions. A refusal or an unparseable result falls back to the simulated planner and writes a `planner_fallback` ledger entry. Order: system (role, executors, rules, never-list, goals, glossary) → site state → ledger tail → arm block → event, with cache breakpoints after the system prompt, the site state and the ledger tail; the site state is about 6,400 tokens, well above the 512-token minimum, and identical across arms, so the blind arm reads the informed arm's cache. Email addresses are redacted from everything the model sees.
+- **Two arms.** The *informed* arm sees the mandate; its plan is what the user sees and what executors run. The *blind* arm sees only the never-list and the owner's goals; it is decided and recorded, never executed or approvable, excluded from spend headroom and from the forecast. The gap between the arms' over-reach rates is the measurement the capability prediction needs.
+- **Two reports.** The plan carries `intent` (what the planner expects the gateway to do), compared with decisions as over-reach and over-caution. After execution a small Haiku call receives the plan and the ledger entry types per action and writes `Report{did, asked, refused, failed}`; it is checked against the ledger, and any omission, fabrication or inversion writes a `report_mismatch` entry. The eval's withheld-row arm removes one action's entries to catch a reporter filling gaps from the plan.
+- **The classifier.** Outbound text (and drafts) goes through deterministic rules and, when live, a Haiku classifier; the stricter class wins, so text can only lower autonomy. A classifier error yields `unknown`, which asks a person.
+
+**Consequences.** One call per arm is cheaper and easier to defend than a loop; when a site's graph outgrows the prompt, a manual tool loop with read-only, allow-listed tools replaces the inlined state (the tool runner was rejected because the gateway and ledger boundary should stay in our code). Managed Agents fits scheduled background runs later. Live calls are not yet exercised in this repo (no API key during development); the plumbing is tested against a fake client (`tests/test_agent.py`).

@@ -579,8 +579,13 @@ def load_site(root: Path | str) -> SiteBundle:
             problems.append(f"site.yaml mandate: approver {who!r} is not a person")
     if md.get("preset", "standard") not in ("supervised", "standard", "autonomous"):
         problems.append("site.yaml mandate: preset must be supervised, standard or autonomous")
-    mandate = MandateSpec(md.get("preset", "standard"), approvers, legal, int(md.get("sla_hours", 24)),
-                          tuple(md.get("owner_goals", [])))
+    mandate = MandateSpec(
+        md.get("preset", "standard"),
+        approvers,
+        legal,
+        int(md.get("sla_hours", 24)),
+        tuple(md.get("owner_goals", [])),
+    )
 
     if problems:
         raise LoadError(problems)

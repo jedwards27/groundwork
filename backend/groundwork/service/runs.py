@@ -6,7 +6,6 @@ Slice 2 adds the planners, gateway, ledger, executors and reports to the same ru
 
 from __future__ import annotations
 
-import traceback
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -16,8 +15,7 @@ from sqlalchemy.orm import Session
 
 from groundwork.db import models as m
 from groundwork.db import repo
-from groundwork.db.session import org_session, owner_session, require_org
-from groundwork.service import views
+from groundwork.db.session import owner_session, require_org
 
 STALE_AFTER = timedelta(minutes=10)
 

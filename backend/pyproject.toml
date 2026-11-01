@@ -71,3 +71,33 @@ name = "core is a leaf: generic engine imports nothing else from groundwork"
 type = "forbidden"
 source_modules = ["groundwork.core"]
 forbidden_modules = ["groundwork.db", "groundwork.api", "groundwork.ingest", "groundwork.domain", "groundwork.schemas", "groundwork.cli", "groundwork.config"]
+
+[[tool.importlinter.contracts]]
+name = "the agent proposes, never acts: no path to executors, approvals, the ledger or the database"
+type = "forbidden"
+source_modules = ["groundwork.agent"]
+forbidden_modules = ["groundwork.executors", "groundwork.approvals", "groundwork.ledger", "groundwork.db", "groundwork.service", "groundwork.api"]
+
+[[tool.importlinter.contracts]]
+name = "ingestion can never create an approval"
+type = "forbidden"
+source_modules = ["groundwork.ingest"]
+forbidden_modules = ["groundwork.approvals", "groundwork.executors", "groundwork.agent"]
+
+[[tool.importlinter.contracts]]
+name = "the gateway is pure: no database, ledger, model client, executors or vertical rules"
+type = "forbidden"
+source_modules = ["groundwork.policy"]
+forbidden_modules = ["groundwork.db", "groundwork.ledger", "groundwork.agent", "groundwork.executors", "groundwork.domain", "groundwork.service", "groundwork.api"]
+
+[[tool.importlinter.contracts]]
+name = "the ledger knows nothing about planners, policy or verticals"
+type = "forbidden"
+source_modules = ["groundwork.ledger"]
+forbidden_modules = ["groundwork.agent", "groundwork.policy", "groundwork.domain", "groundwork.executors", "groundwork.service"]
+
+[[tool.importlinter.contracts]]
+name = "executors depend only on the shared contract"
+type = "forbidden"
+source_modules = ["groundwork.executors"]
+forbidden_modules = ["groundwork.agent", "groundwork.db", "groundwork.ledger", "groundwork.approvals", "groundwork.service", "groundwork.policy"]

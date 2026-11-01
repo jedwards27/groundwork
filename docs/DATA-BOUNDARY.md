@@ -12,7 +12,9 @@ Groundwork's local mode keeps project data on your machine except for one destin
 - The tail of the site's ledger: action titles, decisions and outcomes.
 - In slice 4, the text and pages of documents you load for extraction.
 
-**Never sent anywhere:** approvals and who made them, signing secrets and tokens, people's email addresses, database credentials, the full ledger, and anything from another org.
+**Never sent anywhere:** approvals and who made them, signing secrets and tokens, people's email addresses (addresses inside forwarded messages are replaced with "[address withheld]" before a model sees them, and a test checks the prompt), database credentials, the full ledger, and anything from another org.
+
+**Also sent, when live:** the text of outbound messages and drafts the planner proposes, to the Haiku classifier; the plan and the ledger entry types for its actions, to the Haiku reporter.
 
 Without an API key nothing is sent; the hand-written simulated planner runs instead, under a banner that says so.
 

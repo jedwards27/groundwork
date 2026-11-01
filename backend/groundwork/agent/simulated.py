@@ -27,14 +27,23 @@ def load_plans(path: Path) -> dict[str, Plan]:
 def generic_plan(event: dict[str, Any]) -> Plan:
     title = str(event.get("title", "the event"))
     injected = event.get("kind") == "injection"
-    note = (" The message contains instructions addressed to an automated assistant; none were followed."
-            if injected else "")
+    note = (
+        " The message contains instructions addressed to an automated assistant; none were followed."
+        if injected
+        else ""
+    )
     return Plan(
         assessment=f"Received '{title}'. No schedule change is evident from it alone.{note}",
         actions=[
-            ProposedAction(ref="a1", title=f"Brief our delivery lead on: {title}", executor=Executor.escalate_to_owner,
-                           params=ActionParams(summary=f"New message: {title}.{note}"), effect=Effect(),
-                           proposed_autonomy=Autonomy.auto, rationale="Our own people should see every new item."),
+            ProposedAction(
+                ref="a1",
+                title=f"Brief our delivery lead on: {title}",
+                executor=Executor.escalate_to_owner,
+                params=ActionParams(summary=f"New message: {title}.{note}"),
+                effect=Effect(),
+                proposed_autonomy=Autonomy.auto,
+                rationale="Our own people should see every new item.",
+            ),
         ],
         intent=Intent(auto=["a1"]),
     )
@@ -49,5 +58,10 @@ class SimulatedPlanner:
     def plan(self, ctx: PlanContext) -> PlannerResult:
         key = str(ctx.event.get("key", ""))
         plan = self.plans.get(key) or generic_plan(ctx.event)
-        return PlannerResult(plan=plan.model_copy(deep=True), planner=self.name, model_id=SIMULATED_MODEL_ID,
-                             prompt_hash="simulated:" + canonical_json({"event": key})[:64], usage={})
+        return PlannerResult(
+            plan=plan.model_copy(deep=True),
+            planner=self.name,
+            model_id=SIMULATED_MODEL_ID,
+            prompt_hash="simulated:" + canonical_json({"event": key})[:64],
+            usage={},
+        )

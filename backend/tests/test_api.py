@@ -52,7 +52,12 @@ def test_play_event_runs_and_persists(client):
     assert r.status_code == 202
     run = client.get(f"/runs/{r.json()['run_id']}").json()
     assert run["status"] == "done"
-    assert [s["kind"] for s in run["summary"]["steps"]] == ["queued", "running", "forecast", "done"]
+    kinds = [s["kind"] for s in run["summary"]["steps"]]
+    assert kinds[:3] == ["queued", "running", "forecast"]
+    assert ["plan", "decided", "executed", "differential", "report", "done"] == [
+        k for k in kinds if k in ("plan", "decided", "executed", "differential", "report", "done")
+    ]
+    assert kinds[-1] == "blind_skipped"  # no live model in tests
     assert client.get("/sites/lake-mariner/chain").json()["milestone"]["forecast_finish"] == "2027-03-01"
     assert client.post("/sites/lake-mariner/events", json={"event": "event-a"}).status_code == 409
     with client.stream("GET", f"/runs/{r.json()['run_id']}/stream") as s:

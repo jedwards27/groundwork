@@ -52,6 +52,6 @@ inspect: ## Validate a site folder: make inspect SITE=path/to/your-site
 	cd $(BACKEND) && $(UV) run groundwork inspect $(abspath $(SITE))
 
 test: ## Lint, types, import boundaries and the test suite
-	cd $(BACKEND) && $(UV) run ruff check groundwork tests migrations && $(UV) run pyright && $(UV) run lint-imports && $(UV) run pytest
+	cd $(BACKEND) && $(UV) run ruff check groundwork tests evals migrations && $(UV) run pyright && $(UV) run lint-imports && $(UV) run pytest
 
 .PHONY: help doctor setup db-setup migrate seed api dev demo demo-offline inspect test

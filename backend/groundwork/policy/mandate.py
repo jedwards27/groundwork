@@ -26,7 +26,9 @@ class AutoRule(BaseModel):
     model_config = ConfigDict(extra="forbid")
     name: str
     kinds: list[Kind]
-    role_classes: list[str] = Field(description="Recipient role classes; 'internal' covers actions with no recipient")
+    role_classes: list[str] = Field(
+        description="Recipient role classes; 'internal' covers actions with no recipient"
+    )
     channels: list[Channel] | None = None
     direct_only: bool = True  # the party that must act is the recipient itself, not someone further along
     spend: SpendLimit | None = None
@@ -73,13 +75,19 @@ class Mandate(BaseModel):
         )
         for r in self.auto:
             scope = ", ".join(r.role_classes)
-            via = "only when that recipient is the party that has to act" if r.direct_only else "including requests passed along to another party"
+            via = (
+                "only when that recipient is the party that has to act"
+                if r.direct_only
+                else "including requests passed along to another party"
+            )
             spend = (
                 f"; up to ${r.spend.per_action_cents / 100:,.0f} per action and ${r.spend.per_day_cents / 100:,.0f} per day"
                 if r.spend
                 else ""
             )
-            lines.append(f"May act alone: {', '.join(k.value for k in r.kinds)} to {scope} recipients, {via}{spend}.")
+            lines.append(
+                f"May act alone: {', '.join(k.value for k in r.kinds)} to {scope} recipients, {via}{spend}."
+            )
         lines.append(
             f"Everything else asks a named approver ({', '.join(self.ask.approvers)}; legal: "
             f"{', '.join(self.ask.legal_approvers) or 'same'}), answered within {self.ask.sla_hours} hours."

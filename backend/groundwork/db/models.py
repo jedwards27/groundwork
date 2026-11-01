@@ -11,7 +11,18 @@ import uuid
 from datetime import date, datetime
 from typing import Any
 
-from sqlalchemy import BigInteger, Boolean, Date, DateTime, Float, ForeignKey, Integer, Text, UniqueConstraint, func
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    Date,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    Text,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -280,7 +291,9 @@ class MandateVersion(Base):
     version: Mapped[int] = mapped_column(Integer, nullable=False)
     preset: Mapped[str] = mapped_column(Text, nullable=False)
     doc: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
-    created_by_person_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("person.id"))
+    created_by_person_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("person.id")
+    )
     created_at: Mapped[datetime] = _created()
 
 
@@ -373,6 +386,22 @@ class LedgerEntry(Base):
 
 
 ORG_SCOPED_TABLES: tuple[str, ...] = (
-    "party", "site", "site_party", "person", "asset", "item", "milestone", "dependency", "evidence",
-    "item_evidence", "event", "run", "plan", "mandate", "action", "decision", "approval", "ledger_entry",
+    "party",
+    "site",
+    "site_party",
+    "person",
+    "asset",
+    "item",
+    "milestone",
+    "dependency",
+    "evidence",
+    "item_evidence",
+    "event",
+    "run",
+    "plan",
+    "mandate",
+    "action",
+    "decision",
+    "approval",
+    "ledger_entry",
 )

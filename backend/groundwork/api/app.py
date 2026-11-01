@@ -24,6 +24,8 @@ from groundwork.config import get_settings
 from groundwork.db import models as m
 from groundwork.db import repo
 from groundwork.db.session import org_session, owner_session
+from groundwork.ledger import verify_chain
+from groundwork.policy import PRESETS
 from groundwork.schemas.views import (
     ChainView,
     EventView,
@@ -32,7 +34,10 @@ from groundwork.schemas.views import (
     SiteSummary,
     SiteView,
 )
-from groundwork.service import runs, views
+from groundwork.service import actions as actions_svc
+from groundwork.service import mandates, runs, views
+from groundwork.service.attestation import attestation
+from groundwork.service.scorecard import scorecard
 
 log = structlog.get_logger()
 
@@ -225,6 +230,221 @@ async def stream_run(
             await asyncio.sleep(0.25)
 
     return EventSourceResponse(gen())
+
+
+class SetPreset(BaseModel):
+    preset: str
+
+
+class ApprovalIn(BaseModel):
+    verdict: str
+    idempotency_key: str
+    note: str = ""
+
+
+def _ledger_rows(
+    s: Session, *, arm: str | None = None, run_id: uuid.UUID | None = None, limit: int = 500
+) -> list[dict[str, Any]]:
+    q = select(m.LedgerEntry).order_by(m.LedgerEntry.seq.desc()).limit(limit)
+    if arm == "informed":
+        q = q.where((m.LedgerEntry.arm.is_(None)) | (m.LedgerEntry.arm == "informed"))
+    elif arm:
+        q = q.where(m.LedgerEntry.arm == arm)
+    if run_id is not None:
+        q = q.where(m.LedgerEntry.run_id == run_id)
+    rows = list(s.execute(q).scalars())
+    return [
+        {
+            "seq": e.seq,
+            "type": e.entry_type,
+            "arm": e.arm,
+            "run_id": str(e.run_id) if e.run_id else None,
+            "action_id": str(e.action_id) if e.action_id else None,
+            "recorded_at": e.recorded_at,
+            "payload": e.payload,
+            "hash": e.hash,
+            "prev_hash": e.prev_hash,
+        }
+        for e in reversed(rows)
+    ]
+
+
+@app.get("/sites/{site}/mandate")
+def get_mandate(site: str, s: Session = Depends(db)) -> dict[str, Any]:
+    state = _state(s, site)
+    return mandates.mandate_view(s, state.require_site_id())
+
+
+@app.put("/sites/{site}/mandate")
+def put_mandate(site: str, body: SetPreset, who: Identity = Depends(identity)) -> dict[str, Any]:
+    """Issue a new mandate version from a preset. Re-decides open actions; never re-plans."""
+    if body.preset not in PRESETS:
+        raise HTTPException(422, f"preset must be one of {', '.join(PRESETS)}")
+    with org_session(who.org_id) as s:
+        state = _state(s, site)
+        person = s.get(m.Person, who.person_id)
+        if person is None or not person.approver:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "only an approver can change the mandate")
+        return mandates.set_preset(s, state, body.preset, who.person_id, person.key)
+
+
+@app.get("/sites/{site}/mandate/compare")
+def compare_mandates(site: str, s: Session = Depends(db)) -> dict[str, Any]:
+    """The latest plan under every preset, without writing anything (the dial preview)."""
+    state = _state(s, site)
+    plan_row = mandates.latest_primary_plan(s, state.require_site_id())
+    if plan_row is None:
+        return {"plan_id": None, "presets": []}
+    return {"plan_id": str(plan_row.id), "presets": mandates.compare_presets(s, state, plan_row)}
+
+
+@app.get("/sites/{site}/ledger")
+def get_ledger(
+    site: str,
+    arm: str | None = Query(default="informed"),
+    limit: int = Query(default=500, le=5000),
+    s: Session = Depends(db),
+) -> dict[str, Any]:
+    _state(s, site)
+    return {"entries": _ledger_rows(s, arm=arm, limit=limit)}
+
+
+@app.get("/sites/{site}/ledger/verify")
+def verify_ledger(site: str, s: Session = Depends(db)) -> dict[str, Any]:
+    _state(s, site)
+    r = verify_chain(s)
+    return {
+        "ok": r.ok,
+        "count": r.count,
+        "head_seq": r.head_seq,
+        "head_hash": r.head_hash,
+        "problems": r.problems,
+    }
+
+
+@app.get("/sites/{site}/runs")
+def list_runs(site: str, s: Session = Depends(db)) -> list[RunView]:
+    state = _state(s, site)
+    rows = s.execute(
+        select(m.Run).where(m.Run.site_id == state.site_id).order_by(m.Run.created_at.desc())
+    ).scalars()
+    return [runs.run_view(s, r.id) for r in rows]
+
+
+@app.get("/runs/{run_id}/plans")
+def get_run_plans(run_id: uuid.UUID, s: Session = Depends(db)) -> list[dict[str, Any]]:
+    run = s.get(m.Run, run_id)
+    if run is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "no such run")
+    site = s.get(m.Site, run.site_id)
+    assert site is not None
+    state = repo.load_state(s, site.key)
+    rows = s.execute(select(m.Plan).where(m.Plan.run_id == run_id).order_by(m.Plan.created_at)).scalars()
+    return [actions_svc.plan_view(s, state, p) for p in rows]
+
+
+@app.get("/sites/{site}/latest-plan")
+def latest_plan(site: str, s: Session = Depends(db)) -> dict[str, Any] | None:
+    state = _state(s, site)
+    plan_row = mandates.latest_primary_plan(s, state.require_site_id())
+    return actions_svc.plan_view(s, state, plan_row) if plan_row else None
+
+
+@app.get("/sites/{site}/actions/pending")
+def pending_actions(site: str, s: Session = Depends(db)) -> list[dict[str, Any]]:
+    state = _state(s, site)
+    out: list[dict[str, Any]] = []
+    for r in s.execute(
+        select(m.Run).where(m.Run.site_id == state.site_id).order_by(m.Run.created_at)
+    ).scalars():
+        p = actions_svc.primary_plan(s, r.id)
+        if p is not None:
+            out += [
+                a | {"run_id": str(r.id)}
+                for a in actions_svc.plan_view(s, state, p)["actions"]
+                if a["state"] == "pending"
+            ]
+    return out
+
+
+@app.post("/actions/{action_id}/approvals")
+def post_approval(
+    action_id: uuid.UUID, body: ApprovalIn, who: Identity = Depends(identity)
+) -> dict[str, Any]:
+    """A typed approval or decline by the token's person. On approve, the action runs (dry run)."""
+    from groundwork.approvals import ApprovalError, approve
+    from groundwork.service.pipeline import execute_actions
+
+    with org_session(who.org_id) as s:
+        action = s.get(m.Action, action_id)
+        if action is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "no such action")
+        run = s.get(m.Run, action.run_id)
+        assert run is not None
+        mandate = repo.active_mandate(s, run.site_id)
+        latest = (
+            s.execute(
+                select(m.Decision)
+                .where(m.Decision.action_id == action_id)
+                .order_by(m.Decision.created_at.desc())
+            )
+            .scalars()
+            .first()
+        )
+        kind = latest.kind if latest else "send"
+        from groundwork.schemas.action import Kind
+
+        try:
+            result = approve(
+                s,
+                person_id=who.person_id,
+                kid=who.kid,
+                action_id=action_id,
+                verdict=body.verdict,
+                idempotency_key=body.idempotency_key,
+                note=body.note,
+                mandate_version=mandate.version,
+                allowed_approvers=mandate.approvers_for(Kind(kind)),
+                sla_hours=mandate.ask.sla_hours,
+                primary_plan=actions_svc.is_primary(s, action),
+            )
+        except ApprovalError as exc:
+            raise HTTPException(exc.status, str(exc)) from exc
+        executed: list[str] = []
+        if result.created and body.verdict == "approve":
+            executed = execute_actions(s, [action], action.run_id)
+        return {
+            "approval_id": str(result.approval.id),
+            "created": result.created,
+            "verdict": result.approval.verdict,
+            "executed": executed,
+            "action_hash": result.approval.action_hash,
+            "mandate_version": result.approval.mandate_version,
+        }
+
+
+@app.get("/sites/{site}/scorecard")
+def get_scorecard(site: str, s: Session = Depends(db)) -> dict[str, Any]:
+    _state(s, site)
+    return scorecard(s)
+
+
+@app.get("/sites/{site}/attestation")
+def get_attestation(site: str, s: Session = Depends(db)) -> dict[str, Any]:
+    state = _state(s, site)
+    return attestation(s, site, repo.active_mandate(s, state.require_site_id()))
+
+
+@app.get("/runs/{run_id}/replay")
+def replay_run(run_id: uuid.UUID, s: Session = Depends(db)) -> dict[str, Any]:
+    """A recorded run, step by step, from the run row and its ledger entries (for replay on stage)."""
+    run = s.get(m.Run, run_id)
+    if run is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "no such run")
+    return {
+        "run": runs.run_view(s, run_id).model_dump(mode="json"),
+        "ledger": _ledger_rows(s, arm=None, run_id=run_id),
+    }
 
 
 @app.post("/admin/reset")

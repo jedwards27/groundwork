@@ -62,5 +62,9 @@ def check_report(plan_refs: list[str], entries: dict[str, list[str]], report: Re
         elif got != [exp]:
             inversion.append(ref)
     fabrication += [ref for ref in claimed if ref not in plan_refs]
-    return ReportCheck(ok=not (omission or fabrication or inversion), omission=omission,
-                       fabrication=sorted(set(fabrication)), inversion=inversion)
+    return ReportCheck(
+        ok=not (omission or fabrication or inversion),
+        omission=omission,
+        fabrication=sorted(set(fabrication)),
+        inversion=inversion,
+    )

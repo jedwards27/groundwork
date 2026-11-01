@@ -28,8 +28,21 @@ from groundwork.service.state import EvidenceLite, SiteState
 
 # Children first, so deletes respect foreign keys.
 _ORG_DELETE_ORDER = (
-    m.Approval, m.Decision, m.Action, m.MandateVersion, m.Plan, m.Run, m.Event, m.ItemEvidence, m.Evidence,
-    m.Milestone, m.Dependency, m.Item, m.Asset, m.SiteParty, m.Person,
+    m.Approval,
+    m.Decision,
+    m.Action,
+    m.MandateVersion,
+    m.Plan,
+    m.Run,
+    m.Event,
+    m.ItemEvidence,
+    m.Evidence,
+    m.Milestone,
+    m.Dependency,
+    m.Item,
+    m.Asset,
+    m.SiteParty,
+    m.Person,
 )
 
 
@@ -207,14 +220,31 @@ def seed_bundle(s: Session, b: SiteBundle, *, replace: bool = True) -> uuid.UUID
             )
         )
     state_mandate = _initial_mandate(b)
-    s.add(m.MandateVersion(org_id=oid, site_id=site.id, version=1, preset=state_mandate.preset,
-                           doc=state_mandate.model_dump(mode="json")))
+    s.add(
+        m.MandateVersion(
+            org_id=oid,
+            site_id=site.id,
+            version=1,
+            preset=state_mandate.preset,
+            doc=state_mandate.model_dump(mode="json"),
+        )
+    )
     s.flush()
     from groundwork.ledger import append
 
-    append(s, "mandate_issued", {"site": b.site_key, "version": 1, "preset": state_mandate.preset,
-                                 "issuer": state_mandate.issuer, "approvers": state_mandate.ask.approvers,
-                                 "summary": state_mandate.plain_lines()}, org_id=oid)
+    append(
+        s,
+        "mandate_issued",
+        {
+            "site": b.site_key,
+            "version": 1,
+            "preset": state_mandate.preset,
+            "issuer": state_mandate.issuer,
+            "approvers": state_mandate.ask.approvers,
+            "summary": state_mandate.plain_lines(),
+        },
+        org_id=oid,
+    )
     for r in b.reference_rows:
         existing = s.execute(
             select(m.ReferenceProject).where(m.ReferenceProject.key == r.key)
@@ -243,9 +273,15 @@ def _initial_mandate(b: SiteBundle):  # type: ignore[no-untyped-def]
     from groundwork.policy import build_preset
 
     spec = b.mandate
-    return build_preset(spec.preset, issuer=b.principal, approvers=list(spec.approvers),
-                        legal_approvers=list(spec.legal_approvers), sla_hours=spec.sla_hours,
-                        owner_goals=list(spec.owner_goals), valid_from=b.as_of)
+    return build_preset(
+        spec.preset,
+        issuer=b.principal,
+        approvers=list(spec.approvers),
+        legal_approvers=list(spec.legal_approvers),
+        sla_hours=spec.sla_hours,
+        owner_goals=list(spec.owner_goals),
+        valid_from=b.as_of,
+    )
 
 
 def _jsonable(v: object) -> object:
@@ -438,8 +474,15 @@ def active_mandate(s: Session, site_id: uuid.UUID):  # type: ignore[no-untyped-d
     from groundwork.policy import Mandate
 
     require_org(s)
-    row = s.execute(select(m.MandateVersion).where(m.MandateVersion.site_id == site_id)
-                    .order_by(m.MandateVersion.version.desc())).scalars().first()
+    row = (
+        s.execute(
+            select(m.MandateVersion)
+            .where(m.MandateVersion.site_id == site_id)
+            .order_by(m.MandateVersion.version.desc())
+        )
+        .scalars()
+        .first()
+    )
     if row is None:
         raise KeyError("no mandate for site")
     return Mandate.model_validate(row.doc)

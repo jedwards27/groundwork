@@ -17,8 +17,10 @@ class PlannerRefused(PlannerError):
 
     def __init__(self, category: str | None, explanation: str | None = None):
         self.category = category
-        super().__init__(f"model declined the request (category: {category or 'unspecified'})"
-                         + (f": {explanation}" if explanation else ""))
+        super().__init__(
+            f"model declined the request (category: {category or 'unspecified'})"
+            + (f": {explanation}" if explanation else "")
+        )
 
 
 @dataclass(frozen=True)

@@ -71,11 +71,16 @@ def check_effect(state: SiteState, a: ProposedAction, actor: str | None) -> tupl
     owner = items[e.item].owner
     if e.realized_by == RealizedBy.own_action:
         if owner != state.principal:
-            return False, (f"Effect on an item the principal does not control: '{items[e.item].title}' belongs to "
-                           f"{owner}; only that party (or one it answers to) can move it")
+            return False, (
+                f"Effect on an item the principal does not control: '{items[e.item].title}' belongs to "
+                f"{owner}; only that party (or one it answers to) can move it"
+            )
         return True, ""
     if actor is None or actor not in influence_chain(state, owner):
-        return False, f"The party asked ({actor or 'none'}) cannot influence '{items[e.item].title}' (owned by {owner})"
+        return (
+            False,
+            f"The party asked ({actor or 'none'}) cannot influence '{items[e.item].title}' (owned by {owner})",
+        )
     return True, ""
 
 
@@ -137,7 +142,9 @@ def resolve(
         cancel_ok = bool(ref and ref in evidence and evidence[ref].data.get("cancellation_terms"))
     attendees_ok = True
     if a.executor == Executor.schedule_internal:
-        attendees_ok = all(x in people and people[x].party == state.principal for x in (a.params.attendees or []))
+        attendees_ok = all(
+            x in people and people[x].party == state.principal for x in (a.params.attendees or [])
+        )
     effect_ok, effect_reason = check_effect(state, a, asks)
     text = classified_text(a)
     cc: ContentClass | None = None
@@ -149,18 +156,42 @@ def resolve(
             cc = stricter(cc, model_class)
             classifier = f"{RULES_CLASSIFIER}+{model_name}"
     ctx = RequestContext(
-        principal=state.principal, recipient_party=rp, recipient_known=rp is not None,
+        principal=state.principal,
+        recipient_party=rp,
+        recipient_known=rp is not None,
         recipient_direct=rp is not None and len(views.path_from_principal(state, rp)) == 1,
-        recipient_role_class=role_class, asks_party=asks, path=path, content_class=cc, classifier=classifier,
-        prior_thread=rp is not None and any(e.from_party == rp for e in state.events), amount_cents=amount,
-        amount_ref_valid=amount_ok, cancellation_terms_ok=cancel_ok, attendees_internal=attendees_ok,
-        effect_allowed=effect_ok, effect_reason=effect_reason, spent_today_cents=spent_today_cents,
+        recipient_role_class=role_class,
+        asks_party=asks,
+        path=path,
+        content_class=cc,
+        classifier=classifier,
+        prior_thread=rp is not None and any(e.from_party == rp for e in state.events),
+        amount_cents=amount,
+        amount_ref_valid=amount_ok,
+        cancellation_terms_ok=cancel_ok,
+        attendees_internal=attendees_ok,
+        effect_allowed=effect_ok,
+        effect_reason=effect_reason,
+        spent_today_cents=spent_today_cents,
         missing_params=tuple(missing),
     )
-    lag = response_lag_bd(state, profile, a, list(path)) if a.effect.realized_by == RealizedBy.counterparty_response and a.effect.item else 0
-    details = {"recipient_party": rp, "asks_party": asks, "path": list(path), "role_class": role_class,
-               "amount_cents": amount, "effect_allowed": effect_ok, "effect_reason": effect_reason,
-               "response_lag_bd": lag, "classifier": classifier, "content_class": cc.value if cc else None}
+    lag = (
+        response_lag_bd(state, profile, a, list(path))
+        if a.effect.realized_by == RealizedBy.counterparty_response and a.effect.item
+        else 0
+    )
+    details = {
+        "recipient_party": rp,
+        "asks_party": asks,
+        "path": list(path),
+        "role_class": role_class,
+        "amount_cents": amount,
+        "effect_allowed": effect_ok,
+        "effect_reason": effect_reason,
+        "response_lag_bd": lag,
+        "classifier": classifier,
+        "content_class": cc.value if cc else None,
+    }
     return Resolved(ctx, text, lag, details)
 
 

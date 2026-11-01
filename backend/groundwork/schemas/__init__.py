@@ -29,6 +29,7 @@ __all__ = [
     "EXECUTOR_CHANNEL",
     "EXECUTOR_EFFECT_CLASS",
     "NEVER_EXECUTORS",
+    "OUTBOUND_CLASSIFIED",
     "OUTBOUND_EXECUTORS",
     "ActionParams",
     "Arm",

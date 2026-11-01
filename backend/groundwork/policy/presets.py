@@ -31,24 +31,48 @@ def build_preset(
 ) -> Mandate:
     if name not in PRESETS:
         raise ValueError(f"unknown preset {name!r}; choose one of {', '.join(PRESETS)}")
-    auto = [AutoRule(name="internal", kinds=INTERNAL_KINDS, role_classes=["internal"],
-                     note="Drafting, scheduling the principal's own people, recording decisions, reporting.")]
+    auto = [
+        AutoRule(
+            name="internal",
+            kinds=INTERNAL_KINDS,
+            role_classes=["internal"],
+            note="Drafting, scheduling the principal's own people, recording decisions, reporting.",
+        )
+    ]
     if name in ("standard", "autonomous"):
         direct_only = name == "standard"
-        auto.append(AutoRule(
-            name="routine_messages", kinds=[Kind.send, Kind.chase], role_classes=["counterparty_routine"],
-            channels=[Channel.email, Channel.call], direct_only=direct_only,
-            note="Status requests and coordination with routine counterparties; text must commit nothing.",
-        ))
-        limit = SpendLimit(per_action_cents=5_000_000, per_day_cents=10_000_000) if name == "standard" else \
-            SpendLimit(per_action_cents=25_000_000, per_day_cents=50_000_000)
-        auto.append(AutoRule(
-            name="routine_spend", kinds=[Kind.reserve, Kind.commit], role_classes=["counterparty_routine"],
-            direct_only=True, spend=limit,
-            note="Spend against a written quote or PO line, within the per-action and per-day limits.",
-        ))
+        auto.append(
+            AutoRule(
+                name="routine_messages",
+                kinds=[Kind.send, Kind.chase],
+                role_classes=["counterparty_routine"],
+                channels=[Channel.email, Channel.call],
+                direct_only=direct_only,
+                note="Status requests and coordination with routine counterparties; text must commit nothing.",
+            )
+        )
+        limit = (
+            SpendLimit(per_action_cents=5_000_000, per_day_cents=10_000_000)
+            if name == "standard"
+            else SpendLimit(per_action_cents=25_000_000, per_day_cents=50_000_000)
+        )
+        auto.append(
+            AutoRule(
+                name="routine_spend",
+                kinds=[Kind.reserve, Kind.commit],
+                role_classes=["counterparty_routine"],
+                direct_only=True,
+                spend=limit,
+                note="Spend against a written quote or PO line, within the per-action and per-day limits.",
+            )
+        )
     return Mandate(
-        id=f"mandate-{issuer}", version=version, preset=name, issuer=issuer, subject=subject, valid_from=valid_from,
+        id=f"mandate-{issuer}",
+        version=version,
+        preset=name,
+        issuer=issuer,
+        subject=subject,
+        valid_from=valid_from,
         dry_run=dry_run,
         never=[Kind.pay, Kind.sign, Kind.delete],
         record_bearing_kinds=[Kind.legal, Kind.file, Kind.pay, Kind.sign, Kind.delete],

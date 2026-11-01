@@ -75,7 +75,11 @@ class Decision:
 def derive_kind(action: ProposedAction, ctx: RequestContext) -> Kind:
     ex = action.executor
     if ex == Executor.send_email:
-        return Kind.chase if ctx.prior_thread and ctx.recipient_role_class == "counterparty_routine" else Kind.send
+        return (
+            Kind.chase
+            if ctx.prior_thread and ctx.recipient_role_class == "counterparty_routine"
+            else Kind.send
+        )
     if ex == Executor.draft_document:
         return Kind.legal if ctx.content_class == ContentClass.legal_notice else Kind.draft
     return {
@@ -110,8 +114,17 @@ def decide(action: ProposedAction, ctx: RequestContext, mandate: Mandate) -> Dec
     record_bearing = kind in mandate.record_bearing_kinds or role_class in mandate.record_bearing_role_classes
 
     def out(decision: Autonomy, reason: str, rule: str) -> Decision:
-        return Decision(decision, reason, rule, _delta(action.proposed_autonomy, decision), kind, effect_class,
-                        channel, record_bearing, ctx.amount_cents)
+        return Decision(
+            decision,
+            reason,
+            rule,
+            _delta(action.proposed_autonomy, decision),
+            kind,
+            effect_class,
+            channel,
+            record_bearing,
+            ctx.amount_cents,
+        )
 
     # 1. The never-list, before anything else and regardless of context.
     if ex in NEVER_EXECUTORS or kind in mandate.never:
@@ -124,21 +137,43 @@ def decide(action: ProposedAction, ctx: RequestContext, mandate: Mandate) -> Dec
         return out(Autonomy.ask, "Unknown recipient: not a person or party on this site", "unknown_recipient")
     if ex in OUTBOUND_EXECUTORS and not ctx.recipient_direct:
         route = " → ".join(ctx.path) if ctx.path else "an unknown path"
-        return out(Autonomy.ask, f"No direct channel to {ctx.recipient_party}; the route is {route}", "no_direct_channel")
+        return out(
+            Autonomy.ask,
+            f"No direct channel to {ctx.recipient_party}; the route is {route}",
+            "no_direct_channel",
+        )
     if ex in OUTBOUND_CLASSIFIED and ctx.content_class not in (ContentClass.none,):
         cc = (ctx.content_class or ContentClass.unknown).value
-        why = "the classifier could not confirm it commits nothing" if cc == "unknown" else f"its text reads as {cc.replace('_', ' ')}"
+        why = (
+            "the classifier could not confirm it commits nothing"
+            if cc == "unknown"
+            else f"its text reads as {cc.replace('_', ' ')}"
+        )
         return out(Autonomy.ask, f"Outbound text needs a person: {why}", "content")
     if record_bearing:
-        why = f"{kind.value} actions" if kind in mandate.record_bearing_kinds else f"messages to {role_class.replace('_', ' ')} parties"
+        why = (
+            f"{kind.value} actions"
+            if kind in mandate.record_bearing_kinds
+            else f"messages to {role_class.replace('_', ' ')} parties"
+        )
         return out(Autonomy.ask, f"Record-bearing: {why} always need a person", "record_bearing")
     if not ctx.effect_allowed:
-        return out(Autonomy.ask, ctx.effect_reason or "Effect on an item the principal does not control", "effect")
+        return out(
+            Autonomy.ask, ctx.effect_reason or "Effect on an item the principal does not control", "effect"
+        )
     if kind in SPEND_KINDS:
         if not ctx.amount_ref_valid:
-            return out(Autonomy.ask, "No structured amount: spend must cite a quote, PO line or fee in evidence", "amount")
+            return out(
+                Autonomy.ask,
+                "No structured amount: spend must cite a quote, PO line or fee in evidence",
+                "amount",
+            )
         if kind == Kind.reserve and not (ctx.amount_cents or 0) and not ctx.cancellation_terms_ok:
-            return out(Autonomy.ask, "Zero-deposit reservation without cancellation terms on file", "reservation_terms")
+            return out(
+                Autonomy.ask,
+                "Zero-deposit reservation without cancellation terms on file",
+                "reservation_terms",
+            )
     if ex == Executor.schedule_internal and not ctx.attendees_internal:
         return out(Autonomy.ask, "External attendee on an internal calendar hold", "attendees")
 
@@ -151,25 +186,38 @@ def decide(action: ProposedAction, ctx: RequestContext, mandate: Mandate) -> Dec
         if rule.channels is not None and channel != Channel.none and channel not in rule.channels:
             continue
         if rule.direct_only and not direct:
-            blocked.append(f"it asks {ctx.asks_party} through {' → '.join(ctx.path)}, which the {mandate.preset} "
-                           f"mandate only allows with approval")
+            blocked.append(
+                f"it asks {ctx.asks_party} through {' → '.join(ctx.path)}, which the {mandate.preset} "
+                f"mandate only allows with approval"
+            )
             continue
         if kind in SPEND_KINDS:
             if rule.spend is None:
                 continue
             amount = ctx.amount_cents or 0
             if amount > rule.spend.per_action_cents:
-                blocked.append(f"{_money(amount)} exceeds the {_money(rule.spend.per_action_cents)} per-action limit")
+                blocked.append(
+                    f"{_money(amount)} exceeds the {_money(rule.spend.per_action_cents)} per-action limit"
+                )
                 continue
             if ctx.spent_today_cents + amount > rule.spend.per_day_cents:
-                blocked.append(f"{_money(amount)} would pass the {_money(rule.spend.per_day_cents)} daily limit "
-                               f"({_money(ctx.spent_today_cents)} already committed today)")
+                blocked.append(
+                    f"{_money(amount)} would pass the {_money(rule.spend.per_day_cents)} daily limit "
+                    f"({_money(ctx.spent_today_cents)} already committed today)"
+                )
                 continue
-            return out(Autonomy.auto, f"{_money(amount)} is within the {_money(rule.spend.per_action_cents)} limit "
-                                      f"({rule.name})", rule.name)
+            return out(
+                Autonomy.auto,
+                f"{_money(amount)} is within the {_money(rule.spend.per_action_cents)} limit ({rule.name})",
+                rule.name,
+            )
         return out(Autonomy.auto, rule.note or f"Within authority ({rule.name})", rule.name)
 
     # 4. Ask by default.
     if blocked:
         return out(Autonomy.ask, "Needs approval: " + "; ".join(blocked), "limit")
-    return out(Autonomy.ask, f"Not covered by the {mandate.preset} mandate's auto rules; routed to an approver", "default_ask")
+    return out(
+        Autonomy.ask,
+        f"Not covered by the {mandate.preset} mandate's auto rules; routed to an approver",
+        "default_ask",
+    )

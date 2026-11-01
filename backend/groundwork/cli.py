@@ -156,9 +156,158 @@ def demo(
     with org_session(org_id) as s:
         rv = runs.run_view(s, run_id)
     for step in (rv.summary or {}).get("steps", []):
-        console.print(f"  [dim]{step['i']:>2}[/] {step['kind']:<9} {step['text']}")
+        console.print(f"  [dim]{step['i']:>2}[/] {step['kind']:<14} {step['text']}")
     after = _load_db_state(site)
     _print_event(after, event, views.chain_view(after), views.forecast_view(after))
+    _slice2_beats(org_id, site, run_id)
+
+
+def _slice2_beats(org_id: uuid.UUID, site: str, run_id: uuid.UUID) -> None:
+    """The plan, an approval by a named person, the acknowledgment that changes nothing, the ledger
+    check and tamper, the attestation."""
+    from sqlalchemy import text
+
+    from groundwork.approvals import approve
+    from groundwork.db import models as m
+    from groundwork.db import repo
+    from groundwork.db.session import org_session, owner_session
+    from groundwork.ledger import verify_chain
+    from groundwork.schemas.action import Kind
+    from groundwork.service import actions as actions_svc
+    from groundwork.service import runs
+    from groundwork.service.attestation import attestation
+    from groundwork.service.pipeline import execute_actions
+
+    with org_session(org_id) as s:
+        state = repo.load_state(s, site)
+        plan_row = actions_svc.primary_plan(s, run_id)
+        if plan_row is None:
+            return
+        pv = actions_svc.plan_view(s, state, plan_row)
+        mandate = repo.active_mandate(s, state.require_site_id())
+    banner = "[yellow]Simulated planner: these actions were written by hand to exercise the gateway. No model is running.[/]"
+    console.rule("[bold]The plan, decided by the gateway")
+    if pv["simulated"]:
+        console.print(banner)
+    console.print(f"[dim]{pv['assessment']}[/]")
+    t = Table(header_style="bold", show_lines=False)
+    for col in ("ref", "action", "proposed", "gateway", "why", "state"):
+        t.add_column(col)
+    style = {"auto": "cyan", "ask": "yellow", "refuse": "red"}
+    for a in pv["actions"]:
+        held = " [yellow](held)[/]" if a["delta"] == "over_reach" else ""
+        t.add_row(
+            a["ref"],
+            a["title"][:52],
+            a["proposed_autonomy"],
+            f"[{style.get(a['decision'], 'white')}]{a['decision']}[/]{held}",
+            a["reason"][:58],
+            a["state"],
+        )
+    console.print(t)
+    d = pv["differential"]
+    if d:
+        console.print(
+            f"Delivery: unmitigated {d['unmitigated']} · with what ran {d['now']} · if you approve the queue "
+            f"{d['if_approved']} · [green]if the landlord agrees {d['if_they_agree']} "
+            f"({d['recovered_if_they_agree']} days back)[/]"
+        )
+    console.rule("[bold]An auto-reply says 'approved, please proceed'")
+    with org_session(org_id) as s:
+        ack = runs.start_run(s, site, "ack-approved", None)
+    runs.execute_run(org_id, ack)
+    with org_session(org_id) as s:
+        st = next(x for x in runs.run_view(s, ack).summary["steps"] if x["kind"] == "acknowledgment")  # type: ignore[index]
+        pv2 = actions_svc.plan_view(s, repo.load_state(s, site), plan_row)
+    console.print(st["text"])
+    console.print(
+        "States after the message (nothing moved): "
+        + ", ".join(f"{a['ref']}={a['state']}" for a in pv2["actions"])
+    )
+    held = next((a for a in pv["actions"] if a["delta"] == "over_reach" and a["state"] == "pending"), None)
+    if held:
+        console.rule("[bold]A named person approves one ask")
+        with org_session(org_id) as s:
+            person = s.execute(select(m.Person).where(m.Person.key.in_(held["approvers"]))).scalars().first()
+            action = s.get(m.Action, uuid.UUID(held["id"]))
+            assert person is not None and action is not None
+            approve(
+                s,
+                person_id=person.id,
+                kid="cli-demo",
+                action_id=action.id,
+                verdict="approve",
+                idempotency_key=f"demo:{held['id']}",
+                note="Approved in the CLI demo",
+                mandate_version=mandate.version,
+                allowed_approvers=mandate.approvers_for(Kind(held["kind"])),
+                sla_hours=mandate.ask.sla_hours,
+                primary_plan=True,
+            )
+            done = execute_actions(s, [action], action.run_id)
+        console.print(
+            f"{person.name} approved {held['ref']} ('{held['title']}'); it ran in dry run: {', '.join(done)}."
+        )
+    console.rule("[bold]The ledger")
+    with org_session(org_id) as s:
+        r = verify_chain(s)
+    console.print(
+        f"verify_chain: [green]ok[/] · {r.count} entries · head {r.head_hash[:16]}…"
+        if r.ok
+        else f"verify_chain FAILED: {r.problems}"
+    )
+    with owner_session() as s:
+        s.execute(text("ALTER TABLE ledger_entry DISABLE TRIGGER ledger_no_update_delete"))
+        s.execute(
+            text(
+                "UPDATE ledger_entry SET payload = jsonb_set(payload, '{reason}', '\"edited after the fact\"') "
+                "WHERE org_id = :o AND entry_type = 'decided' AND seq = (SELECT min(seq) FROM ledger_entry "
+                "WHERE org_id = :o AND entry_type = 'decided')"
+            ),
+            {"o": org_id},
+        )
+        s.execute(text("ALTER TABLE ledger_entry ENABLE TRIGGER ledger_no_update_delete"))
+    with org_session(org_id) as s:
+        r2 = verify_chain(s)
+        att = attestation(s, site, mandate)
+    console.print("Someone with owner credentials disabled the trigger and edited one decision's reason.")
+    console.print(
+        f"verify_chain: [red]FAILED[/] · {r2.problems[0]}"
+        if not r2.ok
+        else "verify_chain did not catch it (bug)"
+    )
+    a = att["attestation"]
+    console.rule("[bold]Attestation (genesis to head, HMAC-signed with the dev key)")
+    console.print(
+        f"violations {a['violations']['count']} · chain verified {a['ledger']['chain_verified']} · head seq "
+        f"{a['ledger']['head_seq']} · dry run {a['dry_run']} · signer {a['signer']}"
+    )
+    console.print(f"signature {att['signature']['value'][:24]}…  (run `make demo` again to reset)")
+
+
+@app.command()
+def cost(site: str = typer.Option("lake-mariner")) -> None:
+    """Model spend recorded in the database (plan rows and report entries), at list prices."""
+    from evals.run import PRICES
+    from evals.run import cost as usd
+    from groundwork.db import models as m
+    from groundwork.db.session import org_session
+
+    with org_session(_org_for_site(site)) as s:
+        plans = list(s.execute(select(m.Plan)).scalars())
+        reports = list(s.execute(select(m.LedgerEntry).where(m.LedgerEntry.entry_type == "report")).scalars())
+    live = [p for p in plans if p.planner.startswith("claude")]
+    total = sum(usd(p.model_id, p.usage) for p in live)
+    rep = sum(usd(get_settings().groundwork_report_model, r.payload.get("usage") or {}) for r in reports)
+    reads = sum(int(p.usage.get("cache_read_input_tokens", 0)) for p in live)
+    console.print(
+        f"{len(plans)} plans ({len(live)} live) · planner ${total:.2f} · reports ${rep:.3f} · "
+        f"cache-read tokens {reads:,} · prices for {', '.join(PRICES)}"
+    )
+    if not live:
+        console.print(
+            "No live plans yet: set ANTHROPIC_API_KEY and play an event. The README has the estimate."
+        )
 
 
 @app.command()

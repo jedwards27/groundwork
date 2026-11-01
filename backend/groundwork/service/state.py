@@ -9,10 +9,10 @@ from typing import Any
 
 from groundwork.ingest.site_loader import (
     EventRow,
-    MandateSpec,
     FactRow,
     ItemRow,
     LinkRow,
+    MandateSpec,
     MilestoneRow,
     PartyRow,
     PersonRow,
@@ -90,7 +90,8 @@ class SiteState:
             ],
             facts=list(b.facts),
             reference_rows=list(b.reference_rows),
-            timezone=b.timezone, mandate_spec=b.mandate,
+            timezone=b.timezone,
+            mandate_spec=b.mandate,
         )
 
     def initial_mandate(self):  # type: ignore[no-untyped-def]
@@ -98,9 +99,20 @@ class SiteState:
         from groundwork.policy import build_preset
 
         spec = self.mandate_spec
-        return build_preset(spec.preset, issuer=self.principal, approvers=list(spec.approvers),
-                            legal_approvers=list(spec.legal_approvers), sla_hours=spec.sla_hours,
-                            owner_goals=list(spec.owner_goals), valid_from=self.as_of)
+        return build_preset(
+            spec.preset,
+            issuer=self.principal,
+            approvers=list(spec.approvers),
+            legal_approvers=list(spec.legal_approvers),
+            sla_hours=spec.sla_hours,
+            owner_goals=list(spec.owner_goals),
+            valid_from=self.as_of,
+        )
+
+    def require_site_id(self) -> uuid.UUID:
+        if self.site_id is None:
+            raise RuntimeError("site state was not loaded from the database")
+        return self.site_id
 
     def item(self, key: str) -> ItemRow:
         return next(i for i in self.items if i.key == key)

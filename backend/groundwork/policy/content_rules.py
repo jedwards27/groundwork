@@ -9,19 +9,48 @@ import re
 
 from groundwork.schemas.action import ContentClass
 
-SEVERITY = [ContentClass.none, ContentClass.commits_money, ContentClass.accepts_terms, ContentClass.waives_rights,
-            ContentClass.legal_notice, ContentClass.unknown]
+SEVERITY = [
+    ContentClass.none,
+    ContentClass.commits_money,
+    ContentClass.accepts_terms,
+    ContentClass.waives_rights,
+    ContentClass.legal_notice,
+    ContentClass.unknown,
+]
 
 _RULES: list[tuple[ContentClass, re.Pattern[str]]] = [
-    (ContentClass.legal_notice, re.compile(
-        r"\b(notice of|hereby notif\w*|cure period|in default|event of default|terminat\w*|liquidated damages|"
-        r"breach|reserv\w* (our|its|all|the) rights|remed(y|ies) under)\b", re.I)),
-    (ContentClass.waives_rights, re.compile(r"\b(waive\w*|waiver|relinquish\w*|forg?o(ing|es)?|hold harmless|"
-                                            r"release (any|all) claims?)\b", re.I)),
-    (ContentClass.accepts_terms, re.compile(r"\b(we accept|we agree|agree to|accept(ance|ed)?|approved?|"
-                                            r"go ahead with|sign[- ]off|confirm the order)\b", re.I)),
-    (ContentClass.commits_money, re.compile(r"(\$\s?\d)|\b(fee|invoice|payment|pay|deposit|purchase order|"
-                                            r"PO number|wire|remit\w*|expedite charge)\b", re.I)),
+    (
+        ContentClass.legal_notice,
+        re.compile(
+            r"\b(notice of|hereby notif\w*|cure period|in default|event of default|terminat\w*|liquidated damages|"
+            r"breach|reserv\w* (our|its|all|the) rights|remed(y|ies) under)\b",
+            re.I,
+        ),
+    ),
+    (
+        ContentClass.waives_rights,
+        re.compile(
+            r"\b(waive\w*|waiver|relinquish\w*|forg?o(ing|es)?|hold harmless|"
+            r"release (any|all) claims?)\b",
+            re.I,
+        ),
+    ),
+    (
+        ContentClass.accepts_terms,
+        re.compile(
+            r"\b(we accept|we agree|agree to|accept(ance|ed)?|approved?|"
+            r"go ahead with|sign[- ]off|confirm the order)\b",
+            re.I,
+        ),
+    ),
+    (
+        ContentClass.commits_money,
+        re.compile(
+            r"(\$\s?\d)|\b(fee|invoice|payment|pay|deposit|purchase order|"
+            r"PO number|wire|remit\w*|expedite charge)\b",
+            re.I,
+        ),
+    ),
 ]
 
 

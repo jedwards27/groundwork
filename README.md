@@ -11,8 +11,8 @@ Start with `CLAUDE.md` (the brief), then `docs/ARCHITECTURE.md`, `docs/TECH-DESI
 | Slice | What | State |
 |---|---|---|
 | 1 | Schema, fixture, critical-path and forecast engine, API, CLI demo | **Done** |
-| 2 | Mandate, gateway, ledger, approvals, planners (informed and blind arms), reports, evals | Next |
-| 3 | Mission Control web app ported from `prototype/index.html` | After slice 2 |
+| 2 | Mandate, gateway, ledger, approvals, planners (informed and blind arms), reports, evals | **Done** (live Claude path tested against a fake client only) |
+| 3 | Mission Control web app ported from `prototype/index.html` | Next |
 | 4+ | Email and PDF connectors with extraction, approvals UX, notifications, second site | Later |
 
 ## Run it
@@ -34,7 +34,7 @@ make dev
 docker compose --profile full up
 ```
 
-Set `ANTHROPIC_API_KEY` in `.env` to use the live planner when slice 2 lands. Without it, everything still runs.
+Set `ANTHROPIC_API_KEY` in `.env` to use the live planner (Opus 5.5 plans, Haiku 5.5 classifies outbound text and writes the post-execution report). Without it, everything runs on the hand-written simulated planner, under a banner that says so. Live planning is capped per day (`GROUNDWORK_DAILY_LIVE_RUN_CAP`). `docs/DATA-BOUNDARY.md` lists what is sent.
 
 ## The slice-1 demo
 
@@ -50,7 +50,15 @@ It reseeds the site, then prints:
 4. **The paper chain**, 26 items by party with planned and forecast dates, and the reference set behind the forecast ("no comparable items yet" for the gate, and why).
 5. **Event A played as a run.** The landlord, via the lessee, forwards NYSEG's revised short-circuit data: the coordination study must be re-run and re-reviewed. Delivery moves to Mon Mar 1, 2027 (range Feb 15 to Mar 16), 48 days late, and the forecast names both legs.
 
-`make demo-offline` prints the same from the fixture folder with no database.
+Then the slice-2 beats:
+
+6. **The plan, decided by the gateway.** Eight actions in the end user's seat. Five run alone in dry run, including engaging the end user's own engineer against an $18,500 quote within the $50,000 limit. Three wait for a person: the state escalation, the legal draft for counsel, and the request that the landlord ask NYSEG for staged energization, which the planner proposed to send alone and the gateway **held**. Delivery recovers 0 days on the end user's own actions and **14 days if the landlord agrees**, computed by the scheduler, never by the model.
+7. **An auto-reply says "approved, please proceed".** It is linked to the pending request and changes nothing.
+8. **A named person approves.** Dana approves the held request; it runs in dry run, and the approval is bound to the action's hash and the mandate version.
+9. **The ledger.** `verify_chain` passes; then someone with owner credentials disables the trigger and edits one decision, and verification fails on that entry.
+10. **The attestation.** Genesis to head, zero violations, HMAC-signed with the dev key, with a list of what it does not prove.
+
+`make demo-offline` prints the slice-1 part from the fixture folder with no database. Event B (`groundwork demo --event event-b`) shows the $250,000 expedite payment refused by the never-list.
 
 To watch it through the API, mint a token and call it:
 
@@ -63,6 +71,38 @@ curl -s -H "Authorization: Bearer $TOKEN" localhost:8000/sites/lake-mariner/crit
 ```bash
 curl -s -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"event":"event-a"}' localhost:8000/sites/lake-mariner/events
 ```
+
+## Evals
+
+```bash
+cd backend && uv run python -m evals.run
+```
+
+Plays 6 event templates under the 3 mandate presets in both arms (with and without the mandate in the prompt) and runs the real gateway over every plan. It reports hard violations, over-reach (held) and over-caution, honest reporting against the ledger including a withheld-row check, plan quality against a reviewed set, and injection resistance. `--live --repeat 3` runs Claude (about 430 decisions per arm, about $25 per model version). Definitions are in `backend/evals/README.md`.
+
+Simulated planner, Nov 1, 2026 (both arms identical because the simulated planner ignores the mandate; precision@3 is 1.0 by construction because the reviewed set was written from the same plans):
+
+| Metric | Value |
+|---|---|
+| Hard violations (auto on pay, sign, delete) | 0 |
+| Over-reach rate (held by the gateway) | 3.5% |
+| Over-caution rate | 0.7% |
+| Reports matching the ledger | 100% |
+| Fabrication when a ledger row is withheld | 0% |
+| Injection cases resisted | 6 of 6 |
+
+The live Claude numbers, per arm and model version, go here once a key is used.
+
+## Cost
+
+Measured prompt: about 6,400 cached tokens per site plus about 600 per event. Assuming about 6,000 output tokens per plan:
+
+| | Per event | Per site per month | 15 sites per month |
+|---|---|---|---|
+| 5 events a day | $0.28 | $42 | $630 |
+| 20 events a day | $0.28 | $167 | $2,500 |
+
+Opus 5.5 planning in both arms (the blind arm reads the informed arm's cache), Haiku 5.5 for classification and reports. `cd backend && uv run groundwork cost` reports actual spend from recorded usage.
 
 ## Load your own site
 
@@ -80,11 +120,22 @@ It validates the folder, lists every problem at once if there are any, and other
 make test
 ```
 
-Lint (ruff), types (pyright), import boundaries (import-linter) and the test suite: the calendar and scheduler, golden tests on the fixture (computed gate, both events, holiday loss), loader error reporting, signed tokens, row-level security (the app role sees nothing without an org and nothing of another org), the API end to end, and a check that the generic engine contains no data-center vocabulary.
+Lint (ruff), types (pyright), six import boundaries (import-linter: the planner cannot reach executors, approvals, the ledger or the database; ingestion cannot create approvals) and the test suite. It covers:
+
+- the calendar and scheduler, and golden tests on the fixture;
+- 172 gateway table rows;
+- the ledger: test vector, tamper and delete detection, triggers that bind the owner, no forks under concurrency;
+- the honesty check;
+- the pipeline end to end, and typed, bound approvals;
+- a property test that no inbound message changes any action's state;
+- mandate re-decision, and blind-arm isolation;
+- the Claude planner, classifier and reporter against a fake client;
+- the eval harness, row-level security, and a check that the generic engine contains no data-center vocabulary.
 
 ## Docs
 
-- `docs/decisions/`: ADRs 0001 to 0004 so far.
+- `docs/decisions/`: ADRs 0001 to 0006.
+- `docs/LEDGER.md`: the ledger's hash format, a test vector, and what verification does and does not catch.
 - `docs/PRACTITIONER-QUESTIONS.md`: the 20 questions that confirm or correct the fixture's assumptions.
 - `docs/DATA-BOUNDARY.md`: exactly what leaves your machine.
 - `docs/reviews/`: three rounds of plan review that shaped this design.

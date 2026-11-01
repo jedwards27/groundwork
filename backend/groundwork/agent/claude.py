@@ -62,9 +62,14 @@ class ClaudePlanner:
         plan = resp.parsed_output
         if plan is None:
             raise PlannerError(f"no parseable plan (stop_reason={resp.stop_reason})")
-        return PlannerResult(plan=plan, planner=self.name, model_id=resp.model,
-                             prompt_hash=prompt_hash(self.model, system, messages), usage=_usage(resp),
-                             request_id=getattr(resp, "_request_id", None))
+        return PlannerResult(
+            plan=plan,
+            planner=self.name,
+            model_id=resp.model,
+            prompt_hash=prompt_hash(self.model, system, messages),
+            usage=_usage(resp),
+            request_id=getattr(resp, "_request_id", None),
+        )
 
 
 class ContentVerdict(BaseModel):
@@ -93,9 +98,12 @@ class ClaudeClassifier:
         """Fails closed: any error or refusal yields ``unknown``."""
         try:
             resp = self.client.messages.parse(
-                model=self.model, max_tokens=1024, system=CLASSIFIER_SYSTEM,
+                model=self.model,
+                max_tokens=1024,
+                system=CLASSIFIER_SYSTEM,
                 messages=[{"role": "user", "content": f"TEXT TO CLASSIFY\n<<<\n{text}\n>>>"}],
-                output_format=ContentVerdict, output_config={"effort": "low"},  # type: ignore[typeddict-item]
+                output_format=ContentVerdict,
+                output_config={"effort": "low"},  # type: ignore[typeddict-item]
             )
         except anthropic.APIError as exc:
             return ContentClass.unknown, f"classifier error: {type(exc).__name__}", {}
@@ -121,15 +129,21 @@ class ClaudeReporter:
 
     def report(self, plan: Plan, entries: dict[str, list[str]]) -> tuple[Report, dict[str, Any]]:
         payload = {
-            "plan": [{"ref": a.ref, "title": a.title, "proposed_autonomy": a.proposed_autonomy.value} for a in plan.actions],
+            "plan": [
+                {"ref": a.ref, "title": a.title, "proposed_autonomy": a.proposed_autonomy.value}
+                for a in plan.actions
+            ],
             "intent": plan.intent.model_dump(),
             "ledger_entry_types": entries,
         }
         try:
             resp = self.client.messages.parse(
-                model=self.model, max_tokens=2048, system=REPORTER_SYSTEM,
+                model=self.model,
+                max_tokens=2048,
+                system=REPORTER_SYSTEM,
                 messages=[{"role": "user", "content": canonical_json(payload)}],
-                output_format=Report, output_config={"effort": "low"},  # type: ignore[typeddict-item]
+                output_format=Report,
+                output_config={"effort": "low"},  # type: ignore[typeddict-item]
             )
         except anthropic.APIError as exc:
             raise PlannerError(f"reporter API error: {type(exc).__name__}") from exc

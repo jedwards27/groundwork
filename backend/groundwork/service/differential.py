@@ -39,8 +39,11 @@ def _adjustments(state: SiteState, e: EffectInput) -> list[Adjustment]:
     if eff.kind == EffectKind.none or not e.effect_allowed or not eff.item:
         return []
     # A counterparty-dependent effect cannot land before the counterparty can respond.
-    floor = (not_before(state.as_of, e.response_lag_bd, state.holidays)
-             if eff.realized_by == RealizedBy.counterparty_response else None)
+    floor = (
+        not_before(state.as_of, e.response_lag_bd, state.holidays)
+        if eff.realized_by == RealizedBy.counterparty_response
+        else None
+    )
     if eff.kind == EffectKind.duration_reduction:
         return [Adjustment("duration_reduction", eff.item, eff.days, label=e.ref, floor=floor)]
     if eff.kind == EffectKind.lag_reduction:
@@ -88,10 +91,24 @@ def compute(state: SiteState, effects: list[EffectInput]) -> Differential:
         if e.effect.kind == EffectKind.none:
             continue
         alone = finish([e]) if e.effect_allowed else base
-        contributions.append({"ref": e.ref, "state": e.state, "realized_by": e.effect.realized_by.value,
-                              "credited": e.effect_allowed, "days_alone": rec(alone),
-                              "response_lag_bd": e.response_lag_bd})
-    return Differential(target_date=views.primary_milestone(state).target_date, unmitigated=base, now=f_now,
-                        if_approved=f_appr, if_they_agree=f_agree, recovered_now=rec(f_now),
-                        recovered_if_approved=rec(f_appr), recovered_if_they_agree=rec(f_agree),
-                        contributions=contributions)
+        contributions.append(
+            {
+                "ref": e.ref,
+                "state": e.state,
+                "realized_by": e.effect.realized_by.value,
+                "credited": e.effect_allowed,
+                "days_alone": rec(alone),
+                "response_lag_bd": e.response_lag_bd,
+            }
+        )
+    return Differential(
+        target_date=views.primary_milestone(state).target_date,
+        unmitigated=base,
+        now=f_now,
+        if_approved=f_appr,
+        if_they_agree=f_agree,
+        recovered_now=rec(f_now),
+        recovered_if_approved=rec(f_appr),
+        recovered_if_they_agree=rec(f_agree),
+        contributions=contributions,
+    )

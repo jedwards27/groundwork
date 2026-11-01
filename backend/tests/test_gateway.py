@@ -12,34 +12,74 @@ import pytest
 from groundwork.policy import RequestContext, build_preset, decide
 from groundwork.schemas import ActionParams, Autonomy, ContentClass, Effect, Executor, Kind, ProposedAction
 
-PRESETS = {name: build_preset(name, issuer="principal", approvers=["approver"], legal_approvers=["counsel"],
-                              valid_from=date(2026, 11, 2)) for name in ("supervised", "standard", "autonomous")}
+PRESETS = {
+    name: build_preset(
+        name,
+        issuer="principal",
+        approvers=["approver"],
+        legal_approvers=["counsel"],
+        valid_from=date(2026, 11, 2),
+    )
+    for name in ("supervised", "standard", "autonomous")
+}
 
-FULL_PARAMS = ActionParams(subject="Status", body="Please share the latest status report.", agenda="Weekly status",
-                           attendees=["me"], window_start="2026-11-10", amount_ref="quote-1", scope="Review",
-                           document_title="Status memo", package_title="Package", summary="Summary",
-                           decision="Re-plan", record_ref="r1", deposit_cents=0)
+FULL_PARAMS = ActionParams(
+    subject="Status",
+    body="Please share the latest status report.",
+    agenda="Weekly status",
+    attendees=["me"],
+    window_start="2026-11-10",
+    amount_ref="quote-1",
+    scope="Review",
+    document_title="Status memo",
+    package_title="Package",
+    summary="Summary",
+    decision="Re-plan",
+    record_ref="r1",
+    deposit_cents=0,
+)
 
 
 def action(executor: Executor, proposed: Autonomy = Autonomy.auto, **kw) -> ProposedAction:
-    return ProposedAction(ref="a1", title="t", executor=executor, recipient=kw.pop("recipient", "party-x"),
-                          params=kw.pop("params", FULL_PARAMS), effect=kw.pop("effect", Effect()),
-                          proposed_autonomy=proposed, rationale="r", **kw)
+    return ProposedAction(
+        ref="a1",
+        title="t",
+        executor=executor,
+        recipient=kw.pop("recipient", "party-x"),
+        params=kw.pop("params", FULL_PARAMS),
+        effect=kw.pop("effect", Effect()),
+        proposed_autonomy=proposed,
+        rationale="r",
+        **kw,
+    )
 
 
 def ctx(role_class: str | None, **kw) -> RequestContext:
-    base = dict(principal="principal", recipient_party="party-x" if role_class else None,
-                recipient_known=role_class is not None, recipient_direct=role_class is not None,
-                recipient_role_class=role_class, asks_party="party-x" if role_class else None,
-                path=("party-x",) if role_class else (), content_class=ContentClass.none,
-                amount_cents=1_850_000, amount_ref_valid=True, cancellation_terms_ok=True)
+    base = dict(
+        principal="principal",
+        recipient_party="party-x" if role_class else None,
+        recipient_known=role_class is not None,
+        recipient_direct=role_class is not None,
+        recipient_role_class=role_class,
+        asks_party="party-x" if role_class else None,
+        path=("party-x",) if role_class else (),
+        content_class=ContentClass.none,
+        amount_cents=1_850_000,
+        amount_ref_valid=True,
+        cancellation_terms_ok=True,
+    )
     base.update(kw)
     return RequestContext(**base)
 
 
 # --- the declarative table ---------------------------------------------------------------------
 NEVER = {Executor.pay_invoice, Executor.sign_document, Executor.delete_record}
-INTERNAL = {Executor.draft_document, Executor.schedule_internal, Executor.escalate_to_owner, Executor.record_decision}
+INTERNAL = {
+    Executor.draft_document,
+    Executor.schedule_internal,
+    Executor.escalate_to_owner,
+    Executor.record_decision,
+}
 MESSAGES = {Executor.send_email, Executor.request_meeting}
 SPEND = {Executor.reserve_slot, Executor.commit_spend}
 ROLE_CLASSES = ["regulator", "counterparty_binding", "counterparty_routine", "internal"]
@@ -64,8 +104,9 @@ def expected(executor: Executor, role_class: str, preset: str) -> Autonomy:
 TABLE = list(itertools.product(list(Executor), ROLE_CLASSES, list(PRESETS)))
 
 
-@pytest.mark.parametrize(("executor", "role_class", "preset"), TABLE,
-                         ids=[f"{e.value}-{r}-{p}" for e, r, p in TABLE])
+@pytest.mark.parametrize(
+    ("executor", "role_class", "preset"), TABLE, ids=[f"{e.value}-{r}-{p}" for e, r, p in TABLE]
+)
 def test_table(executor, role_class, preset):
     internal = executor in INTERNAL or executor in NEVER - {Executor.pay_invoice, Executor.sign_document}
     if role_class == "internal":
@@ -76,8 +117,14 @@ def test_table(executor, role_class, preset):
         c = ctx(role_class)
     if internal and role_class != "internal":
         # Internal executors addressed outward: treat the recipient as an external attendee.
-        c = ctx(role_class, attendees_internal=False, effect_allowed=executor != Executor.record_decision,
-                content_class=ContentClass.legal_notice if executor == Executor.draft_document else ContentClass.none)
+        c = ctx(
+            role_class,
+            attendees_internal=False,
+            effect_allowed=executor != Executor.record_decision,
+            content_class=ContentClass.legal_notice
+            if executor == Executor.draft_document
+            else ContentClass.none,
+        )
     d = decide(a, c, PRESETS[preset])
     assert d.decision == expected(executor, role_class, preset), d.reason
 
@@ -121,8 +168,16 @@ def test_request_passed_along_needs_approval_under_standard_not_autonomous():
     assert decide(action(Executor.send_email), c, AUTO).decision == Autonomy.auto
 
 
-@pytest.mark.parametrize("cc", [ContentClass.commits_money, ContentClass.accepts_terms, ContentClass.waives_rights,
-                                ContentClass.legal_notice, ContentClass.unknown])
+@pytest.mark.parametrize(
+    "cc",
+    [
+        ContentClass.commits_money,
+        ContentClass.accepts_terms,
+        ContentClass.waives_rights,
+        ContentClass.legal_notice,
+        ContentClass.unknown,
+    ],
+)
 def test_outbound_text_classes_force_a_person(cc):
     d = decide(action(Executor.send_email), ctx("counterparty_routine", content_class=cc), AUTO)
     assert (d.decision, d.rule) == (Autonomy.ask, "content")
@@ -131,13 +186,19 @@ def test_outbound_text_classes_force_a_person(cc):
 def test_mislabel_attempt_benign_executor_harmful_text():
     # The planner calls it a routine email; the body commits money. Kind comes from the executor,
     # and the classifier class decides.
-    a = action(Executor.send_email, params=FULL_PARAMS.model_copy(update={"body": "We will pay the $250,000 fee."}))
+    a = action(
+        Executor.send_email, params=FULL_PARAMS.model_copy(update={"body": "We will pay the $250,000 fee."})
+    )
     d = decide(a, ctx("counterparty_routine", content_class=ContentClass.commits_money), AUTO)
     assert d.decision == Autonomy.ask and d.delta == "over_reach"
 
 
 def test_legal_draft_is_kind_legal_and_asks():
-    d = decide(action(Executor.draft_document, recipient=None), ctx(None, content_class=ContentClass.legal_notice), AUTO)
+    d = decide(
+        action(Executor.draft_document, recipient=None),
+        ctx(None, content_class=ContentClass.legal_notice),
+        AUTO,
+    )
     assert d.kind == Kind.legal and d.decision == Autonomy.ask and d.rule == "record_bearing"
 
 
@@ -147,13 +208,22 @@ def test_plain_draft_runs_alone_everywhere():
 
 
 def test_chase_versus_send_comes_from_prior_thread():
-    assert decide(action(Executor.send_email), ctx("counterparty_routine", prior_thread=True), STD).kind == Kind.chase
+    assert (
+        decide(action(Executor.send_email), ctx("counterparty_routine", prior_thread=True), STD).kind
+        == Kind.chase
+    )
     assert decide(action(Executor.send_email), ctx("counterparty_routine"), STD).kind == Kind.send
 
 
 def test_effect_on_uncontrolled_item_asks():
-    a = action(Executor.record_decision, recipient=None, effect=Effect(kind="duration_reduction", item="x", days=5))
-    d = decide(a, ctx(None, effect_allowed=False, effect_reason="Effect on an item the principal does not control"), AUTO)
+    a = action(
+        Executor.record_decision, recipient=None, effect=Effect(kind="duration_reduction", item="x", days=5)
+    )
+    d = decide(
+        a,
+        ctx(None, effect_allowed=False, effect_reason="Effect on an item the principal does not control"),
+        AUTO,
+    )
     assert (d.decision, d.rule) == (Autonomy.ask, "effect")
 
 
@@ -173,15 +243,18 @@ def test_external_attendee_on_internal_hold_asks():
     assert (d.decision, d.rule) == (Autonomy.ask, "attendees")
 
 
-@pytest.mark.parametrize(("amount", "spent", "preset", "decision"), [
-    (5_000_000, 0, "standard", Autonomy.auto),          # exactly at the per-action limit
-    (5_000_001, 0, "standard", Autonomy.ask),           # one cent over
-    (4_000_000, 7_000_000, "standard", Autonomy.ask),   # daily limit would be passed
-    (4_000_000, 6_000_000, "standard", Autonomy.auto),  # daily limit exactly met
-    (25_000_000, 0, "autonomous", Autonomy.auto),
-    (25_000_001, 0, "autonomous", Autonomy.ask),
-    (100, 0, "supervised", Autonomy.ask),               # supervised never spends alone
-])
+@pytest.mark.parametrize(
+    ("amount", "spent", "preset", "decision"),
+    [
+        (5_000_000, 0, "standard", Autonomy.auto),  # exactly at the per-action limit
+        (5_000_001, 0, "standard", Autonomy.ask),  # one cent over
+        (4_000_000, 7_000_000, "standard", Autonomy.ask),  # daily limit would be passed
+        (4_000_000, 6_000_000, "standard", Autonomy.auto),  # daily limit exactly met
+        (25_000_000, 0, "autonomous", Autonomy.auto),
+        (25_000_001, 0, "autonomous", Autonomy.ask),
+        (100, 0, "supervised", Autonomy.ask),  # supervised never spends alone
+    ],
+)
 def test_spend_limits(amount, spent, preset, decision):
     c = ctx("counterparty_routine", amount_cents=amount, spent_today_cents=spent)
     d = decide(action(Executor.commit_spend), c, PRESETS[preset])

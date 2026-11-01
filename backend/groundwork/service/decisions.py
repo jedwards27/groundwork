@@ -46,7 +46,15 @@ def decide_plan(
         if classifier is not None and text is not None:
             model_class, why, _ = classifier.classify(text)
             model_name = classifier.model
-        r = resolve(state, profile, mandate, a, spent_today_cents=spent, model_class=model_class, model_name=model_name)
+        r = resolve(
+            state,
+            profile,
+            mandate,
+            a,
+            spent_today_cents=spent,
+            model_class=model_class,
+            model_name=model_name,
+        )
         d = decide(a, r.ctx, mandate)
         if d.decision == Autonomy.auto and d.kind in SPEND_KINDS:
             spent += d.amount_cents or 0
@@ -62,5 +70,11 @@ def intent_check(plan: Plan, decided: list[DecidedAction]) -> dict[str, Any]:
     for d in decided:
         counts[d.decision.delta] += 1
         if bucket.get(d.action.ref) != d.decision.decision.value:
-            mismatched.append({"ref": d.action.ref, "intent": bucket.get(d.action.ref), "decided": d.decision.decision.value})
+            mismatched.append(
+                {
+                    "ref": d.action.ref,
+                    "intent": bucket.get(d.action.ref),
+                    "decided": d.decision.decision.value,
+                }
+            )
     return {**counts, "intent_mismatches": mismatched}
