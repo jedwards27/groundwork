@@ -1,0 +1,250 @@
+# Lake Mariner, CB-5, seen from the end user's seat.
+#
+# Posture: the agent works for Anthropic, the END USER. TeraWulf (Lake Mariner Data LLC) is the
+# landlord, developer and interconnection customer. Fluidstack is the lessee. Anthropic is not a
+# party to the lease (Measured AI). So Anthropic's only direct counterparty on the base building is
+# Fluidstack; TeraWulf is reached through Fluidstack, and NYSEG/NYISO/the town through TeraWulf.
+# That routing is the `reached_via` column below, and the gateway derives every action's path from it.
+#
+# Provenance on every row: public (with a URL) | synthetic (written for the demo) |
+# assumption_to_verify (our best understanding; check with a practitioner).
+
+org:
+  name: Groundwork demo org (end-user posture)
+  timezone: America/New_York
+
+site:
+  key: lake-mariner
+  name: Lake Mariner
+  location: Barker (Town of Somerset), Niagara County, NY
+  profile: datacenter
+  as_of: 2026-11-02
+  principal: anthropic
+  attrs:
+    iso_region: NYISO
+    transmission_owner: NYSEG
+    voltage_class: 345kV
+    county: Niagara
+  calendar:
+    holidays: [2026-11-26, 2026-11-27, 2026-12-24, 2026-12-25, 2027-01-01]
+    provenance: assumption_to_verify
+    note: >-
+      Working calendar shared by the EPC and NYSEG for business-day lags. Thanksgiving and the day
+      after, Christmas Eve and Day, New Year's Day. Martin Luther King Day is treated as a workday.
+
+asset:
+  key: cb-5
+  name: CB-5
+  capacity_mw: 168
+  milestones:
+    - kind: delivery
+      label: CB-5 lease delivery (commissioning Level 4)
+      item: l4
+      target_date: 2027-01-12
+      binding_agreement: Fluidstack lease with TeraWulf; L4 is the contractual delivery milestone
+      provenance: assumption_to_verify
+      source: https://finance.yahoo.com/markets/stocks/articles/terawulf-inc-wulf-q2-2026-190057902.html
+      note: >-
+        "Very early January" and "L4 = contractual delivery milestone" are public (Q2 2026 call
+        summary, secondary). The exact date Jan 12 is the prototype's assumption.
+    - kind: final_acceptance
+      label: CB-5 final acceptance (after L5 integrated systems test)
+      item: final_acceptance
+      target_date: 2027-02-05
+      provenance: synthetic
+
+parties:
+  - key: anthropic
+    name: Anthropic
+    roles: [end_user]
+    provenance: public
+    source: https://measuredai.substack.com/p/anthropic-data-centers
+  - key: fluidstack
+    name: Fluidstack
+    roles: [lessee]
+    provenance: public
+    source: https://measuredai.substack.com/p/anthropic-data-centers
+  - key: terawulf
+    name: TeraWulf (Lake Mariner Data LLC)
+    roles: [landlord, developer]
+    reached_via: fluidstack
+    provenance: public
+    source: https://www.interconnection.fyi/project/nyiso-1670
+    note: Interconnection customer of record is Lake Mariner Data LLC. Whether the end user may write to TeraWulf directly is practitioner question 17; default is through Fluidstack.
+  - key: nyseg
+    name: NYSEG
+    roles: [to]
+    level: state
+    reached_via: terawulf
+    provenance: public
+    source: https://www.sec.gov/Archives/edgar/data/1083301/000110465922041168/wulf-20211231x10k.htm
+    note: Point of interconnection at NYSEG's Kintigh 345 kV substation.
+  - key: nyiso
+    name: NYISO
+    roles: [iso]
+    level: state
+    reached_via: terawulf
+    provenance: public
+    source: https://www.interconnection.fyi/project/nyiso-1670
+  - key: nypa
+    name: New York Power Authority (NYPA)
+    roles: [agency]
+    level: state
+    reached_via: terawulf
+    provenance: public
+    source: https://hntrbrk.com/investigations/terawulf
+    note: 90 MW HLF allocation is market power delivered through the utility, not grid capacity; it gates nothing on CB-5's chain.
+  - key: somerset
+    name: Town of Somerset (building department)
+    roles: [ahj]
+    level: local
+    reached_via: terawulf
+    provenance: public
+    source: https://www.govtech.com/analytics/upstate-new-york-community-approves-ai-data-center-plan
+  - key: inspection-agency
+    name: Electrical inspection agency (third party)
+    roles: [agency]
+    level: local
+    reached_via: terawulf
+    provenance: assumption_to_verify
+    source: https://tocny.org/wp-content/uploads/2026/04/BPD_26-4-30_Approved-Electrical-InspAgn.pdf
+    note: Which approved agency Somerset uses is practitioner question 8.
+  - key: nysdec
+    name: NYS Department of Environmental Conservation (DEC)
+    roles: [regulator]
+    level: state
+    reached_via: terawulf
+    provenance: public
+    source: https://www.dlapiper.com/en/insights/publications/2026/07/executive-order-pauses-dec-permits-for-data-centers-in-new-york
+  - key: swgr-vendor
+    name: Switchgear vendor (34.5 kV lineup)
+    roles: [vendor]
+    reached_via: terawulf
+    provenance: synthetic
+  - key: xfmr-vendor
+    name: Transformer vendor (345/34.5 kV)
+    roles: [vendor]
+    reached_via: terawulf
+    provenance: synthetic
+  - key: gen-vendor
+    name: Generator vendor
+    roles: [vendor]
+    reached_via: terawulf
+    provenance: synthetic
+  - key: ups-vendor
+    name: UPS and battery vendor
+    roles: [vendor]
+    reached_via: terawulf
+    provenance: synthetic
+  - key: cooling-vendor
+    name: Cooling equipment vendor
+    roles: [vendor]
+    reached_via: terawulf
+    provenance: synthetic
+  - key: epc
+    name: EPC and commissioning agent
+    roles: [epc]
+    reached_via: terawulf
+    provenance: synthetic
+  - key: lender
+    name: Landlord's construction lender
+    roles: [lender]
+    reached_via: terawulf
+    provenance: assumption_to_verify
+  - key: ie
+    name: End user's independent engineer
+    roles: [ie]
+    provenance: synthetic
+    note: Engaged by the end user directly. Whether the IE works on a call-off master agreement is an assumption to verify.
+  - key: state-esd
+    name: State economic-development contact (Empire State Development)
+    roles: [agency]
+    level: state
+    provenance: assumption_to_verify
+    note: Assumes the end user has a direct relationship with the state economic-development agency. Any message is record-bearing.
+
+# Demo personas only. Names are fictional; addresses use the reserved .example domain.
+people:
+  - key: dana
+    party: anthropic
+    name: Dana Ortiz
+    title: Infrastructure delivery lead (demo persona)
+    email: dana.ortiz@enduser.example
+    approver: true
+  - key: priya
+    party: anthropic
+    name: Priya Raman
+    title: Counsel, real estate and infrastructure (demo persona)
+    email: priya.raman@enduser.example
+    approver: true
+  - key: sam
+    party: anthropic
+    name: Sam Okafor
+    title: Commissioning witness lead (demo persona)
+    email: sam.okafor@enduser.example
+    approver: false
+  - key: morgan
+    party: fluidstack
+    name: Morgan Lee
+    title: Delivery manager, lessee (demo persona)
+    email: morgan.lee@lessee.example
+  - key: lessee-desk
+    party: fluidstack
+    name: Lessee service desk (automated)
+    title: Ticketing system (demo)
+    email: servicedesk@lessee.example
+  - key: tw-pm
+    party: terawulf
+    name: Site project manager
+    title: Landlord site PM (demo persona)
+    email: site.pm@landlord.example
+  - key: ie-lead
+    party: ie
+    name: Lead protection engineer
+    title: Independent engineer (demo persona)
+    email: protection@ie.example
+  - key: esd-contact
+    party: state-esd
+    name: Regional director
+    title: State economic development (demo persona)
+    email: regional.director@state-econdev.example
+  - key: swgr-pm
+    party: swgr-vendor
+    name: Switchgear project manager
+    title: Vendor PM (demo persona)
+    email: pm@switchgear-vendor.example
+
+# Site facts shown in the UI, each with provenance. Corrected per the plan reviews.
+facts:
+  - label: Contracted critical IT at the campus
+    value: 378 MW for Fluidstack (42 + 168 + 168)
+    provenance: public
+    source: https://measuredai.substack.com/p/anthropic-data-centers
+  - label: Roles
+    value: TeraWulf owns and develops; Fluidstack leases; Anthropic is the end user and not a party to the lease
+    provenance: public
+    source: https://measuredai.substack.com/p/anthropic-data-centers
+  - label: CB-5
+    value: 168 MW; delivery "very early January" 2027, moved from Q4 2026
+    provenance: public
+    source: https://finance.yahoo.com/markets/stocks/articles/terawulf-inc-wulf-q2-2026-190057902.html
+  - label: Point of interconnection
+    value: NYSEG Kintigh 345 kV substation; dual 345 kV feeds
+    provenance: public
+    source: https://www.sec.gov/Archives/edgar/data/1083301/000110465922041168/wulf-20211231x10k.htm
+  - label: Site history
+    value: Former Kintigh coal plant, 650 to 675 MW
+    provenance: public
+    source: https://en.wikipedia.org/wiki/Kintigh_Generating_Station
+  - label: NYPA allocation
+    value: 90 MW HLF, market power delivered via the utility, not grid capacity
+    provenance: public
+    source: https://hntrbrk.com/investigations/terawulf
+  - label: Contracted revenue
+    value: $6.7B is TeraWulf's company-wide contracted revenue (Aug 2025), not this lease alone
+    provenance: public
+    source: https://investors.terawulf.com/sec-filings/all-sec-filings/content/0001104659-25-079463/tm2523651d3_ex99-1.htm
+  - label: Lease rate
+    value: about $155/kW-month (estimate derived by Measured AI, not disclosed)
+    provenance: assumption_to_verify
+    source: https://measuredai.substack.com/p/anthropic-data-centers

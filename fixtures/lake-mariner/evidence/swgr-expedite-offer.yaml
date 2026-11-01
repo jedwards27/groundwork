@@ -1,0 +1,9 @@
+key: swgr-expedite-offer
+kind: fee_offer
+title: Switchgear vendor expedite offer
+party: swgr-vendor
+amount_cents: 25000000
+currency: USD
+scope: Overtime rework and air freight to recover about 2 weeks of the 5 to 7 week slip.
+payer: The landlord (TeraWulf) as purchaser of the lineup. The end user is not a party to the supply contract.
+provenance: synthetic

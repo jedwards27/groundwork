@@ -1,0 +1,13 @@
+key: ie-quote
+kind: quote
+title: Independent engineer quote for a protection-settings pre-review
+party: ie
+amount_cents: 1850000
+currency: USD
+scope: >-
+  Review the landlord's re-run coordination and arc-flash studies and the revised settings package
+  before resubmittal to NYSEG; one round of comments within 5 business days of receipt.
+valid_until: 2026-12-15
+cancellation_terms: Cancellable without charge before work starts.
+provenance: synthetic
+note: Whether the IE works under a call-off master agreement is an assumption to verify.
