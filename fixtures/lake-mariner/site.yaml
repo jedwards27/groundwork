@@ -40,17 +40,29 @@ asset:
     - kind: delivery
       label: CB-5 lease delivery (commissioning Level 4)
       item: l4
-      target_date: 2027-01-12
+      target_date: 2027-02-22
       binding_agreement: Fluidstack lease with TeraWulf; L4 is the contractual delivery milestone
+      provenance: assumption_to_verify
+      source: https://www.sec.gov/Archives/edgar/data/0001083301/000108330126000162/a_wulfearningsreleaseq22026.htm
+      note: >-
+        Public: CB-5 is "targeted to begin phased delivery in early 2027" (TeraWulf's Q2 2026 release,
+        Aug 5, 2026), and L4 is the contractual delivery milestone (Q2 2026 call, said of CB-4). Feb 22
+        is our inference, not a company date: energization in very early January, then CB-4's pace of
+        about six weeks from L3 start-up to L4.
+    - kind: energization
+      label: CB-5 first data hall energizes (after NYSEG's witness test)
+      item: witness
+      target_date: 2027-01-06
       provenance: assumption_to_verify
       source: https://finance.yahoo.com/markets/stocks/articles/terawulf-inc-wulf-q2-2026-190057902.html
       note: >-
-        "Very early January" and "L4 = contractual delivery milestone" are public (Q2 2026 call
-        summary, secondary). The exact date Jan 12 is the prototype's assumption.
+        Public: CB-5's first data hall "is expected to begin energizing in very early January" (TeraWulf's
+        CTO on the Q2 2026 call, as summarized by GuruFocus; secondary). Jan 6, and modelling energization
+        as the end of the witness test, are our assumptions.
     - kind: final_acceptance
       label: CB-5 final acceptance (after L5 integrated systems test)
       item: final_acceptance
-      target_date: 2027-02-05
+      target_date: 2027-03-18
       provenance: synthetic
 
 parties:
@@ -238,10 +250,14 @@ facts:
     value: TeraWulf owns and develops; Fluidstack leases; Anthropic is the end user and not a party to the lease
     provenance: public
     source: https://measuredai.substack.com/p/anthropic-data-centers
-  - label: CB-5
-    value: 168 MW; delivery "very early January" 2027, moved from Q4 2026
+  - label: CB-5 energization
+    value: 168 MW; first data hall expected to begin energizing "very early January" 2027, moved from Q4 2026
     provenance: public
     source: https://finance.yahoo.com/markets/stocks/articles/terawulf-inc-wulf-q2-2026-190057902.html
+  - label: CB-5 delivery
+    value: Targeted to begin phased delivery in early 2027 (no date given)
+    provenance: public
+    source: https://www.sec.gov/Archives/edgar/data/0001083301/000108330126000162/a_wulfearningsreleaseq22026.htm
   - label: Point of interconnection
     value: NYSEG Kintigh 345 kV substation; dual 345 kV feeds
     provenance: public

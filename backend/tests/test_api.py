@@ -40,7 +40,7 @@ def test_sites_chain_forecast(client):
     chain = client.get("/sites/lake-mariner/chain").json()
     assert chain["gate"] == "to_accept" and len(chain["items"]) == 26
     preview = client.get("/sites/lake-mariner/forecast", params={"scenario": "event-a"}).json()
-    assert preview["milestone"]["forecast_finish"] == "2027-03-01"
+    assert preview["milestone"]["forecast_finish"] == "2027-04-13"
     cp = client.get("/sites/lake-mariner/critical-path").json()
     assert [x["key"] for x in cp["critical_path"]] == ["to_accept", "witness", "l3", "l4"]
     assert client.get("/sites/nowhere/chain").status_code == 404
@@ -58,7 +58,7 @@ def test_play_event_runs_and_persists(client):
         k for k in kinds if k in ("plan", "decided", "executed", "differential", "report", "done")
     ]
     assert kinds[-1] == "blind_skipped"  # no live model in tests
-    assert client.get("/sites/lake-mariner/chain").json()["milestone"]["forecast_finish"] == "2027-03-01"
+    assert client.get("/sites/lake-mariner/chain").json()["milestone"]["forecast_finish"] == "2027-04-13"
     assert client.post("/sites/lake-mariner/events", json={"event": "event-a"}).status_code == 409
     with client.stream("GET", f"/runs/{r.json()['run_id']}/stream") as s:
         body = "".join(s.iter_text())

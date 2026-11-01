@@ -49,8 +49,8 @@ def test_baseline_gate_is_computed_to_accept(state):
     assert c.gate == "to_accept"
     assert c.critical_path == ["to_accept", "witness", "l3", "l4"]
     assert c.min_float == 3
-    assert c.milestone.forecast_finish == date(2027, 1, 7)
-    assert c.milestone.target_date == date(2027, 1, 12)
+    assert c.milestone.forecast_finish == date(2027, 2, 17)
+    assert c.milestone.target_date == date(2027, 2, 22)
 
 
 def test_baseline_schedule_is_date_consistent(state):
@@ -59,17 +59,25 @@ def test_baseline_schedule_is_date_consistent(state):
     assert shifted == []
 
 
-def test_thanksgiving_sits_inside_the_witness_notice(state):
+def test_energization_is_very_early_january_and_delivery_follows(state):
+    # Public: the first data hall begins energizing in "very early January" 2027. The fixture
+    # models energization as the end of the witness test; delivery (L4) comes about six weeks later.
+    ms = {m.kind: m for m in views.site_view(state).milestones}
+    assert ms["energization"].forecast_finish == date(2027, 1, 6)
+    assert ms["delivery"].forecast_finish == date(2027, 2, 17)
+
+
+def test_christmas_sits_inside_the_witness_notice(state):
     c = views.chain_view(state)
     loss = next(x for x in c.calendar_losses if x.pred == "to_accept" and x.succ == "witness")
-    assert loss.holidays == [date(2026, 11, 26), date(2026, 11, 27)]
+    assert loss.holidays == [date(2026, 12, 24), date(2026, 12, 25)]
 
 
 def test_event_a_two_legs_reach_delivery(state):
     f = views.forecast_view(state, scenario=["event-a"])
-    assert f.milestone.forecast_low == date(2027, 2, 15)
-    assert f.milestone.forecast_finish == date(2027, 3, 1)
-    assert f.milestone.forecast_high == date(2027, 3, 16)
+    assert f.milestone.forecast_low == date(2027, 3, 29)
+    assert f.milestone.forecast_finish == date(2027, 4, 13)
+    assert f.milestone.forecast_high == date(2027, 4, 28)
     c = views.chain_view(state, scenario=["event-a"])
     assert c.gate == "to_accept"
     assert c.critical_path == ["to_accept", "witness", "l3", "l4"]

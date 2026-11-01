@@ -71,11 +71,11 @@ make demo
 
 It reseeds the site, then prints the same story as text:
 
-1. **The countdown.** CB-5 delivers in 66 days (forecast Thu Jan 7, 2027, against the Jan 12 target), with 3 business days of float.
-2. **The gating item, computed.** NYSEG's acceptance of the protection settings, due Nov 13. Critical path: settings acceptance, witness test, L3 start-up, L4 functional test.
-3. **What's hidden in the calendar.** Thanksgiving and the day after fall inside the 15-business-day notice NYSEG needs between acceptance and the witness test; each holiday pushes delivery a working day. Near-critical items (cut-in certificate, L2, metering) are listed with their float.
+1. **The countdown.** CB-5 delivers in 107 days (forecast Wed Feb 17, 2027, against the Feb 22 target), with 3 business days of float. Only the outline is public: TeraWulf says CB-5's first data hall begins energizing in very early January and phased delivery begins in early 2027. The fixture energizes on Jan 6, at the end of NYSEG's witness test, and infers the delivery date from CB-4's pace of about six weeks from start-up to L4.
+2. **The gating item, computed.** NYSEG's acceptance of the protection settings, due Dec 4. Critical path: settings acceptance, witness test, L3 start-up, L4 functional test.
+3. **What's hidden in the calendar.** Christmas Eve and Christmas Day fall inside the 15-business-day notice NYSEG needs between acceptance and the witness test, Thanksgiving inside NYSEG's review and New Year's Day inside the witness test; each holiday pushes delivery a working day. Everything else feeding the witness test (cut-in certificate, L2, metering) has 17 or more business days of float, so NYSEG's review is the one thing that matters this month.
 4. **The paper chain**, 26 items by party with planned and forecast dates, and the reference set behind the forecast ("no comparable items yet" for the gate, and why).
-5. **Event A played as a run.** The landlord, via the lessee, forwards NYSEG's revised short-circuit data: the coordination study must be re-run and re-reviewed. Delivery moves to Mon Mar 1, 2027 (range Feb 15 to Mar 16), 48 days late, and the forecast names both legs.
+5. **Event A played as a run.** The landlord, via the lessee, forwards NYSEG's revised short-circuit data: the coordination study must be re-run and re-reviewed. Delivery moves to Tue Apr 13, 2027 (range Mar 29 to Apr 28), 50 days late, and the forecast names both legs.
 
 Then the slice-2 beats:
 

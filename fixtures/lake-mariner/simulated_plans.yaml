@@ -6,7 +6,7 @@
 event-a:
   assessment: >-
     NYSEG's revised fault levels at Kintigh send the CB-5 protection settings back through a re-study and a
-    re-review, which moves settings acceptance, the witness test, start-up and L4 past the January 12 delivery
+    re-review, which moves settings acceptance, the witness test, start-up and L4 past the February 22 delivery
     date. As the end user we cannot talk to NYSEG; our levers are information from the lessee, a request that
     the landlord ask NYSEG for staged energization, our own engineer's review of the resubmittal, and re-planning
     our own fit-out.
@@ -54,8 +54,8 @@ event-a:
       executor: schedule_internal
       params:
         attendees: [sam, dana]
-        window_start: "2027-01-25"
-        window_end: "2027-02-19"
+        window_start: "2027-02-15"
+        window_end: "2027-03-19"
       effect: {kind: none}
       proposed_autonomy: auto
       rationale: Witness slots are scarce once NYSEG reschedules; holding our own people costs nothing.
@@ -65,7 +65,7 @@ event-a:
       params:
         summary: >-
           NYSEG's revised short-circuit data sends CB-5's protection settings back through a re-study and re-review;
-          delivery is now forecast after the January 12 lease date. The revised forecast and this plan are attached.
+          delivery is now forecast after the February 22 lease date. The revised forecast and this plan are attached.
       effect: {kind: none}
       proposed_autonomy: auto
       rationale: Our own people should hear the new date before anyone outside does.
