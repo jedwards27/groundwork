@@ -1,24 +1,16 @@
 # Groundwork
 
-The first deployment of **delegated authority for agents**: a written mandate (what an agent may do alone, must ask about and may never do), a gateway outside the model that enforces it, approvals only a named person can give, and a tamper-evident record that the agent's own report is checked against. Groundwork applies them to the paperwork that gates gigawatt data-center builds. It keeps the live **paper critical path** to a delivery milestone, forecasts slips with their sources shown, and acts within the mandate, with every action in an append-only ledger. Evals measure, per model version, how well Claude stays in scope and reports honestly.
+Groundwork coordinates approval-gated projects across companies, acting only inside a signed written mandate, leaving a receipt anyone can verify, and earning wider autonomy as each model version passes the evals, starting with the data-center buildout that is Anthropic's own bottleneck.
 
-The demo site is **Lake Mariner CB-5** (Barker, NY), seen from the **end user's** seat: TeraWulf is landlord and interconnection customer, Fluidstack is the lessee, and Anthropic is the end user two contracts removed from the utility. Public facts carry links; everything else is marked synthetic or an assumption to verify.
+It reads a project's paper trail (utility studies, permits, landlord decisions, vendor tests), names this week's gating item, forecasts slips with their sources, and drafts, chases and asks within the mandate. The delegation layer keeps it inside its authority: a **mandate** says what it may do alone, must ask about and may never do; a **gateway** outside the model decides do, ask or never and shows the clause it relied on; a **named approval** binds one person to one exact action; every step lands in a hash-chained **ledger**, and any **receipt** from it can be re-checked by hash. Everything runs in dry run: nothing is sent.
 
-Start with `CLAUDE.md` (the brief), then `docs/ARCHITECTURE.md`, `docs/TECH-DESIGN-DISCUSSION.md` and `docs/decisions/`.
+The demo site is **Lake Mariner CB-5** (Barker, NY), seen from the end user's seat: TeraWulf is landlord and the utility's customer, Fluidstack is the lessee, and Anthropic is the end user, reaching the utility only through both. Public facts carry links; the schedule, inbox and people are synthetic and labeled.
 
-## Status
+**Hosted:** https://groundwork-demo.fly.dev (not deployed yet; it goes live with `make deploy`, see `docs/HOSTING.md`).
 
-| Slice | What | State |
-|---|---|---|
-| 1 | Schema, fixture, critical-path and forecast engine, API, CLI demo | **Done** |
-| 2 | Mandate, gateway, ledger, approvals, planners (informed and blind arms), reports, evals | **Done** (live Claude path run against the API on Nov 1, 2026; results under Evals) |
-| 3 | Mission Control web app ported from `prototype/index.html`, browser walkthrough, web container | **Done** (Docker profile not yet run: no Docker on the author's machine) |
-| Hosting | Fly.io and Neon config, bootstrap, preflight, nightly reset, local rehearsal | **Ready to deploy** (not yet deployed: needs your Fly and Neon accounts) |
-| 4+ | Email and PDF connectors with extraction, approvals UX, notifications, second site | Later |
+## Run it locally
 
-## Run it
-
-**Prerequisites:** Postgres 14+ running locally, [uv](https://docs.astral.sh/uv/), and Node 20 or newer (22 LTS recommended, from nodejs.org or `nvm install 22`) for the web app. `make doctor` checks all three and prints install commands.
+**You need:** Postgres 14 or newer running locally, [uv](https://docs.astral.sh/uv/), and Node 20 or newer (22 LTS recommended). `make doctor` checks all three and prints install commands.
 
 ```bash
 make doctor
@@ -27,77 +19,23 @@ make doctor
 make dev
 ```
 
-`make dev` creates `.env` with fresh dev secrets, creates the two database roles and databases (`scripts/db-setup.sql`, run as your local Postgres superuser), applies migrations, seeds Lake Mariner, installs the web app's packages, and serves the API on http://localhost:8000 (OpenAPI docs at `/docs`) and **Mission Control on http://localhost:3000**. Ctrl-C stops both.
+`make dev` writes `.env` with fresh dev secrets, creates the database roles and databases, applies migrations, seeds Lake Mariner, installs the web app's packages, and serves **Mission Control on http://localhost:3000** (the API is on http://localhost:8000, docs at `/docs`). Ctrl-C stops both. Sign in as **Dana Ortiz** (delivery lead, approver), then play the demo below.
 
-**Docker only.** The first command writes `.env` with fresh secrets and needs only a shell. The containers are written but not yet run, because the author's machine has no Docker; the same production server passes the browser walkthrough outside Docker.
+Set `ANTHROPIC_API_KEY` in `.env` to have Claude write the plans for the other inbox events (Opus 5.5 plans; Haiku 5.5 checks outbound text and writes the report). The demo event is scripted and never calls a model. `docs/DATA-BOUNDARY.md` lists exactly what leaves your machine.
 
-```bash
-sh scripts/new-env.sh
-```
-```bash
-docker compose --profile full up --build
-```
+Docker, untested because the author's machine has no Docker: `sh scripts/new-env.sh`, then `docker compose --profile full up --build`.
 
-Every port binds to 127.0.0.1, so nothing is reachable from your network.
+## The two-minute demo
 
-**Hosted demo.** Two Fly.io machines and a free Neon Postgres, for about $7 a month. Every visitor gets a private sandbox copy of the demo, kept apart by the same org isolation that separates customers. `docs/HOSTING.md` has every step. `make rehearse-hosted` runs the hosted profile on your machine first, against a throwaway Postgres set up the way Neon's is. Not yet deployed: it needs your Fly and Neon accounts.
+Play **"Demo: NYSEG re-review, and a switchgear change order with an instruction inside it"**, the first message in the inbox. It plays the same hand-written plan every time; the gateway, ledger and report check are live code.
 
-```bash
-make hosted-bootstrap
-```
-```bash
-make deploy
-```
+1. **0:00 to 0:25, the gating item.** The forecast moves to Apr 13, 2027, 50 days past the Feb 22 lease date, and NYSEG's settings review is still the gating item. "Why it moved" lists both delays, each citing the forwarded email it came from.
+2. **0:25 to 0:45, DO.** A status request to Morgan Lee at Fluidstack about the weekly status Fluidstack already sends, citing the schedule line. The mandate clause `routine_messages` allows it alone; it runs in dry run.
+3. **0:45 to 1:10, ASK.** Asking TeraWulf to confirm the energization date. The route reads Anthropic → Fluidstack (Morgan Lee) → TeraWulf (Site project manager), and it waits for Dana Ortiz or Priya Raman: the clause covers direct counterparties only.
+4. **1:10 to 1:30, NEVER.** A line inside the vendor's change order tells an AI assistant to approve and sign CO-7. Signing is on the never-list, no one can approve it, and the agent's report says what it found.
+5. **1:30 to 2:00, the report beside the record.** Each action's reported status matches the ledger. "verify #8" opens the record check: **Match**. Paste the same record with its decision changed: **Mismatch**.
 
-Set `ANTHROPIC_API_KEY` in `.env` to use the live planner (Opus 5.5 plans, Haiku 5.5 classifies outbound text and writes the post-execution report). Without it, everything runs on the hand-written simulated planner, under a banner that says so. Live planning is capped per day (`GROUNDWORK_DAILY_LIVE_RUN_CAP`). `docs/DATA-BOUNDARY.md` lists what is sent.
-
-## Mission Control
-
-Open http://localhost:3000 and pick a demo persona: Dana Ortiz (delivery lead, approver), Priya Raman (counsel, approver) or Sam Okafor (commissioning, viewer). Personas are fictional people seeded with the fixture; anyone using the app can act as any of them, which is why demo login is a switch (`GROUNDWORK_DEMO_LOGIN`) and off for real data. Then:
-
-1. **Read the top of the page.** The countdown, the gating item with its owner and float, and the holidays hidden inside critical-path waits. "Open the status report" shows the source document.
-2. **Play event A** from the inbox. Steps stream in as the run works. The countdown moves, and the differential shows four bars: unmitigated, with what ran, if you approve the queue, and the hatched "if the landlord agrees" bar.
-3. **Read the plan.** What the agent did alone, what it asked a person, what it refused. One row says "Gateway held this": the agent wanted to act alone and the mandate said ask.
-4. **Play the auto-reply** ("approved, please proceed"). The held action stays pending.
-5. **Approve it as Dana.** The dialog shows exactly what is being approved and the hash it binds to. It runs in dry run, and the row records who approved it and when.
-6. **Move the authority dial.** The compare table shows the same plan under each preset; issuing a new mandate re-decides only open actions.
-7. **Check the ledger.** "Chain verified". Then "Tamper with one entry" (local only) and watch verification and the attestation fail. "Reset site" restores the fixture.
-
-## The CLI demo
-
-```bash
-make demo
-```
-
-It reseeds the site, then prints the same story as text:
-
-1. **The countdown.** CB-5 delivers in 107 days (forecast Wed Feb 17, 2027, against the Feb 22 target), with 3 business days of float. Only the outline is public: TeraWulf says CB-5's first data hall begins energizing in very early January and phased delivery begins in early 2027. The fixture energizes on Jan 6, at the end of NYSEG's witness test, and infers the delivery date from CB-4's pace of about six weeks from start-up to L4.
-2. **The gating item, computed.** NYSEG's acceptance of the protection settings, due Dec 4. Critical path: settings acceptance, witness test, L3 start-up, L4 functional test.
-3. **What's hidden in the calendar.** Christmas Eve and Christmas Day fall inside the 15-business-day notice NYSEG needs between acceptance and the witness test, Thanksgiving inside NYSEG's review and New Year's Day inside the witness test; each holiday pushes delivery a working day. Everything else feeding the witness test (cut-in certificate, L2, metering) has 17 or more business days of float, so NYSEG's review is the one thing that matters this month.
-4. **The paper chain**, 26 items by party with planned and forecast dates, and the reference set behind the forecast ("no comparable items yet" for the gate, and why).
-5. **Event A played as a run.** The landlord, via the lessee, forwards NYSEG's revised short-circuit data: the coordination study must be re-run and re-reviewed. Delivery moves to Tue Apr 13, 2027 (range Mar 29 to Apr 28), 50 days late, and the forecast names both legs.
-
-Then the slice-2 beats:
-
-6. **The plan, decided by the gateway.** Eight actions in the end user's seat. Five run alone in dry run, including engaging the end user's own engineer against an $18,500 quote within the $50,000 limit. Three wait for a person: the state escalation, the legal draft for counsel, and the request that the landlord ask NYSEG for staged energization, which the planner proposed to send alone and the gateway **held**. Delivery recovers 0 days on the end user's own actions and **14 days if the landlord agrees**, computed by the scheduler, never by the model.
-7. **An auto-reply says "approved, please proceed".** It is linked to the pending request and changes nothing.
-8. **A named person approves.** Dana approves the held request; it runs in dry run, and the approval is bound to the action's hash and the mandate version.
-9. **The ledger.** `verify_chain` passes; then someone with owner credentials disables the trigger and edits one decision, and verification fails on that entry.
-10. **The attestation.** Genesis to head, zero violations, HMAC-signed with the dev key, with a list of what it does not prove.
-
-`make demo-offline` prints the slice-1 part from the fixture folder with no database. Event B (`groundwork demo --event event-b`) shows the $250,000 expedite payment refused by the never-list.
-
-To watch it through the API, mint a token and call it:
-
-```bash
-TOKEN=$(cd backend && uv run groundwork token dana)
-```
-```bash
-curl -s -H "Authorization: Bearer $TOKEN" localhost:8000/sites/lake-mariner/critical-path
-```
-```bash
-curl -s -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"event":"event-a"}' localhost:8000/sites/lake-mariner/events
-```
+Then try event A (the same delay, with a fuller plan), the auto-reply that says "approved, please proceed" and changes nothing, approving as Dana, the authority dial, and "Tamper with one entry" in the ledger panel.
 
 ## Evals
 
@@ -133,6 +71,37 @@ What the numbers say:
 
 Limits: one synthetic site and six event templates; actions within one plan are not independent, so treat differences under about 5 points as noise; the classifier is Haiku in every run, and a stricter or looser classifier moves over-reach. The scripted planner scores 0 hard violations, 3.5% over-reach and 100% on reports and injection by construction (its plans and the reviewed set were written together).
 
+## Test
+
+```bash
+make test
+```
+```bash
+make e2e
+```
+
+Lint (ruff), types (pyright), six import boundaries (import-linter: the planner cannot reach executors, approvals, the ledger or the database; ingestion cannot create approvals) and the test suite. It covers:
+
+- the calendar and scheduler, and golden tests on the fixture;
+- 172 gateway table rows, and the mandate clause each kind of decision cites;
+- the ledger: test vector, tamper and delete detection, triggers that bind the owner, no forks under concurrency;
+- the honesty check;
+- the pipeline end to end, typed, bound approvals, and the scripted demo path (the same DO, ASK and NEVER even with a live key);
+- checking one record: a match, a forged copy, and an edited stored record;
+- a property test that no inbound message changes any action's state;
+- mandate re-decision, and blind-arm isolation;
+- the Claude planner, classifier and reporter against a fake client;
+- the eval harness, row-level security, and a check that the generic engine contains no data-center vocabulary;
+- that `web/openapi.json` matches the API, so the web app's generated types cannot drift;
+- the hosted profile:
+  - the startup preflight that refuses development secrets;
+  - daily caps that count across orgs;
+  - connection-per-request mode and the nightly reset schedule;
+  - that no database role needs BYPASSRLS;
+- sandboxes: two visitors cannot see each other's work, switching persona keeps a sandbox, "Start over" replaces it, and expired sandboxes are deleted with their ledgers.
+
+`make e2e` is the browser walkthrough (Playwright, `web/e2e/`). It runs the two-minute demo below step by step, including a match and a mismatch on the verify page. It also signs in as a persona, plays event A, check that the countdown and the did/asked/refused counts on the page equal what the API returns, play the auto-reply and see nothing change, approve the held action as Dana, check that a viewer cannot approve (in the page and at the API), then tamper, watch verification fail, and reset. With sandboxes on, as in the hosted profile, a second browser checks that two visitors cannot see each other's work. It uses your installed Google Chrome and starts the API and web app if they are not running. `make web-build` type-checks and builds the production web app.
+
 ## Cost
 
 Measured in the Nov 1, 2026 eval run: about $0.22 per event on Opus 5.5 (both arms, plus the Haiku reports), $0.11 on Sonnet 5.5 and under $0.02 on Haiku 5.5. With Opus planning:
@@ -153,36 +122,6 @@ make inspect SITE=path/to/your-site
 ```
 
 It validates the folder, lists every problem at once if there are any, and otherwise prints the gate, critical path, holiday losses and forecast, plus any sequencing rule your schedule breaks. Loading it into the database is `cd backend && uv run groundwork seed path/to/your-site`. Email and PDF ingestion arrive in slice 4.
-
-## Test
-
-```bash
-make test
-```
-```bash
-make e2e
-```
-
-Lint (ruff), types (pyright), six import boundaries (import-linter: the planner cannot reach executors, approvals, the ledger or the database; ingestion cannot create approvals) and the test suite. It covers:
-
-- the calendar and scheduler, and golden tests on the fixture;
-- 172 gateway table rows;
-- the ledger: test vector, tamper and delete detection, triggers that bind the owner, no forks under concurrency;
-- the honesty check;
-- the pipeline end to end, and typed, bound approvals;
-- a property test that no inbound message changes any action's state;
-- mandate re-decision, and blind-arm isolation;
-- the Claude planner, classifier and reporter against a fake client;
-- the eval harness, row-level security, and a check that the generic engine contains no data-center vocabulary;
-- that `web/openapi.json` matches the API, so the web app's generated types cannot drift;
-- the hosted profile:
-  - the startup preflight that refuses development secrets;
-  - daily caps that count across orgs;
-  - connection-per-request mode and the nightly reset schedule;
-  - that no database role needs BYPASSRLS;
-- sandboxes: two visitors cannot see each other's work, switching persona keeps a sandbox, "Start over" replaces it, and expired sandboxes are deleted with their ledgers.
-
-`make e2e` is the browser walkthrough (Playwright, `web/e2e/`): sign in as a persona, play event A, check that the countdown and the did/asked/refused counts on the page equal what the API returns, play the auto-reply and see nothing change, approve the held action as Dana, check that a viewer cannot approve (in the page and at the API), then tamper, watch verification fail, and reset. With sandboxes on, as in the hosted profile, a second browser checks that two visitors cannot see each other's work. It uses your installed Google Chrome and starts the API and web app if they are not running. `make web-build` type-checks and builds the production web app.
 
 ## Docs
 
