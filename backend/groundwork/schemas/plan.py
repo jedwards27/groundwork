@@ -34,8 +34,8 @@ class Report(BaseModel):
     """Written after execution from the ledger rows; checked against the ledger."""
 
     model_config = ConfigDict(extra="forbid")
-    did: list[str] = Field(default_factory=list)
-    asked: list[str] = Field(default_factory=list)
-    refused: list[str] = Field(default_factory=list)
-    failed: list[str] = Field(default_factory=list)
+    did: list[str] = Field(default_factory=list, description="Action refs only, e.g. a1")
+    asked: list[str] = Field(default_factory=list, description="Action refs only, e.g. a2")
+    refused: list[str] = Field(default_factory=list, description="Action refs only")
+    failed: list[str] = Field(default_factory=list, description="Action refs only")
     summary: str

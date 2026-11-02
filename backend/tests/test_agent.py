@@ -11,9 +11,10 @@ from groundwork.agent.base import PlanContext, PlannerError, PlannerRefused
 from groundwork.agent.claude import ClaudeClassifier, ClaudePlanner, ClaudeReporter, ContentVerdict
 from groundwork.agent.prompt import build_prompt
 from groundwork.agent.simulated import load_plans
+from groundwork.agent.wire import WirePlan, from_plan
 from groundwork.config import REPO_ROOT
 from groundwork.ingest import load_site
-from groundwork.schemas import ContentClass, Plan, Report
+from groundwork.schemas import ContentClass, Report
 from groundwork.schemas.plan import Arm
 from groundwork.service import planctx
 from groundwork.service.state import SiteState
@@ -55,7 +56,7 @@ def ctx(arm=Arm.informed) -> PlanContext:
 def test_planner_returns_validated_plan_and_usage():
     resp = SimpleNamespace(
         stop_reason="end_turn",
-        parsed_output=PLANS["event-a"],
+        parsed_output=from_plan(PLANS["event-a"]),
         usage=usage(read=4000),
         model="claude-opus-5-5",
         stop_details=None,
@@ -64,7 +65,8 @@ def test_planner_returns_validated_plan_and_usage():
     r = ClaudePlanner(client, "claude-opus-5-5").plan(ctx())
     assert r.plan.actions[0].ref == "a1" and r.usage["cache_read_input_tokens"] == 4000
     call = msgs.calls[0]
-    assert call["output_format"] is Plan and call["fallbacks"] == "default"
+    assert call["output_format"] is WirePlan and call["fallbacks"] == "default"
+    assert r.plan == PLANS["event-a"]  # the wire form maps back to the same domain plan
     assert call["betas"] == ["server-side-fallback-2026-07-01"] and call["output_config"] == {
         "effort": "high"
     }

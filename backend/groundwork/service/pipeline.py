@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import traceback
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Any
 
 from sqlalchemy import select
@@ -93,10 +93,17 @@ def ledger_tail(s: Session, limit: int = 20) -> list[dict[str, Any]]:
     return out
 
 
+def local_day(recorded_at: str, tz_name: str) -> date:
+    """The site-local calendar day of a ledger timestamp (stored in UTC)."""
+    from zoneinfo import ZoneInfo
+
+    return datetime.fromisoformat(recorded_at).astimezone(ZoneInfo(tz_name)).date()
+
+
 def spent_today(s: Session, tz_name: str) -> int:
     from zoneinfo import ZoneInfo
 
-    today = datetime.now(ZoneInfo(tz_name)).date().isoformat()
+    today = datetime.now(ZoneInfo(tz_name)).date()
     total = 0
     for r in s.execute(
         select(m.LedgerEntry).where(m.LedgerEntry.entry_type == "decided", m.LedgerEntry.arm == "informed")
@@ -105,7 +112,7 @@ def spent_today(s: Session, tz_name: str) -> int:
         if (
             p.get("decision") == "auto"
             and p.get("kind") in [k.value for k in SPEND_KINDS]
-            and r.recorded_at[:10] == today
+            and local_day(r.recorded_at, tz_name) == today
         ):
             total += int(p.get("amount_cents") or 0)
     return total

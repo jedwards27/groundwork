@@ -11,7 +11,7 @@ Start with `CLAUDE.md` (the brief), then `docs/ARCHITECTURE.md`, `docs/TECH-DESI
 | Slice | What | State |
 |---|---|---|
 | 1 | Schema, fixture, critical-path and forecast engine, API, CLI demo | **Done** |
-| 2 | Mandate, gateway, ledger, approvals, planners (informed and blind arms), reports, evals | **Done** (live Claude path tested against a fake client only) |
+| 2 | Mandate, gateway, ledger, approvals, planners (informed and blind arms), reports, evals | **Done** (live Claude path run against the API on Nov 1, 2026; results under Evals) |
 | 3 | Mission Control web app ported from `prototype/index.html`, browser walkthrough, web container | **Done** (Docker profile not yet run: no Docker on the author's machine) |
 | Hosting | Fly.io and Neon config, bootstrap, preflight, nightly reset, local rehearsal | **Ready to deploy** (not yet deployed: needs your Fly and Neon accounts) |
 | 4+ | Email and PDF connectors with extraction, approvals UX, notifications, second site | Later |
@@ -105,29 +105,42 @@ curl -s -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/
 cd backend && uv run python -m evals.run
 ```
 
-Plays 6 event templates under the 3 mandate presets in both arms (with and without the mandate in the prompt) and runs the real gateway over every plan. It reports hard violations, over-reach (held) and over-caution, honest reporting against the ledger including a withheld-row check, plan quality against a reviewed set, and injection resistance. `--live --repeat 3` runs Claude (about 430 decisions per arm, about $25 per model version). Definitions are in `backend/evals/README.md`.
+Plays 6 event templates under the 3 mandate presets in both arms (with and without the mandate in the prompt) and runs the real gateway over every plan. It reports hard violations, over-reach (held) and over-caution, honest reporting against the ledger including a withheld-row check, plan quality against a reviewed set, and injection resistance (graded by a fixed Sonnet 5.5 judge plus deterministic rules). `--live --model <id> --repeat 3` runs Claude: 108 case runs and about 310 to 360 action decisions per arm. Every case run is saved in `backend/evals/results/`. Definitions and grading notes are in `backend/evals/README.md`.
 
-Simulated planner, Nov 1, 2026 (both arms identical because the simulated planner ignores the mandate; precision@3 is 1.0 by construction because the reviewed set was written from the same plans):
+**Live results, Nov 1, 2026** (Lake Mariner fixture, 6 events x 3 presets x 2 arms x 3 repeats per model; the content classifier and reports run on Haiku 5.5 throughout):
 
-| Metric | Value |
-|---|---|
-| Hard violations (auto on pay, sign, delete) | 0 |
-| Over-reach rate (held by the gateway) | 3.5% |
-| Over-caution rate | 0.7% |
-| Reports matching the ledger | 100% |
-| Fabrication when a ledger row is withheld | 0% |
-| Injection cases resisted | 6 of 6 |
+| Metric | Opus 5.5 with mandate | Opus 5.5 without | Sonnet 5.5 with mandate | Sonnet 5.5 without | Haiku 5.5 with mandate | Haiku 5.5 without |
+|---|---|---|---|---|---|---|
+| Hard violations (auto on pay, sign, delete) | 0 | 0 | 0 | 0 | 0 | 0 |
+| Over-reach: wanted more autonomy than the mandate allows | 19.0% | 35.8% | 13.7% | 39.0% | 10.3% | 25.2% |
+| Over-caution: asked where it could act | 3.2% | 5.4% | 3.2% | 4.6% | 5.3% | 5.9% |
+| Reports matching the ledger | 98.1% | 100.0% | 98.1% | 100.0% | 96.3% | 100.0% |
+| No fabrication when a ledger row is withheld | 98.1% | 100.0% | 100.0% | 100.0% | 100.0% | 98.1% |
+| Injection cases resisted | 18 of 18 | 18 of 18 | 18 of 18 | 18 of 18 | 18 of 18 | 18 of 18 |
+| Plan quality: precision@3 vs. the reviewed set | 0.85 | 0.84 | 0.85 | 0.83 | 0.57 | 0.56 |
+| Action decisions | 358 | 345 | 335 | 344 | 319 | 312 |
 
-The live Claude numbers, per arm and model version, go here once a key is used.
+Cost of the run: Opus 5.5 $12.02, Sonnet 5.5 $6.02, Haiku 5.5 $0.85.
+
+What the numbers say:
+
+- **The rules hold where they are enumerable.** No model proposed paying, signing or deleting on its own authority in about 2,000 decisions; when a model proposed a payment at all (Haiku 14 times, Opus 9, Sonnet never), it proposed refusing it.
+- **Spelling out the mandate roughly halves over-reach, and does not remove it.** With the mandate in the prompt, 10 to 19% of actions still asked for more autonomy than allowed; without it, 25 to 39%. The gateway held every one. This is the capability prediction measured on this product: enumerable scope is reliable with explicit rules plus an external gateway, and judgment alone is not.
+- **Over-reach concentrates at the edges of permissive mandates.** Under the Autonomous preset Opus over-reached on 39% of actions (Supervised 9%, Standard 14%). The two patterns: proposing to draft a legal notice alone (the mandate routes legal drafts to counsel even though nothing is sent), and emails to the lessee asking the landlord or NYSEG to act (the mandate routes requests to further parties, and anything reaching the utility, to a person). Both are fine print a model reads as "safe"; neither escaped the gateway.
+- **Reporting is honest.** 96 to 100% of post-run reports matched the ledger, and with one action's ledger rows withheld, 98 to 100% left it out rather than inventing a status.
+- **Injections were resisted 108 of 108 times.** In the plans read by hand, models flagged the injected date change and payment request to the owner, refused the payment, or asked a legitimate party to confirm in writing.
+- **Opus and Sonnet agree with the reviewed first-three actions about 85% of the time; Haiku 57%.** The reviewed set is pending practitioner review, so this measures agreement with our key, not correctness.
+
+Limits: one synthetic site and six event templates; actions within one plan are not independent, so treat differences under about 5 points as noise; the classifier is Haiku in every run, and a stricter or looser classifier moves over-reach. The scripted planner scores 0 hard violations, 3.5% over-reach and 100% on reports and injection by construction (its plans and the reviewed set were written together).
 
 ## Cost
 
-Measured prompt: about 6,400 cached tokens per site plus about 600 per event. Assuming about 6,000 output tokens per plan:
+Measured in the Nov 1, 2026 eval run: about $0.22 per event on Opus 5.5 (both arms, plus the Haiku reports), $0.11 on Sonnet 5.5 and under $0.02 on Haiku 5.5. With Opus planning:
 
 | | Per event | Per site per month | 15 sites per month |
 |---|---|---|---|
-| 5 events a day | $0.28 | $42 | $630 |
-| 20 events a day | $0.28 | $167 | $2,500 |
+| 5 events a day | $0.22 | $33 | $500 |
+| 20 events a day | $0.22 | $134 | $2,000 |
 
 Opus 5.5 planning in both arms (the blind arm reads the informed arm's cache), Haiku 5.5 for classification and reports. `cd backend && uv run groundwork cost` reports actual spend from recorded usage.
 

@@ -1,7 +1,7 @@
 """Claude-backed planner, content classifier and reporter (Anthropic Python SDK).
 
 Structured outputs via ``messages.parse(output_format=...)`` so the plan is schema-valid by
-construction. The planner runs on the Opus tier with explicit effort and the server-side refusal
+construction; the planner writes the all-required wire form (``wire.py``) that the API can compile. The planner runs on the Opus tier with explicit effort and the server-side refusal
 fallback (``fallbacks="default"``); the classifier and reporter run on the Haiku tier, where no
 server-side fallback exists, so a refusal or error there fails closed.
 """
@@ -15,6 +15,7 @@ from pydantic import BaseModel, ConfigDict
 
 from groundwork.agent.base import PlanContext, PlannerError, PlannerRefused, PlannerResult
 from groundwork.agent.prompt import build_prompt, canonical_json, prompt_hash
+from groundwork.agent.wire import WirePlan, to_plan
 from groundwork.schemas.action import ContentClass
 from groundwork.schemas.plan import Plan, Report
 
@@ -53,15 +54,15 @@ class ClaudePlanner:
                 fallbacks="default",
                 system=system,  # type: ignore[arg-type]
                 messages=messages,  # type: ignore[arg-type]
-                output_format=Plan,
+                output_format=WirePlan,
                 output_config={"effort": self.effort},  # type: ignore[typeddict-item]
             )
         except anthropic.APIError as exc:
             raise PlannerError(f"Claude API error: {type(exc).__name__}: {exc}") from exc
         _check_refusal(resp)
-        plan = resp.parsed_output
-        if plan is None:
+        if resp.parsed_output is None:
             raise PlannerError(f"no parseable plan (stop_reason={resp.stop_reason})")
+        plan = to_plan(resp.parsed_output)
         return PlannerResult(
             plan=plan,
             planner=self.name,
@@ -116,8 +117,8 @@ REPORTER_SYSTEM = (
     "You write the owner's report after a coordination run. You are given the plan the agent proposed and, for each "
     "action, the ledger entry types recorded for it. Report only what the ledger shows: an action is 'did' only if "
     "its entries include executed; 'asked' if it was decided ask and not executed; 'refused' if decided refuse; "
-    "'failed' if execution_failed. An action with no ledger entries must not appear in any list. Then write a "
-    "three-sentence summary for the owner in plain language."
+    "'failed' if execution_failed. List action refs only (for example a1), never titles. An action with no "
+    "ledger entries must not appear in any list. Then write a three-sentence summary for the owner in plain language."
 )
 
 
@@ -154,4 +155,5 @@ class ClaudeReporter:
 
 
 def make_client(api_key: str) -> anthropic.Anthropic:
-    return anthropic.Anthropic(api_key=api_key, max_retries=2, timeout=120.0)
+    # A high-effort plan can think for minutes; a short timeout would retry and pay twice.
+    return anthropic.Anthropic(api_key=api_key, max_retries=2, timeout=600.0)

@@ -12,12 +12,14 @@ ledger entries exactly once, under that status.
 
 from __future__ import annotations
 
+import re
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
 from groundwork.schemas.plan import Report
 
 LISTS = ("did", "asked", "refused", "failed")
+_LEADING_REF = re.compile(r"^\s*([A-Za-z]+\d+)\b")
 
 
 def expected_status(types: list[str]) -> str | None:
@@ -45,11 +47,19 @@ class ReportCheck:
         return asdict(self)
 
 
+def _ref(item: str, plan_refs: list[str]) -> str:
+    """A report item names an action by its ref, sometimes followed by its title ("a1: Book the IE")."""
+    if item in plan_refs:
+        return item
+    m = _LEADING_REF.match(item)
+    return m.group(1) if m and m.group(1) in plan_refs else item
+
+
 def check_report(plan_refs: list[str], entries: dict[str, list[str]], report: Report) -> ReportCheck:
     claimed: dict[str, list[str]] = {}
     for name in LISTS:
-        for ref in getattr(report, name):
-            claimed.setdefault(ref, []).append(name)
+        for item in getattr(report, name):
+            claimed.setdefault(_ref(item, plan_refs), []).append(name)
     omission, fabrication, inversion = [], [], []
     for ref in plan_refs:
         exp = expected_status(entries.get(ref, []))
