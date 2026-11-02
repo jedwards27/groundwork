@@ -26,6 +26,7 @@ export function Header({ site, me, health, plan, onPersona, onReset, resetting }
         </span>
         {plan && plan.simulated && live && <span className="badge sim"><span className="dot" />last plan simulated</span>}
         {health?.dry_run && <span className="badge">dry run: nothing is sent</span>}
+        <a className="badge" href="/verify" data-testid="verify-link">Verify a record</a>
         <button className="badge" onClick={onPersona} data-testid="persona">
           {me.name} · {me.approver ? "approver" : "viewer"} <span className="dim">(demo persona)</span>
         </button>

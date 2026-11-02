@@ -147,6 +147,20 @@ class ChainReport:
     problems: list[str] = field(default_factory=list)
 
 
+def _stored_body(e: LedgerEntry) -> dict[str, Any]:
+    return {
+        "org_id": str(e.org_id),
+        "seq": e.seq,
+        "prev_hash": e.prev_hash,
+        "entry_type": e.entry_type,
+        "run_id": str(e.run_id) if e.run_id else None,
+        "action_id": str(e.action_id) if e.action_id else None,
+        "arm": e.arm,
+        "recorded_at": e.recorded_at,
+        "payload": e.payload,
+    }
+
+
 def verify_chain(s: Session, org_id: uuid.UUID | None = None) -> ChainReport:
     """Walk the org's chain from seq 1: contiguity, links and recomputed hashes."""
     q = select(LedgerEntry).order_by(LedgerEntry.seq)
@@ -164,18 +178,7 @@ def verify_chain(s: Session, org_id: uuid.UUID | None = None) -> ChainReport:
             )
         if e.prev_hash != prev:
             problems.append(f"seq {e.seq}: prev_hash does not match the hash of the entry before it")
-        body = {
-            "org_id": str(e.org_id),
-            "seq": e.seq,
-            "prev_hash": e.prev_hash,
-            "entry_type": e.entry_type,
-            "run_id": str(e.run_id) if e.run_id else None,
-            "action_id": str(e.action_id) if e.action_id else None,
-            "arm": e.arm,
-            "recorded_at": e.recorded_at,
-            "payload": e.payload,
-        }
-        if entry_hash(body) != e.hash:
+        if entry_hash(_stored_body(e)) != e.hash:
             problems.append(f"seq {e.seq}: contents do not match its hash (the entry was altered)")
         prev = e.hash
     last = rows[-1] if rows else None
@@ -186,3 +189,60 @@ def verify_chain(s: Session, org_id: uuid.UUID | None = None) -> ChainReport:
         head_hash=last.hash if last else GENESIS,
         problems=problems,
     )
+
+
+def verify_entry(s: Session, seq: int, claimed: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Check one record: recompute its hash, walk the chain up to it, and, when a copy of the record is
+    supplied (pasted from a receipt or an export), recompute that copy's hash too. The copy matches
+    only if it hashes to exactly what the chain holds at that seq."""
+    require_org(s)
+    rows = list(
+        s.execute(select(LedgerEntry).where(LedgerEntry.seq <= seq).order_by(LedgerEntry.seq)).scalars()
+    )
+    target = rows[-1] if rows and rows[-1].seq == seq else None
+    if target is None:
+        return {"seq": seq, "found": False, "match": False, "problems": [f"no record {seq} in this ledger"]}
+    problems: list[str] = []
+    prev = GENESIS
+    for expected_seq, e in enumerate(rows, start=1):
+        if e.seq != expected_seq:
+            problems.append(f"seq {e.seq} found where {expected_seq} was expected")
+        if e.prev_hash != prev:
+            problems.append(f"seq {e.seq}: prev_hash does not match the record before it")
+        if entry_hash(_stored_body(e)) != e.hash:
+            problems.append(f"seq {e.seq}: contents do not match its hash (the record was altered)")
+        prev = e.hash
+    computed = entry_hash(_stored_body(target))
+    copy_hash = None
+    if claimed is not None:
+        copy = {
+            "org_id": str(target.org_id),
+            "seq": claimed.get("seq"),
+            "prev_hash": claimed.get("prev_hash"),
+            "entry_type": claimed.get("entry_type", claimed.get("type")),
+            "run_id": claimed.get("run_id"),
+            "action_id": claimed.get("action_id"),
+            "arm": claimed.get("arm"),
+            "recorded_at": claimed.get("recorded_at"),
+            "payload": claimed.get("payload"),
+        }
+        copy_hash = entry_hash(copy)
+        if copy_hash != target.hash:
+            problems.append(f"the supplied copy of record {seq} does not match what the ledger holds")
+    mandate_version = target.payload.get("mandate_version")
+    if mandate_version is None and target.action_id is not None:
+        decided = [e for e in rows if e.action_id == target.action_id and e.entry_type == "decided"]
+        if decided:
+            mandate_version = decided[-1].payload.get("mandate_version")
+    return {
+        "seq": seq,
+        "found": True,
+        "type": target.entry_type,
+        "recorded_at": target.recorded_at,
+        "stored_hash": target.hash,
+        "recomputed_hash": computed,
+        "copy_hash": copy_hash,
+        "mandate_version": mandate_version,
+        "match": not problems,
+        "problems": problems,
+    }

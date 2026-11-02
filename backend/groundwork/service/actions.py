@@ -146,6 +146,7 @@ def plan_view(s: Session, state: SiteState, plan: m.Plan) -> dict[str, Any]:
                 "decision": latest.decision if latest else None,
                 "reason": latest.reason if latest else "",
                 "rule": latest.rule if latest else "",
+                "clause": ctx.get("clause", ""),
                 "delta": latest.delta if latest else "",
                 "record_bearing": latest.record_bearing if latest else False,
                 "content_class": latest.content_class if latest else None,

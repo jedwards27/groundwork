@@ -29,7 +29,7 @@ browser ──HTTPS──▶ Mission Control (Fly machine, public)
 
    It creates `groundwork_owner` and `groundwork_app` with random passwords; neither gets BYPASSRLS. It creates the `groundwork` database owned by `groundwork_owner`, checks that both logins work, and writes the database URLs, a new signing secret and an admin token to `.env.hosted` at the repo root. That file is gitignored, readable only by you, and its values are never printed.
 3. **Optional: turn on the live planner** by adding a line `ANTHROPIC_API_KEY=sk-ant-...` to `.env.hosted`.
-4. **Deploy.** App names are global on Fly. If `groundwork-api` or `groundwork-web` is taken, set `FLY_API_APP` and `FLY_WEB_APP` first.
+4. **Deploy.** App names are global on Fly. The defaults are `groundwork-demo-api` and `groundwork-demo` (created Nov 2, 2026); to use other names, set `FLY_API_APP` and `FLY_WEB_APP` first.
 
    ```bash
    make deploy
@@ -44,19 +44,19 @@ browser ──HTTPS──▶ Mission Control (Fly machine, public)
 - **The API is private.** Expect no addresses to be listed:
 
   ```bash
-  fly ips list -a groundwork-api
+  fly ips list -a groundwork-demo-api
   ```
 
 - **Admin paths are not reachable from the browser.** Expect `404`:
 
   ```bash
-  curl -s -o /dev/null -w '%{http_code}\n' -X POST https://groundwork-web.fly.dev/api/gw/admin/reset
+  curl -s -o /dev/null -w '%{http_code}\n' -X POST https://groundwork-demo.fly.dev/api/gw/admin/reset
   ```
 
 - **Logs are clean,** including the startup preflight:
 
   ```bash
-  fly logs -a groundwork-api
+  fly logs -a groundwork-demo-api
   ```
 
 ## Run it
@@ -76,10 +76,10 @@ browser ──HTTPS──▶ Mission Control (Fly machine, public)
 - **Take it down.** Then delete the Neon project in its console.
 
   ```bash
-  fly apps destroy groundwork-web
+  fly apps destroy groundwork-demo
   ```
   ```bash
-  fly apps destroy groundwork-api
+  fly apps destroy groundwork-demo-api
   ```
 
 ## Rehearse on your machine first

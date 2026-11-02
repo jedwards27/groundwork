@@ -302,6 +302,7 @@ def decide_phase(org_id: uuid.UUID, run_id: uuid.UUID, plan_id: uuid.UUID, tools
             context = {
                 **d.resolved.details,
                 "approvers": approvers,
+                "clause": dec.clause,
                 "classifier_reason": d.classifier_reason,
                 "missing_params": list(d.resolved.ctx.missing_params),
             }
@@ -333,6 +334,7 @@ def decide_phase(org_id: uuid.UUID, run_id: uuid.UUID, plan_id: uuid.UUID, tools
                     "decision": dec.decision.value,
                     "reason": dec.reason,
                     "rule": dec.rule,
+                    "clause": dec.clause,
                     "delta": dec.delta,
                     "kind": dec.kind.value,
                     "record_bearing": dec.record_bearing,
@@ -544,6 +546,8 @@ def execute_run(org_id: uuid.UUID, run_id: uuid.UUID, *, force_simulated: bool =
             run.status, run.started_at = "running", datetime.now(UTC)
             site, event = _site(s, run)
             site_key, event_key, event_kind = site.key, event.key, event.kind
+            # The demo path is scripted: it always plays the hand-written plan, model or no model.
+            force_simulated = force_simulated or event.scripted
             step(s, run_id, "running", f"Reading '{event.title}'")
         with org_session(org_id) as s:
             state = repo.load_state(s, site_key)

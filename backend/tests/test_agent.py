@@ -142,6 +142,6 @@ def test_prompt_prefix_is_byte_stable():
     assert a == b and len(a) > 2000  # well above the 512-token cache minimum
 
 
-def test_simulated_plans_exist_for_both_events():
-    assert set(PLANS) == {"event-a", "event-b"}
+def test_simulated_plans_exist_for_both_events_and_the_demo():
+    assert set(PLANS) == {"event-a", "event-b", "demo-monday"}
     assert Path(REPO_ROOT / "fixtures" / "lake-mariner" / "simulated_plans.yaml").exists()

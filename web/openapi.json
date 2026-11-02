@@ -955,6 +955,74 @@
     }
    }
   },
+  "/sites/{site}/ledger/verify-entry": {
+   "post": {
+    "summary": "Verify Ledger Entry",
+    "description": "Recompute one record's hash and the chain up to it; compare a supplied copy if there is one.",
+    "operationId": "verify_ledger_entry_sites__site__ledger_verify_entry_post",
+    "parameters": [
+     {
+      "name": "site",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Site"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/VerifyEntryIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Verify Ledger Entry Sites  Site  Ledger Verify Entry Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/sites/{site}/runs": {
    "get": {
     "summary": "List Runs",
@@ -1967,6 +2035,11 @@
       "type": "string",
       "title": "Note",
       "default": ""
+     },
+     "scripted": {
+      "type": "boolean",
+      "title": "Scripted",
+      "default": false
      }
     },
     "type": "object",
@@ -3162,6 +3235,31 @@
      "type"
     ],
     "title": "ValidationError"
+   },
+   "VerifyEntryIn": {
+    "properties": {
+     "seq": {
+      "type": "integer",
+      "title": "Seq"
+     },
+     "entry": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Entry"
+     }
+    },
+    "type": "object",
+    "required": [
+     "seq"
+    ],
+    "title": "VerifyEntryIn"
    }
   }
  }

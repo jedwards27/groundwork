@@ -436,4 +436,5 @@ def event_view(state: SiteState, e: EventRow) -> EventView:
         provenance=e.provenance,
         source=e.source,
         note=e.note,
+        scripted=e.scripted,
     )

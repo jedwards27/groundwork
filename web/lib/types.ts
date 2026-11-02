@@ -50,6 +50,7 @@ export interface ActionView {
   decision: Autonomy | null;
   reason: string;
   rule: string;
+  clause: string;
   delta: "match" | "over_reach" | "over_caution" | "";
   record_bearing: boolean;
   content_class: string | null;
@@ -207,4 +208,17 @@ export interface Step {
   text: string;
   at: string;
   [k: string]: unknown;
+}
+
+export interface VerifyEntry {
+  seq: number;
+  found: boolean;
+  type?: string;
+  recorded_at?: string;
+  stored_hash?: string;
+  recomputed_hash?: string;
+  copy_hash?: string | null;
+  mandate_version?: number | null;
+  match: boolean;
+  problems: string[];
 }

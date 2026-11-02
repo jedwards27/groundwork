@@ -269,3 +269,29 @@ def test_incomplete_params_ask():
 def test_over_caution_is_recorded():
     d = decide(action(Executor.record_decision, Autonomy.ask, recipient=None), ctx(None), STD)
     assert d.decision == Autonomy.auto and d.delta == "over_caution"
+
+
+# --- every decision names the mandate clause it relied on ------------------------------------------
+def test_every_decision_cites_its_clause():
+    std = PRESETS["standard"]
+    never = decide(action(Executor.sign_document), ctx("counterparty_routine"), std)
+    assert never.decision == Autonomy.refuse and never.clause.startswith("Never: pay, sign, delete")
+
+    status = decide(action(Executor.send_email), ctx("counterparty_routine"), std)
+    assert status.decision == Autonomy.auto and status.clause.startswith("routine_messages:")
+
+    relayed = decide(
+        action(Executor.send_email),
+        ctx("counterparty_routine", asks_party="landlord", path=("party-x", "landlord")),
+        std,
+    )
+    assert relayed.decision == Autonomy.ask and "direct counterparties only" in relayed.clause
+
+    spend = decide(action(Executor.commit_spend), ctx("counterparty_routine", amount_cents=9_000_000), std)
+    assert spend.decision == Autonomy.ask and "per action" in spend.clause
+
+    regulator = decide(action(Executor.send_email), ctx("regulator"), std)
+    assert regulator.decision == Autonomy.ask and regulator.clause.startswith("Record-bearing:")
+
+    unlisted = decide(action(Executor.send_email), ctx("counterparty_routine"), PRESETS["supervised"])
+    assert unlisted.decision == Autonomy.ask and unlisted.clause.startswith("Ask by default")

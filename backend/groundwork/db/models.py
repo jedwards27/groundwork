@@ -243,6 +243,7 @@ class Event(Base):
     note: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(Text, nullable=False)
     applied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    scripted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
 
 class Run(Base):

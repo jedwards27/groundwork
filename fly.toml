@@ -5,7 +5,7 @@
 # web app reaches it at http://<this app>.internal:8000 over Fly's private network, which is why it
 # listens on IPv6 (::). Secrets (database URLs, signing secret, admin token, optional Anthropic key)
 # come from .env.hosted through `fly secrets import`; nothing secret is in this file.
-app = "groundwork-api"
+app = "groundwork-demo-api"
 primary_region = "iad"  # Ashburn, next to Neon's aws-us-east-1
 
 [build]

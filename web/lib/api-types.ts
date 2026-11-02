@@ -253,6 +253,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sites/{site}/ledger/verify-entry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Verify Ledger Entry
+         * @description Recompute one record's hash and the chain up to it; compare a supplied copy if there is one.
+         */
+        post: operations["verify_ledger_entry_sites__site__ledger_verify_entry_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sites/{site}/runs": {
         parameters: {
             query?: never;
@@ -602,6 +622,11 @@ export interface components {
              * @default
              */
             note: string;
+            /**
+             * Scripted
+             * @default false
+             */
+            scripted: boolean;
         };
         /** FactView */
         FactView: {
@@ -1031,6 +1056,15 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** VerifyEntryIn */
+        VerifyEntryIn: {
+            /** Seq */
+            seq: number;
+            /** Entry */
+            entry?: {
+                [key: string]: unknown;
+            } | null;
         };
     };
     responses: never;
@@ -1561,6 +1595,45 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    verify_ledger_entry_sites__site__ledger_verify_entry_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                site: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerifyEntryIn"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

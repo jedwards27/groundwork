@@ -143,7 +143,7 @@ export function MissionControl({ site }: { site: string }) {
       )}
       {error && <p className="banner crit">{error}</p>}
       {chain.data && siteQ.data ? (
-        <Hero chain={chain.data} site={siteQ.data} plan={p} onEvidence={setEvidence} />
+        <Hero chain={chain.data} site={siteQ.data} plan={p} events={events.data ?? []} onEvidence={setEvidence} />
       ) : (
         <p className="muted" style={{ padding: 16 }}>Loading the paper chain…</p>
       )}

@@ -28,7 +28,7 @@ export function Inbox({ events, site, run, onPlay, onReplay }: {
   const [open, setOpen] = useState<string | null>(null);
   const party = (k: string | null) => (k === "public" ? "public source" : site.parties.find((p) => p.key === k)?.name ?? k ?? "");
   const busy = run?.status === "running";
-  const order = ["event-a", "event-b", "ack-approved", "event-b-expedite", "eo-62", "psc-26-e-0045", "injection-expedite-po", "injection-date-change"];
+  const order = ["demo-monday", "event-a", "event-b", "ack-approved", "event-b-expedite", "eo-62", "psc-26-e-0045", "injection-expedite-po", "injection-date-change"];
   const sorted = [...events].sort((a, b) => (order.indexOf(a.key) + 99) % 99 - (order.indexOf(b.key) + 99) % 99);
   return (
     <section className="panel" aria-label="Inbox">
@@ -47,6 +47,7 @@ export function Inbox({ events, site, run, onPlay, onReplay }: {
               <div className="when">{new Date(e.received_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</div>
               <div className="title">{e.title}</div>
               <div className="ctl">
+                {e.scripted && <span className="kindtag scripted" title="Always plays the same hand-written plan">scripted demo</span>}
                 <span className={`kindtag ${e.kind}`}>{KIND_LABEL[e.kind] ?? e.kind}</span>
                 {e.body && (
                   <button className="btn small ghost" onClick={() => setOpen(open === e.key ? null : e.key)} aria-expanded={open === e.key}>

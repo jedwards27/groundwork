@@ -57,6 +57,51 @@ test.beforeEach(async ({ page, context }) => {
   await context.clearCookies();
 });
 
+test("the two-minute demo: the gate and its sources, DO, ASK through the lessee, NEVER, the report beside the record, and a record anyone can verify", async ({ page }) => {
+  await signIn(page, "Dana Ortiz");
+  await play(page, "demo-monday");
+
+  // a. This week's gating item, and why it moved, citing the message each delay came from.
+  await expect(page.getByTestId("gate")).toContainText("NYSEG");
+  await expect(page.getByTestId("why-moved")).toContainText("source:");
+
+  // b. DO: a status request the mandate already allows, with the clause it relied on.
+  await expect(page.getByTestId("decision-a1")).toHaveText("DO");
+  await expect(page.getByTestId("clause-a1")).toContainText("routine_messages");
+  await expect(page.getByTestId("who-a1")).toContainText("No approval needed");
+
+  // c. ASK: the landlord-bound request, routed Anthropic -> Fluidstack -> TeraWulf, waiting on a named person.
+  await expect(page.getByTestId("decision-a2")).toHaveText("ASK");
+  const route = page.getByTestId("route-a2");
+  await expect(route).toContainText("Anthropic");
+  await expect(route).toContainText("Fluidstack (Morgan Lee)");
+  await expect(route).toContainText("TeraWulf");
+  await expect(route).toContainText("Dana Ortiz");
+  await expect(page.getByTestId("who-a2")).toContainText("Waiting for a named approver: Dana Ortiz");
+
+  // d. NEVER: the change order a vendor document told the agent to sign; the report says so.
+  await expect(page.getByTestId("decision-a3")).toHaveText("NEVER");
+  await expect(page.getByTestId("clause-a3")).toContainText("Never: pay, sign, delete");
+  await expect(page.getByTestId("report")).toContainText("told an AI assistant to approve and sign it");
+
+  // e. The report beside the record, then one record checked by hash, and a forged copy rejected.
+  await expect(page.getByTestId("report-verdict")).toContainText("verified match");
+  const plan = await api<Plan>(page, `sites/${SITE}/latest-plan`);
+  expect(plan.simulated).toBe(true);
+  expect(plan.report_check?.ok).toBe(true);
+  await page.getByTestId("report-vs-record").getByRole("link").last().click();
+  await expect(page).toHaveURL(/\/verify\?seq=\d+/);
+  // The record list renders client-side, so once it holds a record the page is interactive.
+  await expect(page.getByTestId("verify-select")).toHaveValue(/^\d+$/);
+  await page.getByTestId("verify-run").click();
+  await expect(page.getByTestId("verify-verdict")).toHaveText("Match");
+  await page.getByRole("button", { name: "Copy the selected record into the box" }).click();
+  const box = page.getByTestId("verify-copy");
+  await box.fill((await box.inputValue()).replace('"decision": "refuse"', '"decision": "auto"'));
+  await page.getByTestId("verify-run").click();
+  await expect(page.getByTestId("verify-verdict")).toHaveText("Mismatch");
+});
+
 test("event A: the gate moves, the gateway holds one action, an auto-reply changes nothing, a named person approves", async ({ page }) => {
   await signIn(page, "Dana Ortiz");
 

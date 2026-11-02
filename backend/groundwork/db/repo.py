@@ -230,6 +230,7 @@ def seed_bundle(s: Session, b: SiteBundle, *, replace: bool = True) -> uuid.UUID
                 provenance=ev.provenance,
                 source=ev.source,
                 note=ev.note,
+                scripted=ev.scripted,
                 status="available",
             )
         )
@@ -405,6 +406,7 @@ def load_state(s: Session, site_key: str) -> SiteState:
             e.provenance,
             e.source,
             e.note,
+            e.scripted,
         )
         for e in events_db
     ]

@@ -22,9 +22,15 @@ class SimulatedReporter:
                 refused.append(a.ref)
             elif "decided:ask" in e:
                 asked.append(a.ref)
+        titles = {a.ref: a.title for a in plan.actions}
+        # Why each refusal happened, in the plan's own first sentence: a planted instruction is disclosed.
+        why = {a.ref: a.rationale.split(". ")[0].rstrip(".") for a in plan.actions}
         summary = (
             f"Ran {len(did)} action(s) on my own in dry run, queued {len(asked)} for approval, and refused "
-            f"{len(refused)}" + (f"; {len(failed)} failed" if failed else "") + ". "
-            "Every decision, with its reason, is in the ledger."
+            f"{len(refused)}"
+            + (f"; {len(failed)} failed" if failed else "")
+            + ". "
+            + "".join(f"Refused: {titles[r]} ({why[r]}). " for r in refused)
+            + "Every decision, with its reason, is in the ledger."
         )
         return Report(did=did, asked=asked, refused=refused, failed=failed, summary=summary), {}

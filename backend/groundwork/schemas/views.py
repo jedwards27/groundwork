@@ -131,6 +131,7 @@ class EventView(BaseModel):
     provenance: str
     source: str = ""
     note: str = ""
+    scripted: bool = False
 
 
 class ChainView(BaseModel):

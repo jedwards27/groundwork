@@ -161,6 +161,7 @@ class EventRow:
     provenance: str
     source: str
     note: str
+    scripted: bool = False  # always plays the hand-written plan (the demo path)
 
 
 @dataclass(frozen=True)
@@ -527,6 +528,7 @@ def load_site(root: Path | str) -> SiteBundle:
                 _prov(e.get("provenance"), where, problems),
                 e.get("source", ""),
                 (e.get("note") or "").strip(),
+                bool(e.get("scripted", False)),
             )
         )
 

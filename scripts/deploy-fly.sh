@@ -5,8 +5,8 @@
 # App names are global on Fly; set FLY_API_APP and FLY_WEB_APP if the defaults are taken.
 set -eu
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-API_APP=${FLY_API_APP:-groundwork-api}
-WEB_APP=${FLY_WEB_APP:-groundwork-web}
+API_APP=${FLY_API_APP:-groundwork-demo-api}
+WEB_APP=${FLY_WEB_APP:-groundwork-demo}
 SECRETS="$ROOT/.env.hosted"
 
 command -v fly >/dev/null 2>&1 || { echo "Install flyctl first: https://fly.io/docs/flyctl/install/"; exit 1; }

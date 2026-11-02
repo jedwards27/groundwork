@@ -1,13 +1,14 @@
 "use client";
 import { daysBetween, fmt, fmtLong } from "@/lib/format";
 import { stages } from "@/lib/stages";
-import type { ChainView, PlanView, SiteView } from "@/lib/types";
+import type { ChainView, EventView, PlanView, SiteView } from "@/lib/types";
 import { Prov } from "./Tip";
 
-export function Hero({ chain, site, plan, onEvidence }: {
+export function Hero({ chain, site, plan, events, onEvidence }: {
   chain: ChainView;
   site: SiteView;
   plan: PlanView | null;
+  events: EventView[];
   onEvidence: (key: string) => void;
 }) {
   const ms = chain.milestone;
@@ -15,6 +16,10 @@ export function Hero({ chain, site, plan, onEvidence }: {
   const gate = chain.items.find((i) => i.key === chain.gate);
   const party = (k: string) => site.parties.find((p) => p.key === k)?.name ?? k;
   const slipped = gate && gate.finish_shift_days > 0;
+  // Every delay on the gating item, with the message it came from: the forecast cites its sources.
+  const legs = gate
+    ? events.filter((e) => e.status === "applied").flatMap((e) => e.impacts.filter((i) => i.item === gate.key).map((i) => ({ i, e })))
+    : [];
   return (
     <section className="hero" aria-label="Delivery countdown">
       <div className="count">
@@ -57,6 +62,26 @@ export function Hero({ chain, site, plan, onEvidence }: {
                 </button>
               )}
             </div>
+            {legs.length > 0 && (
+              <div className="moved" data-testid="why-moved">
+                <b>Why it moved</b>
+                <ul>
+                  {legs.map(({ i, e }, n) => (
+                    <li key={n}>
+                      {i.leg} <span className="num">(+{i.low} to {i.high} days)</span>
+                      <details>
+                        <summary>
+                          source: {party(e.from_party)}
+                          {e.forwarded_from ? ` forwarding ${party(e.forwarded_from)}` : ""},{" "}
+                          {new Date(e.received_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                        </summary>
+                        <pre className="body">{e.body}</pre>
+                      </details>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         )}
         {chain.calendar_losses.length > 0 && (

@@ -127,6 +127,7 @@ def set_preset(
             context = {
                 **d.resolved.details,
                 "approvers": approvers,
+                "clause": dec.clause,
                 "missing_params": list(d.resolved.ctx.missing_params),
             }
             s.add(
@@ -157,6 +158,7 @@ def set_preset(
                     "decision": dec.decision.value,
                     "reason": dec.reason,
                     "rule": dec.rule,
+                    "clause": dec.clause,
                     "delta": dec.delta,
                     "kind": dec.kind.value,
                     "record_bearing": dec.record_bearing,

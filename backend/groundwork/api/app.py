@@ -24,7 +24,7 @@ from groundwork.config import get_settings, hosted_problems
 from groundwork.db import models as m
 from groundwork.db import repo
 from groundwork.db.session import org_session, owner_session
-from groundwork.ledger import verify_chain
+from groundwork.ledger import verify_chain, verify_entry
 from groundwork.policy import PRESETS
 from groundwork.schemas.views import (
     ChainView,
@@ -342,6 +342,18 @@ def verify_ledger(site: str, s: Session = Depends(db)) -> dict[str, Any]:
         "head_hash": r.head_hash,
         "problems": r.problems,
     }
+
+
+class VerifyEntryIn(BaseModel):
+    seq: int
+    entry: dict[str, Any] | None = None
+
+
+@app.post("/sites/{site}/ledger/verify-entry")
+def verify_ledger_entry(site: str, body: VerifyEntryIn, s: Session = Depends(db)) -> dict[str, Any]:
+    """Recompute one record's hash and the chain up to it; compare a supplied copy if there is one."""
+    _state(s, site)
+    return verify_entry(s, body.seq, body.entry)
 
 
 @app.get("/sites/{site}/runs")
