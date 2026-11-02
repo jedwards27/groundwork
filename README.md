@@ -1,6 +1,6 @@
 # Groundwork
 
-An owner's coordination agent for large, paperwork-constrained builds, starting with gigawatt data centers. It keeps the live **paper critical path** to a delivery milestone, forecasts slips with their sources shown, and (from slice 2) acts within an explicit grant of authority, with every action in an append-only ledger.
+The first deployment of **delegated authority for agents**: a written mandate (what an agent may do alone, must ask about and may never do), a gateway outside the model that enforces it, approvals only a named person can give, and a tamper-evident record that the agent's own report is checked against. Groundwork applies them to the paperwork that gates gigawatt data-center builds. It keeps the live **paper critical path** to a delivery milestone, forecasts slips with their sources shown, and acts within the mandate, with every action in an append-only ledger. Evals measure, per model version, how well Claude stays in scope and reports honestly.
 
 The demo site is **Lake Mariner CB-5** (Barker, NY), seen from the **end user's** seat: TeraWulf is landlord and interconnection customer, Fluidstack is the lessee, and Anthropic is the end user two contracts removed from the utility. Public facts carry links; everything else is marked synthetic or an assumption to verify.
 
