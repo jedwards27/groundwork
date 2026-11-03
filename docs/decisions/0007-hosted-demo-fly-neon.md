@@ -2,6 +2,8 @@
 
 **Status:** accepted. Settles the hosting `[DECIDE]` in ARCHITECTURE §3.
 
+**Update (Nov 3, 2026):** ADR 0009 folds the two Fly machines into one. The API now serves the web app from the same origin, so there is no web machine, no private-network hop and no admin token on a second box. The rest of this record (Neon, sandboxes, caps, the preflight, the rehearsal) stands.
+
 **Context.** The hosted demo holds only the synthetic and public Lake Mariner fixture. It has to be reachable by a link, cost a few dollars a month, keep the API key and signing secret off anything public, stay in dry run, and reset itself. Two facts shaped the choice:
 
 - **BYPASSRLS.** Locally, the owner role (migrations, seeding, reset) had the BYPASSRLS attribute, and every org-scoped table forced row-level security even for its owner. On managed Postgres you are not a superuser. Postgres lets only a superuser, or a role that already has BYPASSRLS, grant it, and attributes are not inherited through role membership. Neon's admin role belongs to `neon_superuser`, which has the attribute, but whether that admin can create a role with it could not be confirmed from the documentation.

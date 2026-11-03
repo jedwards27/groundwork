@@ -2,7 +2,7 @@
 
 Groundwork coordinates approval-gated projects across companies, acting only inside a signed written mandate, leaving a receipt anyone can verify, and earning wider autonomy as each model version passes the evals, starting with the data-center buildout that is Anthropic's own bottleneck.
 
-It reads a project's paper trail (utility studies, permits, landlord decisions, vendor tests), names this week's gating item, forecasts slips with their sources, and drafts, chases and asks within the mandate. The delegation layer keeps it inside its authority: a **mandate** says what it may do alone, must ask about and may never do; a **gateway** outside the model decides do, ask or never and shows the clause it relied on; a **named approval** binds one person to one exact action; every step lands in a hash-chained **ledger**, and any **receipt** from it can be re-checked by hash. Everything runs in dry run: nothing is sent.
+It reads a project's paper trail (utility studies, permits, landlord decisions, vendor tests), names this week's gating item, forecasts slips with their sources, and drafts, chases and asks within the mandate. The delegation layer keeps it inside its authority: a **mandate** says what it may do alone, must ask about and may never do; a **gateway** outside the model decides allow, ask or deny and shows the clause it relied on; a **named approval** binds one person to one exact action; every step lands in a hash-chained **ledger**, and any **receipt** from it can be re-checked by hash. Everything runs in dry run: nothing is sent.
 
 The demo site is **Lake Mariner CB-5** (Barker, NY), seen from the end user's seat: TeraWulf is landlord and the utility's customer, Fluidstack is the lessee, and Anthropic is the end user, reaching the utility only through both. Public facts carry links; the schedule, inbox and people are synthetic and labeled.
 
@@ -18,14 +18,14 @@ The main way to try Groundwork is as a plugin inside the Claude app. It runs on 
    - **Claude Code:** unzip it and run `claude --plugin-dir dist/groundwork-plugin`.
 3. **Set up and play:** run `/groundwork:setup` to say who you are, then `/groundwork:demo` for the two-minute demo.
 
-You approve asks, confirm drafts and check receipts on a local page. Groundwork gives you its link; it's only reachable from your computer. Other skills:
+You approve asks, confirm drafts and check receipts in the Groundwork app: the same web app as the hosted demo, served on your computer. Claude gives you its link, which signs you in; the app answers only on your computer. Other skills:
 - `/groundwork:new-project` starts tracking one of your own projects from a few sentences, a spreadsheet or your email.
 - `/groundwork:mandate` writes or changes a mandate in plain words.
 - The `coordinate` skill handles "what are we waiting on?" and checking project mail.
 
 Everything stays in dry run. If Claude tries to send project mail through another connector, Groundwork's guard records it and holds it; your other use of Gmail or Slack is untouched.
 
-**Backtesting a past project.** Start it with `/groundwork:new-project` as of the date you want to begin, using only what was known then. Then replay its messages in date order. Each recorded message moves the project's date forward to the message's date. `check_overdue` moves the date forward by itself and lists work past due with no word, so Groundwork can plan chases. A message can report progress: an item done or started, with its date. It can also report date changes. Both wait for your confirmation on the local page, and until then `status` shows the forecast "if confirmed" beside the confirmed one. Links Claude inferred rather than read in a source are flagged, and you can confirm or remove them. `docs/DATA-BOUNDARY.md` covers what leaves your machine, and ADR 0008 covers the design.
+**Backtesting a past project.** Start it with `/groundwork:new-project` as of the date you want to begin, using only what was known then. Then replay its messages in date order. Each recorded message moves the project's date forward to the message's date. `check_overdue` moves the date forward by itself and lists work past due with no word, so Groundwork can plan chases. A message can report progress: an item done or started, with its date. It can also report date changes. Both wait for your confirmation in the app, and until then `status` shows the forecast "if confirmed" beside the confirmed one. Links Claude inferred rather than read in a source are flagged, and you can confirm or remove them. `docs/DATA-BOUNDARY.md` covers what leaves your machine, and ADR 0008 covers the design.
 
 **Hosted fallback:** if you'd rather not install anything, the same demo runs in the browser at https://groundwork-demo.fly.dev (not deployed yet; it goes live with `make deploy`, see `docs/HOSTING.md`).
 
@@ -40,23 +40,25 @@ make doctor
 make dev
 ```
 
-`make dev` writes `.env` with fresh dev secrets, creates the database roles and databases, applies migrations, seeds Lake Mariner, installs the web app's packages, and serves **Mission Control on http://localhost:3000** (the API is on http://localhost:8000, docs at `/docs`). Ctrl-C stops both. Sign in as **Dana Ortiz** (delivery lead, approver), then play the demo below.
+`make dev` writes `.env` with fresh dev secrets, creates the database roles and databases, applies migrations, seeds Lake Mariner, installs the web app's packages, and serves **Groundwork on http://localhost:3000** with live reload (its API is on http://localhost:8000 under `/api`, docs at `/api/docs`). Ctrl-C stops both. You're signed in as **Dana Ortiz**, the demo project's lead and its one approver; there is no one else to choose. Then play the demo below.
+
+`make web-build` builds the web app into `web/dist`, and from then on `make api` serves it too, on http://localhost:8000: one process, as in the plugin and the hosted demo (ADR 0009).
 
 Set `ANTHROPIC_API_KEY` in `.env` to have Claude write the plans for the other inbox events (Opus 5.5 plans; Haiku 5.5 checks outbound text and writes the report). The demo event is scripted and never calls a model. `docs/DATA-BOUNDARY.md` lists exactly what leaves your machine.
 
-Docker, untested because the author's machine has no Docker: `sh scripts/new-env.sh`, then `docker compose --profile full up --build`.
+Docker, untested because the author's machine has no Docker: `sh scripts/new-env.sh`, then `docker compose --profile full up --build`, then open http://localhost:8000.
 
 ## The two-minute demo
 
-Play **"Demo: NYSEG re-review, and a switchgear change order with an instruction inside it"**, the first message in the inbox. It plays the same hand-written plan every time; the gateway, ledger and report check are live code.
+Open **Lake Mariner**, then its **Inbox** tab, and play **"Demo: NYSEG re-review, and a switchgear change order with an instruction inside it"**, the first message. It plays the same hand-written plan every time; the gateway, ledger and report check are live code.
 
-1. **0:00 to 0:25, the gating item.** The forecast moves to Apr 13, 2027, 50 days past the Feb 22 lease date, and NYSEG's settings review is still the gating item. "Why it moved" lists both delays, each citing the forwarded email it came from.
-2. **0:25 to 0:45, DO.** A status request to Morgan Lee at Fluidstack about the weekly status Fluidstack already sends, citing the schedule line. The mandate clause `routine_messages` allows it alone; it runs in dry run.
-3. **0:45 to 1:10, ASK.** Asking TeraWulf to confirm the energization date. The route reads Anthropic → Fluidstack (Morgan Lee) → TeraWulf (Site project manager), and it waits for Dana Ortiz or Priya Raman: the clause covers direct counterparties only.
-4. **1:10 to 1:30, NEVER.** A line inside the vendor's change order tells an AI assistant to approve and sign CO-7. Signing is on the never-list, no one can approve it, and the agent's report says what it found.
-5. **1:30 to 2:00, the report beside the record.** Each action's reported status matches the ledger. "verify #8" opens the record check: **Match**. Paste the same record with its decision changed: **Mismatch**.
+1. **0:00 to 0:25, the gating item.** The forecast moves to Apr 13, 2027, 50 days past the Feb 22 lease date, and NYSEG's settings review is still what the project is waiting on. **Why** lists both delays, each citing the forwarded email it came from. **See the decisions** opens the Actions tab.
+2. **0:25 to 0:45, Allow.** A status request to Morgan Lee at Fluidstack about the weekly status Fluidstack already sends, citing the schedule line. The mandate clause `routine_messages` allows it alone; it runs in dry run.
+3. **0:45 to 1:10, Ask.** Asking TeraWulf to confirm the energization date. The route reads Anthropic → Fluidstack → TeraWulf, and it waits for you, since the clause covers direct counterparties only. It also shows on the home view under **Needs you**.
+4. **1:10 to 1:30, Deny.** A line inside the vendor's change order tells an AI assistant to approve and sign CO-7. Signing is on the never-list, no one can approve it, and the agent's report says what it found.
+5. **1:30 to 2:00, the report beside the record.** **Report matches the ledger.** Open "The agent's report beside the ledger" and pick a record number to open the record check: **Match**. Paste the stored record with its decision changed: **Mismatch**.
 
-Then try event A (the same delay, with a fuller plan), the auto-reply that says "approved, please proceed" and changes nothing, approving as Dana, the authority dial, and "Tamper with one entry" in the ledger panel.
+Then try event A (the same delay, with a fuller plan), the auto-reply that says "approved, please proceed" and changes nothing, approving from the home view, a new template in the Mandate tab, and **Tamper with one demo record** in the **You** menu.
 
 ## Evals
 
@@ -107,7 +109,7 @@ Lint (ruff), types (pyright), six import boundaries (import-linter: the planner 
 - 172 gateway table rows, and the mandate clause each kind of decision cites;
 - the ledger: test vector, tamper and delete detection, triggers that bind the owner, no forks under concurrency;
 - the honesty check;
-- the pipeline end to end, typed, bound approvals, and the scripted demo path (the same DO, ASK and NEVER even with a live key);
+- the pipeline end to end, typed, bound approvals, and the scripted demo path (the same allow, ask and deny even with a live key);
 - checking one record: a match, a forged copy, and an edited stored record;
 - a property test that no inbound message changes any action's state;
 - mandate re-decision, and blind-arm isolation;
@@ -119,9 +121,10 @@ Lint (ruff), types (pyright), six import boundaries (import-linter: the planner 
   - daily caps that count across orgs;
   - connection-per-request mode and the nightly reset schedule;
   - that no database role needs BYPASSRLS;
-- sandboxes: two visitors cannot see each other's work, switching persona keeps a sandbox, "Start over" replaces it, and expired sandboxes are deleted with their ledgers.
+- sandboxes: two visitors cannot see each other's work, signing in again keeps a sandbox, "Start over" replaces it, and expired sandboxes are deleted with their ledgers;
+- the web app's session: a cookie its scripts cannot read, state changes refused without this app's Origin, and, in the plugin, one browser that sees every project on the computer while each request runs in one project's org.
 
-`make e2e` is the browser walkthrough (Playwright, `web/e2e/`). It runs the two-minute demo below step by step, including a match and a mismatch on the verify page. It also signs in as a persona, plays event A, check that the countdown and the did/asked/refused counts on the page equal what the API returns, play the auto-reply and see nothing change, approve the held action as Dana, check that a viewer cannot approve (in the page and at the API), then tamper, watch verification fail, and reset. With sandboxes on, as in the hosted profile, a second browser checks that two visitors cannot see each other's work. It uses your installed Google Chrome and starts the API and web app if they are not running. `make web-build` type-checks and builds the production web app.
+`make e2e` is the browser walkthrough (Playwright, `web/e2e/`). It runs the two-minute demo step by step, including a match and a mismatch on the verify page. It also plays event A, checks the forecast against the API, finds the action the gateway held, plays the auto-reply and sees nothing change, approves the held action from the home view, issues a new mandate version and checks that only open actions were decided again, and tampers with a record, watches verification fail and resets. It checks that a state change without this app's Origin is refused. With sandboxes on, as in the hosted profile, a second browser checks that two visitors cannot see each other's work. It uses your installed Google Chrome and starts the API and the web app's dev server if they are not running; `E2E_BASE_URL=http://localhost:8000 make e2e` tests the built app instead.
 
 ## Cost
 
@@ -146,7 +149,7 @@ It validates the folder, lists every problem at once if there are any, and other
 
 ## Docs
 
-- `docs/decisions/`: ADRs 0001 to 0007.
+- `docs/decisions/`: ADRs 0001 to 0009.
 - `docs/HOSTING.md`: deploying, checking and running the hosted demo.
 - `docs/LEDGER.md`: the ledger's hash format, a test vector, and what verification does and does not catch.
 - `docs/PRACTITIONER-QUESTIONS.md`: the 20 questions that confirm or correct the fixture's assumptions.

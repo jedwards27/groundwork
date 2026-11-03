@@ -37,7 +37,7 @@ When Groundwork runs as a Claude plugin, project data reaches Anthropic only thr
 - what Claude reads with their connectors;
 - what Groundwork's tools return to Claude.
 
-The Groundwork server runs on the machine and keeps everything under `~/.groundwork`: the embedded database, drafts, the person's name and email, and the local page's token. It makes no network calls at run time; it clears `ANTHROPIC_API_KEY`, so the server itself never calls a model. The local page listens on 127.0.0.1 only. The outbound guard holds connector sends addressed to a party on a tracked project and records them; it sends nothing.
+The Groundwork server runs on the machine and keeps everything under `~/.groundwork`: the embedded database, drafts, the person's name and email, and the token in Claude's links to the web app. It makes no network calls at run time; it clears `ANTHROPIC_API_KEY`, so the server itself never calls a model. The web app and its API listen on 127.0.0.1 only, and answer only to the names 127.0.0.1 and localhost. The outbound guard holds connector sends addressed to a party on a tracked project and records them; it sends nothing.
 
 On first launch, uv downloads Python 3.12 and the locked packages from PyPI, including `pgserver`, which bundles the Postgres binaries. No project data is involved.
 
@@ -45,7 +45,7 @@ On first launch, uv downloads Python 3.12 and the locked packages from PyPI, inc
 
 The hosted demo holds only the synthetic and public Lake Mariner fixture. Where things live (docs/HOSTING.md, ADR 0007):
 
-- **Fly.io, Ashburn (`iad`):** two machines. Mission Control is the only public one. The API has no public address and is reached over Fly's private network. Fly keeps the request logs.
+- **Fly.io, Ashburn (`iad`):** one public machine serving the web app and its API (ADR 0009). Fly keeps the request logs.
 - **Neon, AWS US East 1:** the database. Connections use TLS.
 - **Secrets:** stored as Fly secrets. The API machine holds the database URLs, the signing secret, the admin token and, if set, the Anthropic API key. The web machine holds only the admin token. They are generated into a gitignored `.env.hosted` and never printed.
 - **Anthropic's API:** receives what is listed above, only when a key is set, and capped per day. After the cap the simulated planner runs with its banner.

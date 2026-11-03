@@ -3,7 +3,7 @@ import { Button, KIND, SIZE } from "baseui/button";
 import { ButtonGroup, MODE } from "baseui/button-group";
 import { Spinner } from "baseui/spinner";
 import { LabelSmall, ParagraphSmall } from "baseui/typography";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { EventView, SiteView, Step } from "@/lib/types";
 import { Chip, Drawer, Empty, Field, Grow, Line, Muted, Quote, Row } from "./ui";
 
@@ -43,10 +43,11 @@ export function InboxTab({ events, site, run, onPlay, claudePlans, onSeeActions 
   const [css, theme] = useStyletron();
   const [filter, setFilter] = useState(0);
   const [open, setOpen] = useState<string | null>(null);
-  // A message being played opens on its own, so its steps are in view.
-  useEffect(() => {
-    if (run) setOpen(run.event);
-  }, [run?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Playing a message opens it, so its steps are in view; coming back to the tab later does not.
+  const start = (key: string) => {
+    setOpen(key);
+    onPlay(key);
+  };
   const party = (k: string | null) => (k === "public" ? "Public source" : (site.parties.find((p) => p.key === k)?.name ?? k ?? ""));
   const rank = (k: string) => (ORDER.includes(k) ? ORDER.indexOf(k) : 99);
   const sorted = [...events].sort((a, b) => rank(a.key) - rank(b.key) || (a.received_at < b.received_at ? 1 : -1));
@@ -93,7 +94,7 @@ export function InboxTab({ events, site, run, onPlay, claudePlans, onSeeActions 
                 disabled={busy}
                 onClick={(ev) => {
                   ev.stopPropagation();
-                  onPlay(e.key);
+                  start(e.key);
                 }}
                 data-testid={`play-${e.key}`}
               >
@@ -115,7 +116,7 @@ export function InboxTab({ events, site, run, onPlay, claudePlans, onSeeActions 
           msg && (
             <>
               {playable(msg) && !thisRun && (
-                <Button onClick={() => onPlay(msg.key)} disabled={busy} data-testid="drawer-play">
+                <Button onClick={() => start(msg.key)} disabled={busy} data-testid="drawer-play">
                   Play this message
                 </Button>
               )}
@@ -143,7 +144,13 @@ export function InboxTab({ events, site, run, onPlay, claudePlans, onSeeActions 
                 {thisRun.status === "running" && <Spinner $size="24px" />}
                 {thisRun.status === "done" && (
                   <div className={css({ marginTop: theme.sizing.scale400 })}>
-                    <Button onClick={onSeeActions} data-testid="see-actions">
+                    <Button
+                      onClick={() => {
+                        setOpen(null);
+                        onSeeActions();
+                      }}
+                      data-testid="see-actions"
+                    >
                       See the decisions
                     </Button>
                   </div>

@@ -1,16 +1,14 @@
 # Hosting the demo
 
-The hosted demo is Mission Control on a public HTTPS link, running the Lake Mariner fixture: synthetic and public data only, dry run forced on, and live planning capped per day. Every visitor gets a private sandbox, their own copy of the demo that nobody else sees, deleted after 12 hours. ADR 0007 explains the choices.
+The hosted demo is the Groundwork web app on a public HTTPS link, running the Lake Mariner fixture: synthetic and public data only, dry run forced on, and live planning capped per day. Every visitor is signed in as the demo's lead and gets a private sandbox, their own copy of the demo that nobody else sees, deleted after 12 hours. ADR 0007 explains the choices, and ADR 0009 the move to one machine.
 
 ```
-browser ──HTTPS──▶ Mission Control (Fly machine, public)
-                        │  Fly private network (IPv6)
-                        ▼
-                   API (Fly machine, no public address) ──TLS──▶ Postgres (Neon, free plan)
-                        └──────────────────────────────────────▶ api.anthropic.com (only with a key)
+browser ──HTTPS──▶ Groundwork (one Fly machine: the web app, and its API under /api)
+                        ├──TLS──▶ Postgres (Neon, free plan)
+                        └───────▶ api.anthropic.com (only with a key)
 ```
 
-**Cost:** about $7 a month for two small Fly machines; Neon's free plan is $0. Fly needs a card on file.
+**Cost:** less than $7 a month for one small Fly machine (the old layout used two); Neon's free plan is $0. Fly needs a card on file.
 
 ## What you need
 
@@ -29,39 +27,36 @@ browser ──HTTPS──▶ Mission Control (Fly machine, public)
 
    It creates `groundwork_owner` and `groundwork_app` with random passwords; neither gets BYPASSRLS. It creates the `groundwork` database owned by `groundwork_owner`, checks that both logins work, and writes the database URLs, a new signing secret and an admin token to `.env.hosted` at the repo root. That file is gitignored, readable only by you, and its values are never printed.
 3. **Optional: turn on the live planner** by adding a line `ANTHROPIC_API_KEY=sk-ant-...` to `.env.hosted`.
-4. **Deploy.** App names are global on Fly. The defaults are `groundwork-demo-api` and `groundwork-demo` (created Nov 2, 2026); to use other names, set `FLY_API_APP` and `FLY_WEB_APP` first.
+4. **Deploy.** App names are global on Fly. The default is `groundwork-demo` (created Nov 2, 2026); to use another name, set `FLY_APP` first. The `groundwork-demo-api` app from the old two-machine layout is no longer used; destroy it when convenient (below).
 
    ```bash
    make deploy
    ```
 
-   It creates the two Fly apps if they are missing and imports the secrets: the API gets all of them, the web app only the admin token. Then it deploys the API, whose release step migrates and loads the fixture, and then Mission Control. It ends by printing the link: `https://<web app>.fly.dev`.
+   It creates the Fly app if it is missing, imports the secrets, and deploys. The image builds the web app in a Node stage and serves it from Python, so the machine runs no Node. The release step migrates and loads the fixture. It ends by printing the link: `https://groundwork-demo.fly.dev`.
 
 ## Check it
 
-- **The page.** Open the link and choose Dana Ortiz. A blue banner says this is your own copy of the demo and when it will be deleted. There is no "Tamper with one entry" button, and the ledger says "Chain verified".
-- **Sandboxes.** Open the link in a private window too and play event A in one window. The other window's countdown does not move.
-- **The API is private.** Expect no addresses to be listed:
+- **The page.** Open the link: you land on the home view, signed in. The header has a "Private copy" tag whose tooltip says when your copy will be deleted. The **You** menu has no tamper item, and a project's Ledger tab says "Verified".
+- **Sandboxes.** Open the link in a private window too and play event A in one window. The other window's forecast does not move.
+- **Admin and tamper paths are refused.** Expect `403` from both:
 
   ```bash
-  fly ips list -a groundwork-demo-api
+  curl -s -o /dev/null -w '%{http_code}\n' -X POST https://groundwork-demo.fly.dev/api/admin/reset
   ```
-
-- **Admin paths are not reachable from the browser.** Expect `404`:
-
   ```bash
-  curl -s -o /dev/null -w '%{http_code}\n' -X POST https://groundwork-demo.fly.dev/api/gw/admin/reset
+  curl -s -o /dev/null -w '%{http_code}\n' -X POST https://groundwork-demo.fly.dev/api/admin/tamper
   ```
 
 - **Logs are clean,** including the startup preflight:
 
   ```bash
-  fly logs -a groundwork-demo-api
+  fly logs -a groundwork-demo
   ```
 
 ## Run it
 
-- **Sandboxes.** A visitor's first demo login creates their sandbox. Switching persona keeps it, and "Start over" replaces it with a fresh copy. It is deleted 12 hours after it was created; a visitor who returns after their one-hour session gets a new one.
+- **Sandboxes.** A visitor's first visit signs them in and creates their sandbox. "Start over with a fresh copy" in the **You** menu replaces it. It is deleted 12 hours after it was created; a visitor who returns after their one-hour session gets a new one.
 - **Nightly sweep.** At 08:00 UTC (3 or 4 a.m. Eastern) the API deletes expired sandboxes and reloads the shared fixture that sandboxes are copied from. A deploy also reloads it.
 - **Caps, across all visitors.** Up to 200 new sandboxes, 300 runs and 30 runs that call Claude a day. After the Claude cap, the simulated planner takes over with its banner. They are set in `fly.toml`; redeploy after changing them.
 - **Rotate every secret.** This rotates both database passwords, the signing secret (every token stops working) and the admin token.
@@ -78,6 +73,9 @@ browser ──HTTPS──▶ Mission Control (Fly machine, public)
   ```bash
   fly apps destroy groundwork-demo
   ```
+
+  The old API app, if it is still there:
+
   ```bash
   fly apps destroy groundwork-demo-api
   ```
@@ -88,10 +86,10 @@ browser ──HTTPS──▶ Mission Control (Fly machine, public)
 make rehearse-hosted
 ```
 
-It builds the web app, then starts a throwaway Postgres whose admin role is neither superuser nor BYPASSRLS, as on Neon. It runs the same bootstrap, preflight and release commands as a deploy, and serves the hosted API on :8100 and Mission Control on :3200. Run the browser walkthrough against it from another terminal; the tamper test is skipped because the hosted profile refuses it. Ctrl-C deletes the cluster and its secrets.
+It builds the web app, then starts a throwaway Postgres whose admin role is neither superuser nor BYPASSRLS, as on Neon. It runs the same bootstrap, preflight and release commands as a deploy, and serves the hosted profile, the web app and its API, on :8100. Run the browser walkthrough against it from another terminal; the tamper test is skipped because the hosted profile refuses it. Ctrl-C deletes the cluster and its secrets.
 
 ```bash
-E2E_BASE_URL=http://localhost:3200 make e2e
+E2E_BASE_URL=http://localhost:8100 make e2e
 ```
 
 ## Safety rails, and what they do not cover
@@ -101,9 +99,9 @@ E2E_BASE_URL=http://localhost:3200 make e2e
   - either database URL uses a development password;
   - both URLs use the same role;
   - the daily caps are missing or out of range.
-- **Hosted profile.** Dry run is forced on whatever the configuration says, tokens last one hour, and the API refuses the tamper endpoint.
+- **Hosted profile.** Dry run is forced on whatever the configuration says, tokens last one hour, and the API refuses both tamper endpoints. It also refuses to start with `GROUNDWORK_LOCAL` on, which would let one browser act in every org.
 - **Isolation.** Each visitor's sandbox is a separate org, so row-level security keeps visitors apart, as it does customers.
-- **Who holds what.** The web machine holds only the admin token.
+- **Who holds what.** The one machine holds every secret. The browser holds only its session token, in a cookie its scripts cannot read, and a state change riding on that cookie must carry the app's own Origin.
 - **Not covered:**
   - There is no rate limit per visitor beyond the daily caps, so one visitor could use up the day's sandboxes.
   - The API holds the owner credentials, because the nightly reset needs them.
@@ -115,4 +113,5 @@ These come from the providers' documentation and the local rehearsal, not from a
 
 - Neon lets `neondb_owner` run `CREATE ROLE` and `CREATE DATABASE` from SQL. If `CREATE DATABASE` is refused, create a database named `groundwork` in the Neon console with `groundwork_owner` as owner, then run the bootstrap again with `--force`.
 - Neon's compute suspends between visits when the API holds no idle connections. Neon documents suspension after five minutes without queries; the API opens a connection per request (`GROUNDWORK_DB_NULLPOOL`), so this should hold. Watch the compute hours in the Neon console during the first week.
-- `fly deploy` builds from the folder it runs in. `scripts/deploy-fly.sh` runs it from the repo root for the API and from `web/` for Mission Control.
+- `fly deploy` builds from the folder it runs in. `scripts/deploy-fly.sh` runs it from the repo root, which the image needs for `web/` and `fixtures/`.
+- One `shared-cpu-1x` machine with 512 MB serves the web app and the API; the old web machine had the same size. If the API runs short of memory under the demo's load, raise it in `fly.toml`.
