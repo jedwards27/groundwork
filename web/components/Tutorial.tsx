@@ -13,8 +13,10 @@ import { LabelLarge, LabelMedium, LabelSmall, LabelXSmall, ParagraphSmall } from
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { get, send, stream } from "@/lib/client";
+import { tutorial as t } from "@/copy/tutorial";
 import { DEMO_PROJECT } from "@/lib/format";
 import type { EventView, Session } from "@/lib/types";
+import { Rich } from "./ui";
 
 const STORE = "gw-tutorial";
 // Remembered for good once someone finishes, so home stops offering it.
@@ -23,7 +25,7 @@ const P = `/projects/${DEMO_PROJECT}`;
 
 interface Step {
   title: string;
-  body: ReactNode;
+  body: string;
   route: string;
   // What the step outlines (defaults to `target`).
   highlight?: string;
@@ -44,124 +46,41 @@ interface Step {
   end?: boolean;
 }
 
+const say = t.steps;
+const click = (c: { bubble: string; cta: string }, below?: boolean) => ({ bubble: c.bubble, cta: c.cta, below });
+
+// The words live in web/copy/tutorial.ts; this is where each step points and what finishes it.
 export const STEPS: Step[] = [
+  { ...say.welcome, route: "/", target: `project-${DEMO_PROJECT}`, click: click(say.welcome), doneAt: P },
+  { ...say.date, route: P, highlight: "summary", target: "gate", click: click(say.date, true) },
+  { ...say.path, route: P, target: "path", inDrawer: true },
+  { ...say.graph, route: P, target: "graph" },
+  { ...say.inbox, route: P, target: "tab-inbox", click: click(say.inbox), doneAt: `${P}/inbox` },
+  { ...say.email, route: `${P}/inbox`, target: "play-demo-monday", click: click(say.email) },
   {
-    title: "Welcome to Groundwork",
-    body: "You're Jordan, Anthropic's project manager for Lake Mariner. Groundwork keeps track of everything the project is waiting on, and acts on it inside rules you set.",
-    route: "/",
-    target: `project-${DEMO_PROJECT}`,
-    click: { bubble: "Click Lake Mariner", cta: "Click Lake Mariner to open it." },
-    doneAt: P,
-  },
-  {
-    title: "When it'll be ready",
-    body: "This is the date the data hall should be ready, and how late that is. \"Waiting on\" is the step holding the date up right now.",
-    route: P,
-    highlight: "summary",
-    target: "gate",
-    click: { bubble: "Click here", cta: "Click \"Waiting on\" to see what the date depends on.", below: true },
-  },
-  {
-    title: "The path to the date",
-    body: "These steps have to happen, in this order, for the data hall to be ready. Any delay to one of them moves the date. Everything else has some slack.",
-    route: P,
-    target: "path",
-    inDrawer: true,
-  },
-  {
-    title: "What depends on what",
-    body: "Here is every step of the project on the calendar, with arrows for what waits on what. The blue ones decide the date. Next, see what happens when an email comes in.",
-    route: P,
-    highlight: "graph",
-    target: "tab-inbox",
-    click: { bubble: "Click Inbox", cta: "Click the Inbox tab." },
-    doneAt: `${P}/inbox`,
-  },
-  {
-    title: "An email arrives",
-    body: "Fluidstack, which leases the building, forwarded an email from TeraWulf, the landlord: the utility wants to review the power settings again, which could push the date out.",
-    route: `${P}/inbox`,
-    target: "play-demo-monday",
-    click: { bubble: "Click Play", cta: "Click Play to have the email arrive, as if it just landed." },
-  },
-  {
-    title: "Groundwork works through it",
-    body: "Groundwork reads the email, moves the forecast, plans what to do next and checks each step against your rules.",
+    ...say.run,
     route: `${P}/inbox`,
     target: "see-actions",
-    waiting: "Groundwork is working through the email. Watch the steps.",
-    click: { bubble: "Click here", cta: "Done. Click See the 3 next steps." },
+    click: click(say.run),
     doneAt: `${P}/actions`,
     inDrawer: true,
   },
+  { ...say.plan, route: `${P}/actions`, target: "actions-list" },
+  { ...say.rules, route: `${P}/actions`, highlight: "actions-list", target: "action-a2", click: click(say.rules) },
+  { ...say.approve, route: `${P}/actions`, target: "approve", click: click(say.approve), after: 800, inDrawer: true },
+  { ...say.mandateTab, route: `${P}/actions`, target: "tab-mandate", click: click(say.mandateTab), doneAt: `${P}/mandate` },
+  { ...say.mandate, route: `${P}/mandate`, highlight: "template", target: "tab-ledger", click: click(say.mandate), doneAt: `${P}/ledger` },
   {
-    title: "One email, three next steps",
-    body: "From that one email, Groundwork planned three next steps: get this week's status from Fluidstack, have the landlord confirm the power-on date in writing, and sign the revised schedule the landlord asked for.",
-    route: `${P}/actions`,
-    target: "actions-list",
-  },
-  {
-    title: "Your rules decided each one",
-    body: (
-      <>
-        The AI proposed them; your rules, applied by plain code outside the AI, decided each one. <b>Allow:</b> a routine status check
-        with Fluidstack went ahead on its own (in this demo it's recorded, not sent). <b>Ask:</b> anything that goes to the landlord waits
-        for you. <b>Deny:</b> signing could commit Anthropic to new dates, so Groundwork never signs. That one is yours.
-      </>
-    ),
-    route: `${P}/actions`,
-    highlight: "actions-list",
-    target: "action-a2",
-    click: { bubble: "Click the Ask", cta: "Click the Ask to open it." },
-  },
-  {
-    title: "Approve it",
-    body: "This is exactly what would be sent, and the rule that says it needs you. Your approval is recorded with your name.",
-    route: `${P}/actions`,
-    target: "approve",
-    click: { bubble: "Click Approve", cta: "Read it, then click Approve." },
-    after: 800,
-    inDrawer: true,
-  },
-  {
-    title: "Where the rules live",
-    body: "Approved. The rules that sent it to you are the project's mandate.",
-    route: `${P}/actions`,
-    target: "tab-mandate",
-    click: { bubble: "Click Mandate", cta: "Click the Mandate tab to see them." },
-    doneAt: `${P}/mandate`,
-  },
-  {
-    title: "Your rules, in plain words",
-    body: "What Groundwork may do on its own, must ask you about, and may never do. Templates run from Supervised, which asks about almost everything, to Auto. A preview changes nothing until you issue it.",
-    route: `${P}/mandate`,
-    highlight: "template",
-    target: "tab-ledger",
-    click: { bubble: "Then click Ledger", cta: "Try another template to preview it, then click the Ledger tab." },
-    doneAt: `${P}/ledger`,
-  },
-  {
-    title: "Everything is recorded",
-    body: "Every step, including your approval, is recorded here, and each record is sealed to the one before it. If anyone edits a past record later, even with access to the database, this check fails.",
+    ...say.ledger,
     route: `${P}/ledger`,
     highlight: "chain-ok",
     target: "home-link",
-    click: { bubble: "Click Groundwork", cta: "Click Groundwork, top left, to go back home." },
+    click: click(say.ledger),
     doneAt: "/",
     plays: "event-b",
   },
-  {
-    title: "Back home",
-    body: "While you looked around, a second email came in: the building's main electrical equipment failed a factory test. Groundwork already did what your rules allow. What needs you waits here, and what it did is below.",
-    route: "/",
-    highlight: "needs-you",
-  },
-  {
-    title: "Start your own project",
-    body: "Groundwork works for anything that waits on other people: a remodel, a store opening, a grid connection.",
-    route: "/",
-    end: true,
-  },
+  { ...say.home, route: "/", highlight: "needs-you" },
+  { ...say.end, route: "/", end: true },
 ];
 
 interface Saved {
@@ -171,8 +90,9 @@ interface Saved {
   max: number;
 }
 
-const Ctx = createContext<{ start: () => void; open: boolean; paused: number | null; done: boolean }>({
+const Ctx = createContext<{ start: () => void; restart: () => void; open: boolean; paused: number | null; done: boolean }>({
   start: () => undefined,
+  restart: () => undefined,
   open: false,
   paused: null,
   done: false,
@@ -223,10 +143,11 @@ function find(testId: string): HTMLElement | null {
 }
 
 // Scroll so `el` sits in the open space between the header and the tutorial's panel, if it isn't
-// there already. Something taller than that space starts just under the header.
+// there already. Something taller than that space starts just under the header. The jump is
+// instant, so what you're about to click is where it will stay.
 function reveal(el: HTMLElement) {
   if (el.closest('[data-baseweb="drawer"]')) {
-    el.scrollIntoView({ block: "center", behavior: "smooth" });
+    el.scrollIntoView({ block: "center" });
     return;
   }
   const top = (document.querySelector("header")?.getBoundingClientRect().bottom ?? 0) + 16;
@@ -234,7 +155,7 @@ function reveal(el: HTMLElement) {
   const r = el.getBoundingClientRect();
   if (r.top >= top && r.bottom <= bottom) return;
   const want = r.height > bottom - top || r.top < top ? top : bottom - r.height;
-  window.scrollBy({ top: r.top - want, behavior: "smooth" });
+  window.scrollBy({ top: r.top - want });
 }
 
 function closeDrawers() {
@@ -243,14 +164,12 @@ function closeDrawers() {
 }
 
 export function TutorialProvider({ session, children }: { session: Session; children: ReactNode }) {
-  const [, theme] = useStyletron();
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [state, setState] = useState<Saved | null>(load);
   const [done, setDone] = useState(loadDone);
   const [asking, setAsking] = useState(false);
   const [starting, setStarting] = useState(false);
-  const fresh = !!session.health.sandboxes && !session.local;
 
   const set = useCallback((s: Saved | null) => {
     setState(s);
@@ -268,10 +187,15 @@ export function TutorialProvider({ session, children }: { session: Session; chil
     });
   }, []);
 
-  // Opening it again resumes a paused tutorial; otherwise it asks before starting the demo over.
+  // Opening it again resumes a paused tutorial at the furthest step reached; otherwise it asks
+  // before starting the demo over. Starting over closes the panel while it asks.
   const start = useCallback(() => {
-    if (state && !state.open) set({ ...state, open: true });
+    if (state && !state.open) set({ step: state.max, open: true, max: state.max });
     else setAsking(true);
+  }, [state, set]);
+  const restart = useCallback(() => {
+    if (state?.open) set({ ...state, open: false });
+    setAsking(true);
   }, [state, set]);
 
   const begin = async () => {
@@ -280,8 +204,9 @@ export function TutorialProvider({ session, children }: { session: Session; chil
       await send("POST", "demo/reset");
       await qc.invalidateQueries();
       setAsking(false);
-      set({ step: 0, open: true, max: 0 });
+      // Home first: the first step finishes on reaching Lake Mariner, so it mustn't start there.
       navigate("/");
+      set({ step: 0, open: true, max: 0 });
     } catch (e) {
       toaster.negative((e as Error).message, {});
     } finally {
@@ -297,9 +222,10 @@ export function TutorialProvider({ session, children }: { session: Session; chil
         if (events.find((e) => e.key === event)?.status === "applied") return;
         const { run_id } = await send<{ run_id: string }>("POST", `sites/${DEMO_PROJECT}/events`, { event });
         const es = stream(`runs/${run_id}/stream`);
+        // Refresh everything but the ledger, so the count you're reading doesn't jump under you.
         es.addEventListener("end", () => {
           es.close();
-          void qc.invalidateQueries();
+          void qc.invalidateQueries({ predicate: (q) => !["ledger", "verify", "attestation"].includes(String(q.queryKey[0])) });
         });
       } catch {
         // The tour goes on without it; home just has less to show.
@@ -309,7 +235,7 @@ export function TutorialProvider({ session, children }: { session: Session; chil
   );
 
   return (
-    <Ctx.Provider value={{ start, open: !!state?.open, paused: state && !state.open ? state.step : null, done }}>
+    <Ctx.Provider value={{ start, restart, open: !!state?.open, paused: state && !state.open ? state.max : null, done }}>
       {children}
       {state?.open && (
         <Panel
@@ -323,26 +249,20 @@ export function TutorialProvider({ session, children }: { session: Session; chil
         />
       )}
       <Modal isOpen={asking} onClose={() => setAsking(false)} closeable>
-        <ModalHeader>Lake Mariner, in two minutes</ModalHeader>
+        <ModalHeader>{t.start.title}</ModalHeader>
         <ModalBody>
-          <ParagraphSmall marginTop={0}>
-            Anthropic is bringing a new data center online at Lake Mariner, in Barker, New York. TeraWulf owns the building, Fluidstack
-            leases it and provides it to Anthropic, and NYSEG, the local utility, has to connect it to the grid.
-          </ParagraphSmall>
-          <ParagraphSmall>
-            You're Jordan, Anthropic's project manager. When the data hall is ready depends on all of them, and Groundwork's job is to keep
-            that date on track.
-          </ParagraphSmall>
-          <ParagraphSmall marginBottom={0} color={theme.colors.contentTertiary}>
-            {fresh ? "You'll get a fresh copy of the demo." : "The demo starts over."} Your own projects stay as they are.
-          </ParagraphSmall>
+          {t.start.paragraphs.map((text, n) => (
+            <ParagraphSmall key={n} marginTop={n ? undefined : 0} marginBottom={n === t.start.paragraphs.length - 1 ? 0 : undefined}>
+              <Rich text={text} />
+            </ParagraphSmall>
+          ))}
         </ModalBody>
         <ModalFooter>
           <ModalButton kind={KIND.tertiary} onClick={() => setAsking(false)}>
-            Not now
+            {t.start.cancel}
           </ModalButton>
           <ModalButton onClick={begin} isLoading={starting} data-testid="tutorial-begin">
-            Start
+            {t.start.begin}
           </ModalButton>
         </ModalFooter>
       </Modal>
@@ -368,6 +288,7 @@ function Panel({ step, review, local, go, play, pause, finish }: {
   const [lost, setLost] = useState(false);
   const [drawer, setDrawer] = useState(false);
   const moved = useRef(false);
+  const away = useRef(false);
 
   const advance = useCallback(
     (delay = 0) => {
@@ -394,18 +315,22 @@ function Panel({ step, review, local, go, play, pause, finish }: {
   }, []);
 
   // Entering a step (or opening the tutorial again): close what the last step left open, unless
-  // this step lives in it, then go to the step's page. A step seen before shows its own page.
+  // this step lives in it, then go to the step's page.
   useEffect(() => {
     moved.current = false;
+    away.current = false;
     setLost(false);
     if (!s.inDrawer) closeDrawers();
-    if (here !== s.route && (review || !(s.doneAt && here === s.doneAt))) navigate(s.route);
+    if (here !== s.route) navigate(s.route);
     if (s.plays && !review) play(s.plays);
   }, [step]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Reaching the step's goal page some other way also finishes it.
+  // Arriving at the step's goal page some other way also finishes it. Arriving, not being there:
+  // a step that starts on its goal page (the page hasn't caught up yet) waits until you come back.
   useEffect(() => {
-    if (!review && s.doneAt && here === s.doneAt) advance();
+    if (review || !s.doneAt) return;
+    if (here !== s.doneAt) away.current = true;
+    else if (away.current) advance();
   }, [here, s.doneAt, review, advance]);
 
   // Keep pointing at the target, and outlining what the step is about, as the page changes.
@@ -462,39 +387,41 @@ function Panel({ step, review, local, go, play, pause, finish }: {
 
   const backLink = step > 0 && (
     <Button kind={KIND.tertiary} size={SIZE.mini} onClick={back} data-testid="tutorial-back">
-      Back
+      {t.panel.back}
     </Button>
   );
 
   if (s.end)
     return (
-      <Modal isOpen onClose={finish} closeable size="auto" overrides={{ Dialog: { style: { maxWidth: "720px", width: "calc(100vw - 32px)" } } }}>
+      <Modal isOpen onClose={finish} closeable size="auto" overrides={{ Dialog: { style: { maxWidth: "560px", width: "calc(100vw - 32px)" } } }}>
         <ModalHeader>
           <span data-testid="tutorial-title">{s.title}</span>
         </ModalHeader>
         <ModalBody>
-          <ParagraphSmall marginTop={0}>{s.body}</ParagraphSmall>
+          <ParagraphSmall marginTop={0}>
+            <Rich text={s.body} />
+          </ParagraphSmall>
           <Finish local={local} done={finish} back={backLink} />
         </ModalBody>
       </Modal>
     );
 
-  const count = `${step + 1} of ${STEPS.length}`;
+  const n = step + 1;
   // Steps you've already done, and click steps with nothing to click, move on with Next.
   const needsClick = !!s.click && !review && !lost;
   const close = (
-    <Button kind={KIND.tertiary} size={SIZE.mini} onClick={pause} aria-label="Close the tutorial" data-testid="tutorial-close">
+    <Button kind={KIND.tertiary} size={SIZE.mini} onClick={pause} aria-label={t.panel.close} data-testid="tutorial-close">
       <Delete size={18} />
     </Button>
   );
   const cta = s.click && !review && (
     <LabelMedium color={theme.colors.contentAccent} data-testid="tutorial-cta">
-      {lost ? "Can't find it on this page. Click Next to keep going." : !el && s.waiting ? s.waiting : s.click.cta}
+      {lost ? t.panel.lost : !el && s.waiting ? s.waiting : s.click.cta}
     </LabelMedium>
   );
   const next = !needsClick && (
     <Button size={drawer ? SIZE.mini : SIZE.compact} onClick={() => advance()} data-testid="tutorial-next">
-      Next
+      {t.panel.next}
     </Button>
   );
   const pointer = needsClick && el && s.click && <Pointer el={el} text={s.click.bubble} below={s.click.below} />;
@@ -514,7 +441,7 @@ function Panel({ step, review, local, go, play, pause, finish }: {
       <>
         {pointer}
         <aside
-          aria-label="Tutorial"
+          aria-label={t.panel.label}
           data-testid="tutorial"
           className={css({
             ...shell,
@@ -529,7 +456,7 @@ function Panel({ step, review, local, go, play, pause, finish }: {
           })}
         >
           <LabelXSmall color={theme.colors.contentTertiary} data-testid="tutorial-count" $style={{ whiteSpace: "nowrap" }}>
-            {count}
+            {t.panel.shortCount(n, STEPS.length)}
           </LabelXSmall>
           <div className={css({ flex: "1 1 auto", minWidth: 0 })}>
             {cta || <LabelSmall data-testid="tutorial-title">{s.title}</LabelSmall>}
@@ -545,7 +472,7 @@ function Panel({ step, review, local, go, play, pause, finish }: {
     <>
       {pointer}
       <aside
-        aria-label="Tutorial"
+        aria-label={t.panel.label}
         data-testid="tutorial"
         className={css({
           ...shell,
@@ -553,20 +480,26 @@ function Panel({ step, review, local, go, play, pause, finish }: {
           left: theme.sizing.scale600,
           right: theme.sizing.scale600,
           maxWidth: "380px",
+          // At most half the window, so what it points at always has room above it; the text scrolls.
+          maxHeight: "50vh",
           padding: theme.sizing.scale600,
-          display: "grid",
-          gridTemplateColumns: "minmax(0, 1fr)",
+          display: "flex",
+          flexDirection: "column",
           gap: theme.sizing.scale300,
         })}
       >
         <div className={css({ display: "flex", alignItems: "center" })}>
           <LabelXSmall color={theme.colors.contentTertiary} data-testid="tutorial-count">
-            Tutorial · {count}
+            {t.panel.count(n, STEPS.length)}
           </LabelXSmall>
           <span className={css({ marginLeft: "auto" })}>{close}</span>
         </div>
         <LabelLarge data-testid="tutorial-title">{s.title}</LabelLarge>
-        <ParagraphSmall margin={0}>{s.body}</ParagraphSmall>
+        <div className={css({ flex: "1 1 auto", minHeight: 0, overflowY: "auto" })}>
+          <ParagraphSmall margin={0}>
+            <Rich text={s.body} />
+          </ParagraphSmall>
+        </div>
         {cta}
         {(backLink || next) && (
           <div className={css({ display: "flex", alignItems: "center", justifyContent: "space-between" })}>
@@ -631,53 +564,30 @@ function Pointer({ el, text, below }: { el: HTMLElement; text: string; below?: b
   );
 }
 
+// The end of the tour: start a project of your own, or keep exploring the demo.
 function Finish({ local, done, back }: { local: boolean; done: () => void; back: ReactNode }) {
   const [css, theme] = useStyletron();
   const navigate = useNavigate();
-  const card = css({
-    border: `1px solid ${theme.colors.borderOpaque}`,
-    borderRadius: theme.borders.radius300,
-    padding: theme.sizing.scale500,
-    display: "grid",
-    gap: theme.sizing.scale200,
-  });
   return (
-    <div
-      className={css({ display: "grid", gap: theme.sizing.scale400, gridTemplateColumns: "minmax(0, 1fr)", "@media (min-width: 640px)": { gridTemplateColumns: "1fr 1fr" } })}
-      data-testid="tutorial-finish"
-    >
-      <div className={card}>
-        <LabelXSmall>On this website</LabelXSmall>
-        <ParagraphSmall margin={0} color={theme.colors.contentSecondary}>
-          Fill in a short form: what you're waiting on, from whom, and by when. You'll see the forecast before you save it.
-        </ParagraphSmall>
-        <div>
-          <Button
-            size={SIZE.compact}
-            onClick={() => {
-              done();
-              navigate("/projects/new");
-            }}
-            data-testid="tutorial-new-project"
-          >
-            Create a project here
-          </Button>
-        </div>
-      </div>
-      <div className={card}>
-        <LabelXSmall>In the Claude app</LabelXSmall>
-        <ParagraphSmall margin={0} color={theme.colors.contentSecondary}>
-          {local
-            ? "In Claude, run /groundwork:new-project and describe the project. Claude drafts it; you confirm it here."
-            : "Install the Groundwork plugin, then run /groundwork:new-project. Claude reads your email and drafts the project; you confirm it."}
-        </ParagraphSmall>
-      </div>
-      <div className={css({ display: "flex", justifyContent: "space-between", "@media (min-width: 640px)": { gridColumn: "1 / span 2" } })}>
-        {back}
-        <Button kind={KIND.tertiary} size={SIZE.compact} onClick={done} data-testid="tutorial-done">
-          Done
+    <div className={css({ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: theme.sizing.scale500 })} data-testid="tutorial-finish">
+      <div className={css({ display: "flex", gap: theme.sizing.scale300, flexWrap: "wrap" })}>
+        <Button
+          onClick={() => {
+            done();
+            navigate("/projects/new");
+          }}
+          data-testid="tutorial-new-project"
+        >
+          {t.finish.newProject}
+        </Button>
+        <Button kind={KIND.secondary} onClick={done} data-testid="tutorial-done">
+          {t.finish.explore}
         </Button>
       </div>
+      <ParagraphSmall margin={0} color={theme.colors.contentSecondary}>
+        <Rich text={local ? t.finish.localNote : t.finish.hostedNote} />
+      </ParagraphSmall>
+      {back && <div>{back}</div>}
     </div>
   );
 }

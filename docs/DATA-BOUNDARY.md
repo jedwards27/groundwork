@@ -43,7 +43,7 @@ On first launch, uv downloads Python 3.12 and the locked packages from PyPI, inc
 
 ## Hosted demo (separate profile)
 
-The hosted demo holds only the synthetic and public Lake Mariner fixture. Where things live (docs/HOSTING.md, ADR 0007):
+The hosted demo holds only the synthetic and public Lake Mariner fixture. It is for the demo only: real projects run on the person's own computer, through the plugin or `make dev` (ADR 0010). Where things live (docs/HOSTING.md, ADR 0007):
 
 - **Fly.io, Ashburn (`iad`):** one public machine serving the web app and its API (ADR 0009). Fly keeps the request logs.
 - **Neon, AWS US East 1:** the database. Connections use TLS.

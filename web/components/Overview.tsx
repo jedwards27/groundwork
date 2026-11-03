@@ -5,7 +5,10 @@ import type { ReactNode } from "react";
 import { daysBetween, fmt, PROVENANCE_LABEL } from "@/lib/format";
 import type { ChainView, PlanView, SiteView } from "@/lib/types";
 import { Chain } from "./Chain";
+import { project } from "@/copy/project";
 import { Grow, Hint, Line, Muted, Row, Section } from "./ui";
+
+const say = project.overview;
 
 // A section title with one line saying what it is, so a closed accordion still explains itself.
 function Titled({ title, about }: { title: string; about: ReactNode }) {
@@ -24,22 +27,19 @@ export function Overview({ chain, site, plan }: { chain: ChainView; site: SiteVi
   const party = (k: string) => site.parties.find((p) => p.key === k)?.name ?? k;
   return (
     <div className={css({ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: theme.sizing.scale600 })}>
-      <Section title="What depends on what" hint="Every step in the project and what it waits on, laid out on the calendar." testId="graph">
+      <Section title={say.graph.title} hint={say.graph.hint} testId="graph">
         <Chain chain={chain} />
       </Section>
       <Accordion>
         <Panel
           title={
-            <Titled
-              title="Days the plan can win back"
-              about={d ? `${d.recovered_if_they_agree} days back if you approve and they agree` : "After a message comes in and Groundwork plans"}
-            />
+            <Titled title={say.winBack.title} about={d ? say.winBack.about(d.recovered_if_they_agree) : say.winBack.aboutNoPlan} />
           }
         >
           <Differential chain={chain} plan={plan} />
         </Panel>
         {chain.calendar_losses.length > 0 && (
-          <Panel title={<Titled title="Holidays that cost days" about="Days off that fall on the steps that decide the date" />}>
+          <Panel title={<Titled title={say.holidays.title} about={say.holidays.about} />}>
             {chain.calendar_losses.map((l, n) => (
               <ParagraphSmall key={n} marginTop={0}>
                 {l.sentence}
@@ -48,17 +48,17 @@ export function Overview({ chain, site, plan }: { chain: ChainView; site: SiteVi
           </Panel>
         )}
         {site.facts.length > 0 && (
-          <Panel title={<Titled title="About this project" about={site.attrs.blurb || "Facts, each with its source"} />}>
+          <Panel title={<Titled title={say.about.title} about={site.attrs.blurb || say.about.aboutFallback} />}>
             {site.facts.map((f) => (
               <Row key={f.label}>
                 <Grow>
                   <Muted>{f.label}</Muted>
                   <Line>{f.value}</Line>
                 </Grow>
-                <Hint text={`${PROVENANCE_LABEL[f.provenance] ?? f.provenance}${f.source ? `. Source: ${f.source}` : ""}`} />
+                <Hint text={say.about.source(PROVENANCE_LABEL[f.provenance] ?? f.provenance, f.source)} />
               </Row>
             ))}
-            <Muted>Working for {party(site.principal)}. Every number carries its source.</Muted>
+            <Muted>{say.about.workingFor(party(site.principal))}</Muted>
           </Panel>
         )}
       </Accordion>
@@ -72,14 +72,14 @@ function Differential({ chain, plan }: { chain: ChainView; plan: PlanView | null
   const d = plan?.differential;
   const t = theme.colors;
   const rows: { label: string; date: string | null; color: string; hatch?: boolean }[] = [
-    { label: "Target", date: target, color: t.borderOpaque },
-    { label: d ? "If nothing is done" : "Forecast now", date: d ? d.unmitigated : (chain.milestone.forecast_finish ?? null), color: t.contentNegative },
+    { label: say.winBack.target, date: target, color: t.borderOpaque },
+    { label: d ? say.winBack.ifNothing : say.winBack.forecastNow, date: d ? d.unmitigated : (chain.milestone.forecast_finish ?? null), color: t.contentNegative },
   ];
   if (d)
     rows.push(
-      { label: "With what already ran", date: d.now, color: t.contentAccent },
-      { label: "If you approve the asks", date: d.if_approved, color: t.contentPositive },
-      { label: "If they agree too", date: d.if_they_agree, color: t.contentPositive, hatch: true },
+      { label: say.winBack.withWhatRan, date: d.now, color: t.contentAccent },
+      { label: say.winBack.ifApproved, date: d.if_approved, color: t.contentPositive },
+      { label: say.winBack.ifTheyAgree, date: d.if_they_agree, color: t.contentPositive, hatch: true },
     );
   const deltas = rows.map((r) => daysBetween(target, r.date));
   const max = Math.max(1, ...deltas);
@@ -98,13 +98,11 @@ function Differential({ chain, plan }: { chain: ChainView; plan: PlanView | null
             />
           </div>
           <ParagraphSmall margin={0} className={css({ textAlign: "right" })}>
-            {deltas[i] > 0 ? `+${deltas[i]} d` : deltas[i] < 0 ? `${-deltas[i]} d early` : "on time"} · {fmt(r.date)}
+            {deltas[i] > 0 ? say.winBack.late(deltas[i]) : deltas[i] < 0 ? say.winBack.early(-deltas[i]) : say.winBack.onTime} · {fmt(r.date)}
           </ParagraphSmall>
         </div>
       ))}
-      <Muted>
-        Days past the target, worked out from the schedule. Days that depend on someone else agreeing are counted only once they do.
-      </Muted>
+      <Muted>{say.winBack.note}</Muted>
     </div>
   );
 }

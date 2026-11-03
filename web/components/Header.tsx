@@ -8,13 +8,15 @@ import { LabelLarge, LabelMedium, LabelSmall, ParagraphXSmall } from "baseui/typ
 import { Link, useMatch, useNavigate } from "react-router";
 import { get } from "@/lib/client";
 import type { Session, SiteView } from "@/lib/types";
+import { app } from "@/copy/app";
+import { tutorial as t } from "@/copy/tutorial";
 import { STEPS, useTutorial } from "./Tutorial";
 
 type Item = { id: string; label: string };
 
 function hoursLeft(iso: string): string {
   const h = Math.max(0, Math.round((new Date(iso).getTime() - Date.now()) / 3_600_000));
-  return h <= 1 ? "under an hour" : `${h} hours`;
+  return h <= 1 ? app.account.underAnHour : app.account.hours(h);
 }
 
 // The header holds the product, where you are, and you. Status lives where it applies, not here.
@@ -26,19 +28,26 @@ export function Header({ session }: { session: Session }) {
   const key = match?.params.key && match.params.key !== "new" ? match.params.key : undefined;
   const site = useQuery({ queryKey: ["site", key], queryFn: () => get<SiteView>(`sites/${key}`), enabled: !!key });
   const you = session.you;
-  const name = you?.name ?? "You";
+  const name = you?.name ?? app.account.fallbackName;
   const about = session.local
-    ? you?.email || "On this computer"
+    ? you?.email || app.account.onThisComputer
     : you?.sandbox_expires_at
-      ? `Demo account · your copy is deleted in ${hoursLeft(you.sandbox_expires_at)}`
-      : "Demo account";
+      ? app.account.demoWithExpiry(hoursLeft(you.sandbox_expires_at))
+      : app.account.demo;
 
-  const items: Item[] = [
-    { id: "tutorial", label: tutorial.paused === null ? "Take the tutorial" : `Resume the tutorial (${tutorial.paused + 1} of ${STEPS.length})` },
-  ];
+  // Open: start over (which closes the panel first). Paused: resume or start over. Otherwise: take it.
+  const items: Item[] = tutorial.open
+    ? [{ id: "restart", label: t.menu.restart }]
+    : tutorial.paused !== null
+      ? [
+          { id: "resume", label: t.menu.resume(tutorial.paused + 1, STEPS.length) },
+          { id: "restart", label: t.menu.restart },
+        ]
+      : [{ id: "resume", label: t.menu.take }];
 
   const act = (id: string) => {
-    if (id === "tutorial") tutorial.start();
+    if (id === "resume") tutorial.start();
+    if (id === "restart") tutorial.restart();
   };
 
   const avatar = css({
@@ -75,7 +84,7 @@ export function Header({ session }: { session: Session }) {
         })}
       >
         <Link to="/" className={css({ textDecoration: "none", color: "inherit" })} data-testid="home-link">
-          <LabelLarge $style={{ fontWeight: 700 }}>Groundwork</LabelLarge>
+          <LabelLarge $style={{ fontWeight: 700 }}>{app.name}</LabelLarge>
         </Link>
         {key && site.data && (
           <LabelMedium color={theme.colors.contentTertiary} className={css({ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "none", "@media (min-width: 640px)": { display: "block" } })}>

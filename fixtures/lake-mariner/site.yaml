@@ -36,11 +36,11 @@ site:
 
 asset:
   key: cb-5
-  name: The data hall
+  name: The data center
   capacity_mw: 168
   milestones:
     - kind: delivery
-      label: Data hall ready
+      label: Data center ready
       item: l4
       target_date: 2027-02-22
       binding_agreement: Fluidstack lease with TeraWulf; L4 is the contractual delivery milestone
@@ -255,7 +255,7 @@ facts:
     provenance: public
     source: https://measuredai.substack.com/p/anthropic-data-centers
   - label: Power-on date
-    value: 168 MW; first data hall expected to begin energizing "very early January" 2027, moved from Q4 2026
+    value: 168 MW; the first part of the data center expected to begin energizing "very early January" 2027, moved from Q4 2026
     provenance: public
     source: https://finance.yahoo.com/markets/stocks/articles/terawulf-inc-wulf-q2-2026-190057902.html
   - label: Hand-over date

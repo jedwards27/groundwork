@@ -24,6 +24,14 @@ def _local(v: Viewer) -> bool:
     return v.local and get_settings().groundwork_local
 
 
+def _named(text: str, names: dict[str, str]) -> str:
+    """The gateway writes its reasons over keys (it is generic); swap in the names people know."""
+    if not names:
+        return text
+    keys = sorted(names, key=len, reverse=True)
+    return re.sub(r"\b(" + "|".join(re.escape(k) for k in keys) + r")\b", lambda mt: names[mt.group(1)], text)
+
+
 def _asks(v: Viewer, refs: list[overview.ProjectRef]) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for ref in refs:
@@ -43,6 +51,7 @@ def _asks(v: Viewer, refs: list[overview.ProjectRef]) -> list[dict[str, Any]]:
                         "title": a["title"],
                         "kind": a["kind"],
                         "clause": a["clause"],
+                        "reason": _named(a["reason"], names),
                         "mandate_version": a["mandate_version"],
                         "route": [names.get(state.principal) or state.principal] + [names.get(k) or k for k in a["path"]],
                         "recipient": a.get("recipient_name") or a.get("recipient"),

@@ -7,7 +7,8 @@ import { Home } from "@/components/Home";
 import { NewProject } from "@/components/NewProject";
 import { Project } from "@/components/Project";
 import { TutorialProvider } from "@/components/Tutorial";
-import { Empty, Page } from "@/components/ui";
+import { Empty, Page, Rich } from "@/components/ui";
+import { app } from "@/copy/app";
 import { VerifyRecord } from "@/components/VerifyRecord";
 import { get, send } from "@/lib/client";
 import type { Session } from "@/lib/types";
@@ -36,8 +37,8 @@ export function App() {
   if (session.isError)
     return (
       <Page>
-        <Banner kind={BANNER.negative} title="Groundwork isn't reachable">
-          Start it with <code>make api</code> (or open it from Claude), then reload.
+        <Banner kind={BANNER.negative} title={app.shell.unreachableTitle}>
+          <Rich text={app.shell.unreachableBody} />
         </Banner>
       </Page>
     );
@@ -51,9 +52,8 @@ export function App() {
   if (!s.signed_in)
     return (
       <Page>
-        <Banner kind={BANNER.info} title={s.local ? "Open Groundwork from Claude" : "Not signed in"}>
-          {signInError ||
-            "Ask Claude for your Groundwork link (the pending tool gives it). The link opens this app signed in as you, on this computer only."}
+        <Banner kind={BANNER.info} title={s.local ? app.shell.openFromClaudeTitle : app.shell.notSignedInTitle}>
+          {signInError || app.shell.notSignedInBody}
         </Banner>
       </Page>
     );
@@ -69,7 +69,7 @@ export function App() {
           path="*"
           element={
             <Page>
-              <Empty>Nothing here.</Empty>
+              <Empty>{app.shell.notFound}</Empty>
             </Page>
           }
         />

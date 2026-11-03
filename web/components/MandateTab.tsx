@@ -5,14 +5,23 @@ import { Button, KIND, SIZE } from "baseui/button";
 import { Modal, ModalBody, ModalButton, ModalFooter, ModalHeader } from "baseui/modal";
 import { Select } from "baseui/select";
 import { toaster } from "baseui/toast";
-import { ParagraphSmall } from "baseui/typography";
+import { LabelMedium, ParagraphSmall } from "baseui/typography";
 import { useEffect, useState } from "react";
 import { send } from "@/lib/client";
 import { DECISION_LABEL, TEMPLATE_LABEL as LABEL } from "@/lib/format";
-import type { CompareRow, MandateView, Me } from "@/lib/types";
-import { Chip, Grow, Hint, Line, Muted, Row } from "./ui";
+import { project } from "@/copy/project";
+import type { CompareRow, MandateView, Me, PlanView } from "@/lib/types";
+import { Chip, DecisionTag, Grow, Hint, Line, Muted, Row, Section } from "./ui";
 
-export function MandateTab({ site, mandate, compare, me }: { site: string; mandate: MandateView; compare: CompareRow[]; me: Me | null }) {
+const say = project.mandate;
+
+export function MandateTab({ site, mandate, compare, plan, me }: {
+  site: string;
+  mandate: MandateView;
+  compare: CompareRow[];
+  plan: PlanView | null;
+  me: Me | null;
+}) {
   const [css, theme] = useStyletron();
   const qc = useQueryClient();
   const [chosen, setChosen] = useState(mandate.preset);
@@ -21,6 +30,11 @@ export function MandateTab({ site, mandate, compare, me }: { site: string; manda
   const changed = chosen !== mandate.preset;
   const approver = !!me?.approver;
   const preview = compare.find((r) => r.preset === chosen);
+  const now = compare.find((r) => r.current);
+  // What the previewed template would decide differently on the latest plan.
+  const changes = (plan?.actions ?? [])
+    .map((a) => ({ a, from: now?.decisions[a.ref], to: preview?.decisions[a.ref] }))
+    .filter((x) => x.from && x.to && x.from !== x.to);
   const issue = async () => {
     try {
       const r = await send<{ version: number; redecided: { ref: string; from: string; to: string }[]; executed: string[] }>("PUT", `sites/${site}/mandate`, {
@@ -28,11 +42,11 @@ export function MandateTab({ site, mandate, compare, me }: { site: string; manda
       });
       const moved = r.redecided.filter((x) => x.from !== x.to);
       toaster.positive(
-        `Mandate v${r.version} issued. ${
-          moved.length
-            ? `Decided again: ${moved.map((x) => `${x.ref} ${DECISION_LABEL[x.from] ?? x.from} → ${DECISION_LABEL[x.to] ?? x.to}`).join(", ")}.`
-            : "No open action changed."
-        }${r.executed.length ? ` Ran in dry run: ${r.executed.join(", ")}.` : ""}`,
+        say.issued(r.version) +
+          (moved.length
+            ? say.decidedAgain(moved.map((x) => say.move(x.ref, DECISION_LABEL[x.from] ?? x.from, DECISION_LABEL[x.to] ?? x.to)).join(", "))
+            : say.noneChanged) +
+          (r.executed.length ? say.ranDry(r.executed.join(", ")) : ""),
         {},
       );
       await qc.invalidateQueries();
@@ -53,81 +67,93 @@ export function MandateTab({ site, mandate, compare, me }: { site: string; manda
             clearable={false}
             searchable={false}
             size="compact"
-            aria-label="Mandate template"
+            aria-label={say.templateLabel}
           />
         </div>
-        <Chip testId="mandate-version">{changed ? "preview" : `v${mandate.version}`}</Chip>
-        <Hint text="A template sets what may run on its own, what must ask a named person, and what is denied. Paying, signing and deleting are denied under every template." />
+        <Chip testId="mandate-version">{changed ? say.preview : say.version(mandate.version)}</Chip>
+        <Hint text={say.hint} />
         <span className={css({ marginLeft: "auto" })}>
           <Button size={SIZE.compact} disabled={!changed || !approver} onClick={() => setConfirm(true)} data-testid="issue">
-            Issue v{mandate.version + 1}
+            {say.issue(mandate.version + 1)}
           </Button>
         </span>
       </div>
-      {changed && preview && (
-        <Muted testId="preview">
-          Under {LABEL[chosen]}, the latest plan would get {preview.auto} allow, {preview.ask} ask and {preview.refuse} deny. Nothing changes
-          until you issue a new version.
-        </Muted>
+      {changed && (
+        <div
+          data-testid="preview"
+          className={css({
+            padding: theme.sizing.scale500,
+            borderRadius: theme.borders.radius300,
+            background: theme.colors.backgroundAccentLight,
+            display: "grid",
+            gridTemplateColumns: "minmax(0, 1fr)",
+            gap: theme.sizing.scale300,
+          })}
+        >
+          <LabelMedium>{say.previewTitle(LABEL[chosen] ?? chosen)}</LabelMedium>
+          <ParagraphSmall margin={0}>{!plan ? say.previewNoPlan : changes.length ? say.previewChanges : say.previewNoChange}</ParagraphSmall>
+          {changes.map(({ a, from, to }) => (
+            <div key={a.ref} className={css({ display: "flex", gap: theme.sizing.scale300, alignItems: "center", flexWrap: "wrap" })}>
+              <DecisionTag decision={from ?? null} />
+              <span aria-hidden>→</span>
+              <DecisionTag decision={to ?? null} />
+              <ParagraphSmall margin={0}>{a.title}</ParagraphSmall>
+            </div>
+          ))}
+          <Muted>{say.previewNote}</Muted>
+        </div>
       )}
 
-      <div data-testid="plain-lines">
+      <Section title={say.rulesTitle(mandate.version)} testId="plain-lines">
         {mandate.plain_lines.map((l) => (
           <Row key={l}>
             <ParagraphSmall margin={0}>{l}</ParagraphSmall>
           </Row>
         ))}
-      </div>
+      </Section>
 
       <Accordion>
         {compare.length > 0 && (
-          <Panel title="Compare templates on the latest plan">
+          <Panel title={say.compare}>
             {compare.map((r) => (
               <Row key={r.preset}>
                 <Grow>
                   <Line>
                     {LABEL[r.preset] ?? r.preset}
-                    {r.current ? " (now)" : ""}
+                    {r.current ? say.current : ""}
                   </Line>
-                  <Muted>{r.recovered_if_they_agree} days back if they agree</Muted>
+                  <Muted>{say.daysBack(r.recovered_if_they_agree)}</Muted>
                 </Grow>
-                <Chip kind="green">Allow {r.auto}</Chip>
-                <Chip kind="yellow">Ask {r.ask}</Chip>
-                <Chip kind="red">Deny {r.refuse}</Chip>
-                {r.held > 0 && <Chip tip="Times the agent proposed more autonomy than this template allows.">Held {r.held}</Chip>}
+                <Chip kind="green">{say.allow(r.auto)}</Chip>
+                <Chip kind="yellow">{say.ask(r.ask)}</Chip>
+                <Chip kind="red">{say.deny(r.refuse)}</Chip>
+                {r.held > 0 && <Chip tip={say.heldTip}>{say.held(r.held)}</Chip>}
               </Row>
             ))}
           </Panel>
         )}
-        <Panel title="Versions">
+        <Panel title={say.versions}>
           {mandate.history.map((v) => (
             <Row key={v.version}>
               <Grow>
-                <Line>
-                  v{v.version} · {LABEL[v.preset] ?? v.preset}
-                </Line>
+                <Line>{say.versionRow(v.version, LABEL[v.preset] ?? v.preset)}</Line>
               </Grow>
               <Muted>{new Date(v.at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</Muted>
             </Row>
           ))}
         </Panel>
       </Accordion>
-      <Muted>Same plan, different authority: the gateway decides open actions again; it never re-plans, and what already ran stays on the record.</Muted>
+      <Muted>{say.footer}</Muted>
 
       <Modal isOpen={confirm} onClose={() => setConfirm(false)} closeable>
-        <ModalHeader>
-          Issue mandate v{mandate.version + 1}: {LABEL[chosen]}
-        </ModalHeader>
-        <ModalBody>
-          Open actions are decided again under the new version, and any that may now run on their own run in dry run. The new version is a
-          record on the ledger, issued by you.
-        </ModalBody>
+        <ModalHeader>{say.confirmTitle(mandate.version + 1, LABEL[chosen] ?? chosen)}</ModalHeader>
+        <ModalBody>{say.confirmBody}</ModalBody>
         <ModalFooter>
           <ModalButton kind={KIND.tertiary} onClick={() => setConfirm(false)}>
-            Cancel
+            {say.cancel}
           </ModalButton>
           <ModalButton onClick={issue} data-testid="issue-confirm">
-            Issue v{mandate.version + 1}
+            {say.issue(mandate.version + 1)}
           </ModalButton>
         </ModalFooter>
       </Modal>

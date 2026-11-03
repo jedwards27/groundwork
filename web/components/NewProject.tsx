@@ -15,30 +15,14 @@ import { useNavigate } from "react-router";
 import { ApiError, send } from "@/lib/client";
 import { fmtLong, lateness, TEMPLATE_LABEL } from "@/lib/format";
 import type { Session } from "@/lib/types";
+import { newProject as say } from "@/copy/newProject";
 import { Chip, Muted, Page, Section } from "./ui";
 
 type Role = "contractor" | "designer" | "consultant" | "vendor" | "landlord" | "lender" | "ahj" | "agency" | "regulator" | "developer" | "operator" | "community";
 type Status = "not_started" | "in_progress" | "done";
 
-const ROLES: { id: Role; label: string }[] = [
-  { id: "contractor", label: "Contractor" },
-  { id: "vendor", label: "Vendor or supplier" },
-  { id: "ahj", label: "Permit office" },
-  { id: "agency", label: "Inspector or utility" },
-  { id: "landlord", label: "Landlord" },
-  { id: "designer", label: "Designer or architect" },
-  { id: "consultant", label: "Consultant" },
-  { id: "lender", label: "Lender" },
-  { id: "regulator", label: "Regulator" },
-  { id: "developer", label: "Developer" },
-  { id: "operator", label: "Operator" },
-  { id: "community", label: "Community group" },
-];
-const STATUSES: { id: Status; label: string }[] = [
-  { id: "not_started", label: "Not started" },
-  { id: "in_progress", label: "Under way" },
-  { id: "done", label: "Done" },
-];
+const ROLES = (Object.keys(say.parties.roles) as Role[]).map((id) => ({ id, label: say.parties.roles[id] }));
+const STATUSES = (Object.keys(say.steps.statuses) as Status[]).map((id) => ({ id, label: say.steps.statuses[id] }));
 
 interface PartyRow { name: string; role: Role; contact: string; email: string }
 interface ItemRow { title: string; owner: string; status: Status; finish: string; after: string[] }
@@ -83,30 +67,33 @@ function plus(days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-// A small example to start from: a kitchen remodel whose cabinets arrive weeks after they were
-// meant to go in, so the forecast opens late, waiting on the supplier.
-const example = (): Form => ({
-  name: "Kitchen remodel",
-  location: "Oakland, CA",
-  finish_label: "Kitchen usable",
-  finish_target: plus(85),
-  finish_item: 4,
-  template: "supervised",
-  as_of: today(),
-  your_name: "",
-  parties: [
-    { name: "Bayside Builders", role: "contractor", contact: "Bob Ruiz", email: "bob@bayside.example" },
-    { name: "Oakland Planning & Building", role: "ahj", contact: "", email: "" },
-    { name: "Cabinet supplier", role: "vendor", contact: "", email: "" },
-  ],
-  items: [
-    { title: "Building permit issued", owner: "Oakland Planning & Building", status: "in_progress", finish: plus(28), after: [] },
-    { title: "Cabinets delivered", owner: "Cabinet supplier", status: "not_started", finish: plus(92), after: [] },
-    { title: "Cabinets installed", owner: "Bayside Builders", status: "not_started", finish: plus(70), after: ["Building permit issued", "Cabinets delivered"] },
-    { title: "Countertops installed", owner: "Bayside Builders", status: "not_started", finish: plus(78), after: ["Cabinets installed"] },
-    { title: "Final inspection passed", owner: "Oakland Planning & Building", status: "not_started", finish: plus(85), after: ["Countertops installed"] },
-  ],
-});
+// A small example to start from (its words are in web/copy/newProject.ts): a kitchen remodel whose
+// cabinets arrive weeks after they were meant to go in, so the forecast opens late, waiting on the supplier.
+const example = (): Form => {
+  const x = say.example;
+  return {
+    name: x.name,
+    location: x.location,
+    finish_label: x.finishLabel,
+    finish_target: plus(85),
+    finish_item: 4,
+    template: "supervised",
+    as_of: today(),
+    your_name: "",
+    parties: [
+      { name: x.contractor, role: "contractor", contact: x.contractorContact, email: x.contractorEmail },
+      { name: x.permitOffice, role: "ahj", contact: "", email: "" },
+      { name: x.supplier, role: "vendor", contact: "", email: "" },
+    ],
+    items: [
+      { title: x.permit, owner: x.permitOffice, status: "in_progress", finish: plus(28), after: [] },
+      { title: x.delivered, owner: x.supplier, status: "not_started", finish: plus(92), after: [] },
+      { title: x.installed, owner: x.contractor, status: "not_started", finish: plus(70), after: [x.permit, x.delivered] },
+      { title: x.countertops, owner: x.contractor, status: "not_started", finish: plus(78), after: [x.installed] },
+      { title: x.inspection, owner: x.permitOffice, status: "not_started", finish: plus(85), after: [x.countertops] },
+    ],
+  };
+};
 
 function slug(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "x";
@@ -130,12 +117,12 @@ function draft(f: Form) {
   const itemKey = Object.fromEntries(f.items.map((it, i) => [it.title, itemKeys[i]]));
   const finish = f.finish_item >= 0 && f.finish_item < f.items.length ? f.finish_item : f.items.length - 1;
   return {
-    your_name: f.your_name || "You",
+    your_name: f.your_name || say.defaults.yourName,
     draft: {
       name: f.name.trim(),
       location: f.location.trim(),
       as_of: f.as_of || null,
-      finish_label: f.finish_label.trim() || "Finished",
+      finish_label: f.finish_label.trim() || say.defaults.finished,
       finish_item: itemKeys[finish],
       finish_target: f.finish_target,
       template: f.template,
@@ -187,15 +174,15 @@ export function NewProject({ session }: { session: Session }) {
   };
   const setParty = (i: number, patch: Partial<PartyRow>) => set({ parties: f.parties.map((p, j) => (j === i ? { ...p, ...patch } : p)) });
   const setItem = (i: number, patch: Partial<ItemRow>) => set({ items: f.items.map((it, j) => (j === i ? { ...it, ...patch } : it)) });
-  const owners = [{ id: "you", label: "You" }, ...f.parties.filter((p) => p.name.trim()).map((p) => ({ id: p.name, label: p.name }))];
+  const owners = [{ id: "you", label: say.steps.you }, ...f.parties.filter((p) => p.name.trim()).map((p) => ({ id: p.name, label: p.name }))];
   const titles = f.items.map((it) => it.title).filter((t) => t.trim());
   const finishIndex = f.finish_item >= 0 && f.finish_item < f.items.length ? f.finish_item : f.items.length - 1;
 
   const check = (): string[] => {
     const out: string[] = [];
-    if (!f.name.trim()) out.push("Give the project a name.");
-    if (!f.finish_target) out.push("Say when it's meant to finish.");
-    if (f.items.some((it) => !it.title.trim() || !it.finish)) out.push("Every step needs a description and a date.");
+    if (!f.name.trim()) out.push(say.errors.name);
+    if (!f.finish_target) out.push(say.errors.date);
+    if (f.items.some((it) => !it.title.trim() || !it.finish)) out.push(say.errors.steps);
     return out;
   };
 
@@ -238,66 +225,65 @@ export function NewProject({ session }: { session: Session }) {
   return (
     <Page>
       <div className={css({ display: "flex", alignItems: "center", gap: theme.sizing.scale400, flexWrap: "wrap" })}>
-        <HeadingSmall margin={0}>New project</HeadingSmall>
+        <HeadingSmall margin={0}>{say.title}</HeadingSmall>
         <span className={css({ marginLeft: "auto" })}>
           <Button kind={KIND.tertiary} size={SIZE.compact} onClick={() => { setF(example()); setPreview(null); setErrors([]); }} data-testid="use-example">
-            Fill in an example
+            {say.fillExample}
           </Button>
         </span>
       </div>
       <Muted>
-        Anything that waits on other organizations: a remodel, a store opening, a grid connection.{" "}
-        {session.local ? "It's yours, on this computer." : "In this demo it lives in your private copy and is deleted with it."}
+        {say.intro} {session.local ? say.whereItLives.local : say.whereItLives.hosted}
       </Muted>
 
-      <Section title="The project">
+      <Section title={say.project.title}>
         <div className={css({ display: "grid", gap: theme.sizing.scale300, gridTemplateColumns: "minmax(0, 1fr)", "@media (min-width: 720px)": { gridTemplateColumns: "1fr 1fr" } })}>
-          <FormControl label="Name">
-            <Input size="compact" value={f.name} onChange={(e) => set({ name: e.currentTarget.value })} placeholder="Kitchen remodel" overrides={{ Input: { props: { "data-testid": "project-name" } } }} />
+          <FormControl label={say.project.name}>
+            <Input size="compact" value={f.name} onChange={(e) => set({ name: e.currentTarget.value })} placeholder={say.project.namePlaceholder} overrides={{ Input: { props: { "data-testid": "project-name" } } }} />
           </FormControl>
-          <FormControl label="Where (optional)">
-            <Input size="compact" value={f.location} onChange={(e) => set({ location: e.currentTarget.value })} placeholder="Oakland, CA" />
+          <FormControl label={say.project.where}>
+            <Input size="compact" value={f.location} onChange={(e) => set({ location: e.currentTarget.value })} placeholder={say.project.wherePlaceholder} />
           </FormControl>
-          <FormControl label="Finished means" caption="The moment that matters, in your words.">
-            <Input size="compact" value={f.finish_label} onChange={(e) => set({ finish_label: e.currentTarget.value })} placeholder="Kitchen usable" />
+          <FormControl label={say.project.finishedMeans} caption={say.project.finishedMeansCaption}>
+            <Input size="compact" value={f.finish_label} onChange={(e) => set({ finish_label: e.currentTarget.value })} placeholder={say.project.finishedMeansPlaceholder} />
           </FormControl>
-          <FormControl label="Promised or hoped-for date">
+          <FormControl label={say.project.date}>
             <Input size="compact" type="date" value={f.finish_target} onChange={(e) => set({ finish_target: e.currentTarget.value })} />
           </FormControl>
         </div>
       </Section>
 
-      <Section title="Who you're waiting on" hint="Each organization that owes you something. A contact's email lets the plugin file their mail to this project.">
+      <Section title={say.parties.title} hint={say.parties.hint}>
         <div className={css({ display: "grid", gap: theme.sizing.scale300 })}>
           {f.parties.map((p, i) => (
             <div key={i} className={row}>
-              <Input size="compact" value={p.name} onChange={(e) => setParty(i, { name: e.currentTarget.value })} placeholder="Organization" aria-label="Organization" />
-              {select(ROLES, p.role, (v) => setParty(i, { role: v as Role }), "Role")}
-              <Input size="compact" value={p.contact} onChange={(e) => setParty(i, { contact: e.currentTarget.value })} placeholder="Contact (optional)" aria-label="Contact" />
-              <Input size="compact" value={p.email} onChange={(e) => setParty(i, { email: e.currentTarget.value })} placeholder="Email (optional)" aria-label="Email" />
-              <Button kind={KIND.tertiary} size={SIZE.compact} onClick={() => set({ parties: f.parties.filter((_, j) => j !== i) })} aria-label="Remove">
+              <Input size="compact" value={p.name} onChange={(e) => setParty(i, { name: e.currentTarget.value })} placeholder={say.parties.organization} aria-label={say.parties.organization} />
+              {select(ROLES, p.role, (v) => setParty(i, { role: v as Role }), say.parties.role)}
+              <Input size="compact" value={p.contact} onChange={(e) => setParty(i, { contact: e.currentTarget.value })} placeholder={say.parties.contact} aria-label={say.parties.contact} />
+              <Input size="compact" value={p.email} onChange={(e) => setParty(i, { email: e.currentTarget.value })} placeholder={say.parties.email} aria-label={say.parties.email} />
+              <Button kind={KIND.tertiary} size={SIZE.compact} onClick={() => set({ parties: f.parties.filter((_, j) => j !== i) })} aria-label={say.parties.remove}>
                 <Delete size={18} />
               </Button>
             </div>
           ))}
           <div>
             <Button kind={KIND.secondary} size={SIZE.mini} onClick={() => set({ parties: [...f.parties, { name: "", role: "contractor", contact: "", email: "" }] })}>
-              Add an organization
+              {say.parties.add}
             </Button>
           </div>
         </div>
       </Section>
 
-      <Section title="What has to happen" hint="Each step, who owes it, when it's due, and which steps must finish first. Groundwork works out what sets the finish date.">
+      <Section title={say.steps.title} hint={say.steps.hint}>
         <div className={css({ display: "grid", gap: theme.sizing.scale500 })}>
           {f.items.map((it, i) => (
             <div key={i} className={css({ display: "grid", gap: theme.sizing.scale200 })}>
               <div className={row}>
-                <Input size="compact" value={it.title} onChange={(e) => setItem(i, { title: e.currentTarget.value })} placeholder="Building permit issued" aria-label="Step" />
-                {select(owners, it.owner || "you", (v) => setItem(i, { owner: v }), "Who owes it")}
-                {select(STATUSES, it.status, (v) => setItem(i, { status: v as Status }), "Status")}
-                <Input size="compact" type="date" value={it.finish} onChange={(e) => setItem(i, { finish: e.currentTarget.value })} aria-label="Due" />
-                <Button kind={KIND.tertiary} size={SIZE.compact} onClick={() => set({ items: f.items.filter((_, j) => j !== i) })} aria-label="Remove" disabled={f.items.length === 1}>
+                <Input size="compact" value={it.title} onChange={(e) => setItem(i, { title: e.currentTarget.value })} placeholder={say.steps.stepPlaceholder} aria-label={say.steps.step} />
+                {select(owners, it.owner || "you", (v) => setItem(i, { owner: v }), say.steps.owner)}
+                {select(STATUSES, it.status, (v) => setItem(i, { status: v as Status }), say.steps.status)}
+                <Input size="compact" type="date" value={it.finish} onChange={(e) => setItem(i, { finish: e.currentTarget.value })} aria-label={say.steps.due} />
+                <Button kind={KIND.tertiary} size={SIZE.compact} onClick={() => set({ items: f.items.filter((_, j) => j !== i) })} aria-label={say.parties.remove} disabled={f.items.length === 1}>
                   <Delete size={18} />
                 </Button>
               </div>
@@ -308,20 +294,20 @@ export function NewProject({ session }: { session: Session }) {
                   options={titles.filter((t) => t !== it.title).map((t) => ({ id: t, label: t }))}
                   value={it.after.map((t) => ({ id: t, label: t }))}
                   onChange={({ value }) => setItem(i, { after: value.map((v) => String(v.id)) })}
-                  placeholder="Waits on (optional)"
-                  aria-label="Waits on"
+                  placeholder={say.steps.waitsOn}
+                  aria-label={say.steps.waitsOn}
                 />
               )}
             </div>
           ))}
           <div>
             <Button kind={KIND.secondary} size={SIZE.mini} onClick={() => set({ items: [...f.items, { title: "", owner: "", status: "not_started", finish: "", after: [] }] })}>
-              Add a step
+              {say.steps.add}
             </Button>
           </div>
           {titles.length > 1 && (
-            <FormControl label="Which step means it's finished?">
-              {select(f.items.map((it, i) => ({ id: String(i), label: it.title || `Step ${i + 1}` })), String(finishIndex), (v) => set({ finish_item: Number(v) }), "Finishing step")}
+            <FormControl label={say.steps.finishing}>
+              {select(f.items.map((it, i) => ({ id: String(i), label: it.title || say.steps.numbered(i + 1) })), String(finishIndex), (v) => set({ finish_item: Number(v) }), say.steps.finishingLabel)}
             </FormControl>
           )}
         </div>
@@ -329,22 +315,22 @@ export function NewProject({ session }: { session: Session }) {
 
       <div className={css({ marginTop: theme.sizing.scale800 })}>
         <Accordion>
-          <Panel title="More options">
+          <Panel title={say.more.title}>
             <div className={css({ display: "grid", gap: theme.sizing.scale300, gridTemplateColumns: "minmax(0, 1fr)", "@media (min-width: 720px)": { gridTemplateColumns: "1fr 1fr 1fr" } })}>
-              <FormControl label="Mandate template" caption="Supervised asks you before anything goes out. You can widen it later.">
+              <FormControl label={say.more.template} caption={say.more.templateCaption}>
                 {select(
                   (["supervised", "standard", "auto"] as const).map((t) => ({ id: t, label: TEMPLATE_LABEL[t === "auto" ? "autonomous" : t] })),
                   f.template,
                   (v) => set({ template: v as Form["template"] }),
-                  "Mandate template",
+                  say.more.template,
                 )}
               </FormControl>
-              <FormControl label="The project's date" caption="Today, or an earlier date to replay a past project.">
+              <FormControl label={say.more.asOf} caption={say.more.asOfCaption}>
                 <Input size="compact" type="date" value={f.as_of} onChange={(e) => set({ as_of: e.currentTarget.value })} />
               </FormControl>
               {!session.local && (
-                <FormControl label="Your name" caption="Shown as the project's approver.">
-                  <Input size="compact" value={f.your_name} onChange={(e) => set({ your_name: e.currentTarget.value })} placeholder="You" />
+                <FormControl label={say.more.yourName} caption={say.more.yourNameCaption}>
+                  <Input size="compact" value={f.your_name} onChange={(e) => set({ your_name: e.currentTarget.value })} placeholder={say.more.yourNamePlaceholder} />
                 </FormControl>
               )}
             </div>
@@ -367,24 +353,24 @@ export function NewProject({ session }: { session: Session }) {
           data-testid="project-preview"
           className={css({ marginTop: theme.sizing.scale600, padding: theme.sizing.scale600, borderRadius: theme.borders.radius300, background: theme.colors.backgroundSecondary, display: "grid", gap: theme.sizing.scale200 })}
         >
-          <Muted>Forecast · {preview.finish}</Muted>
+          <Muted>{say.preview.forecast(preview.finish)}</Muted>
           <div className={css({ display: "flex", gap: theme.sizing.scale300, alignItems: "center", flexWrap: "wrap" })}>
             <LabelMedium>{fmtLong(preview.forecast)}</LabelMedium>
             <Chip kind={lateness(preview.days_late).late ? "red" : "green"}>{lateness(preview.days_late).text}</Chip>
           </div>
-          {preview.sets_the_date && <Muted>Waiting on: {preview.sets_the_date}</Muted>}
+          {preview.sets_the_date && <Muted>{say.preview.waitingOn(preview.sets_the_date)}</Muted>}
         </div>
       )}
 
       <div className={css({ display: "flex", gap: theme.sizing.scale300, marginTop: theme.sizing.scale600, flexWrap: "wrap" })}>
         <Button kind={KIND.secondary} onClick={() => run(false)} isLoading={busy && !preview} data-testid="check-forecast">
-          Check the forecast
+          {say.check}
         </Button>
         <Button onClick={() => run(true)} isLoading={busy && !!preview} disabled={!preview} data-testid="create-project">
-          Create the project
+          {say.create}
         </Button>
         <Button kind={KIND.tertiary} onClick={() => navigate("/")}>
-          Cancel
+          {say.cancel}
         </Button>
       </div>
     </Page>

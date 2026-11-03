@@ -9,30 +9,23 @@ import { HeadingXSmall, LabelMedium, ParagraphSmall } from "baseui/typography";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { get, send } from "@/lib/client";
-import { ago, DEMO_PROJECT, fmt, lateness } from "@/lib/format";
+import { ago, DEMO_PROJECT, fmt, lateness, reasonSentence } from "@/lib/format";
 import type { AskItem, DraftItem, HomeView, Session } from "@/lib/types";
 import { ApproveButtons } from "./Approve";
 import { STEPS, useTutorial } from "./Tutorial";
-import { Chip, Drawer, Empty, Field, Grow, Line, Muted, Page, Quote, Row, Section } from "./ui";
+import { Accordion, Panel } from "baseui/accordion";
+import { home as say } from "@/copy/home";
+import { project } from "@/copy/project";
+import { tutorial as t } from "@/copy/tutorial";
+import { Chip, Drawer, Empty, Field, Grow, Line, Muted, Outgoing, Page, Row, Section } from "./ui";
 
-// "Did 1 · asked you about 1 · refused 1", leaving out what's zero.
+// "Did 1 on its own, asked you about 1, refused 1", leaving out what's zero.
 function did(c: { allow: number; ask: number; deny: number }): string {
-  const parts = [
-    c.allow ? `did ${c.allow} on its own` : "",
-    c.ask ? `asked you about ${c.ask}` : "",
-    c.deny ? `refused ${c.deny}` : "",
-  ].filter(Boolean);
-  const text = parts.join(", ") || "nothing to do";
+  const parts = [c.allow ? say.activity.did(c.allow) : "", c.ask ? say.activity.asked(c.ask) : "", c.deny ? say.activity.refused(c.deny) : ""].filter(Boolean);
+  const text = parts.join(", ") || say.activity.nothing;
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-const DRAFT_LABEL: Record<DraftItem["kind"], string> = {
-  project: "New project",
-  mandate: "Mandate",
-  facts: "Dates",
-  links: "Links",
-  people: "People",
-};
 
 export function Home({ session }: { session: Session }) {
   const [css, theme] = useStyletron();
@@ -68,44 +61,38 @@ export function Home({ session }: { session: Session }) {
           })}
         >
           <div className={css({ flex: "1 1 260px", display: "grid", gap: theme.sizing.scale200 })}>
-            <HeadingXSmall margin={0}>{tutorial.paused === null ? "New here? Take the two-minute tutorial" : "Pick up the tutorial"}</HeadingXSmall>
+            <HeadingXSmall margin={0}>{tutorial.paused === null ? t.card.title : t.card.pausedTitle}</HeadingXSmall>
             <ParagraphSmall margin={0} color={theme.colors.contentSecondary}>
-              {tutorial.paused === null
-                ? "See how Groundwork keeps a project's date on track, using the Lake Mariner demo."
-                : `You stopped at step ${tutorial.paused + 1} of ${STEPS.length}.`}
+              {tutorial.paused === null ? t.card.body : t.card.pausedBody(tutorial.paused + 1, STEPS.length)}
             </ParagraphSmall>
           </div>
           <Button onClick={tutorial.start} data-testid="tutorial-card-start">
-            {tutorial.paused === null ? "Start the tutorial" : "Resume"}
+            {tutorial.paused === null ? t.card.start : t.card.resume}
           </Button>
         </div>
       )}
       <Section
-        title={waiting ? `Needs you · ${waiting}` : "Needs you"}
-        hint="Asks wait for your approval; drafts are what Claude prepared and only you can make real."
+        title={waiting ? say.needsYou.titleWithCount(waiting) : say.needsYou.title}
+        hint={say.needsYou.hint}
         testId="needs-you"
       >
-        {waiting === 0 && <Empty>Nothing needs you right now.</Empty>}
+        {waiting === 0 && <Empty>{say.needsYou.empty}</Empty>}
         {h.asks.map((a) => (
           <Row key={a.id} onClick={() => setAsk(a)} testId={`ask-${a.ref}`}>
-            <Chip kind="yellow">Ask</Chip>
+            <Chip kind="yellow">{say.needsYou.ask}</Chip>
             <Grow>
               <Line>{a.title}</Line>
-              <Muted>
-                {a.project_name} · {ago(a.at)}
-              </Muted>
+              <Muted>{say.needsYou.row(a.project_name, ago(a.at))}</Muted>
             </Grow>
             <ChevronRight size={20} color={theme.colors.contentTertiary} />
           </Row>
         ))}
         {h.drafts.map((d) => (
           <Row key={d.id} onClick={() => setDraft(d)} testId={`draft-${d.id}`}>
-            <Chip kind="blue">{DRAFT_LABEL[d.kind]}</Chip>
+            <Chip kind="blue">{say.draftKinds[d.kind]}</Chip>
             <Grow>
               <Line>{d.title}</Line>
-              <Muted>
-                {d.project} · {ago(d.at)}
-              </Muted>
+              <Muted>{say.needsYou.row(d.project, ago(d.at))}</Muted>
             </Grow>
             <ChevronRight size={20} color={theme.colors.contentTertiary} />
           </Row>
@@ -113,15 +100,15 @@ export function Home({ session }: { session: Session }) {
       </Section>
 
       <Section
-        title="Projects"
+        title={say.projects.title}
         testId="projects"
         right={
           <Button kind={KIND.secondary} size={SIZE.mini} onClick={() => navigate("/projects/new")} data-testid="new-project">
-            New project
+            {say.projects.newProject}
           </Button>
         }
       >
-        {h.projects.length === 0 && <Empty>No projects yet. Ask Claude to start one from your email or a few sentences.</Empty>}
+        {h.projects.length === 0 && <Empty>{say.projects.empty}</Empty>}
         {h.projects.map((p) => {
           const late = lateness(p.days_late);
           return (
@@ -141,14 +128,14 @@ export function Home({ session }: { session: Session }) {
                         }}
                         overrides={{ Root: { style: { margin: 0 } } }}
                       >
-                        Tutorial
+                        {say.projects.tutorial}
                       </Tag>
                     </span>
                   )}
                 </span>
                 <Muted>
                   {p.finish}
-                  {p.sets_the_date ? ` · waiting on ${p.sets_the_date}` : ""}
+                  {p.sets_the_date ? say.projects.waitingOn(p.sets_the_date) : ""}
                 </Muted>
               </Grow>
               <div className={css({ flex: "0 0 auto", display: "grid", justifyItems: "end", gap: theme.sizing.scale100 })}>
@@ -162,27 +149,27 @@ export function Home({ session }: { session: Session }) {
       </Section>
 
       <Section
-        title="What Groundwork did"
-        hint="When a message comes in, Groundwork plans what to do next. It does what your mandate allows, asks you about the rest, and refuses what's never allowed."
+        title={say.activity.title}
+        hint={say.activity.hint}
         right={
           h.runs.length > 3 && (
             <Button kind={KIND.tertiary} size={SIZE.mini} onClick={() => setAllRuns(!allRuns)}>
-              {allRuns ? "Show fewer" : "Show all"}
+              {allRuns ? say.activity.showFewer : say.activity.showAll}
             </Button>
           )
         }
         testId="runs"
       >
-        {h.runs.length === 0 && <Empty>Nothing yet. When a message comes in, what Groundwork did about it shows here.</Empty>}
+        {h.runs.length === 0 && <Empty>{say.activity.empty}</Empty>}
         {runs.map((r) => (
           <Row key={r.run} onClick={() => navigate(`/projects/${r.project}/actions`)} testId="run">
             <Grow>
               <Line>{r.message}</Line>
-              <Muted>{did(r.counts)} · {r.project_name} · {ago(r.at)}</Muted>
+              <Muted>{say.activity.row(did(r.counts), r.project_name, ago(r.at))}</Muted>
             </Grow>
             {r.report_ok === false && (
-              <Chip kind="red" tip="Groundwork's own account of what it did doesn't match the ledger.">
-                Doesn't add up
+              <Chip kind="red" tip={say.activity.mismatchTip}>
+                {say.activity.mismatch}
               </Chip>
             )}
             <ChevronRight size={20} color={theme.colors.contentTertiary} />
@@ -197,22 +184,29 @@ export function Home({ session }: { session: Session }) {
 }
 
 function AskDrawer({ ask, onClose }: { ask: AskItem | null; onClose: () => void }) {
+  const say2 = project.action;
   return (
     <Drawer open={!!ask} onClose={onClose} title={ask?.title} testId="ask-drawer">
       {ask && (
         <>
-          <Muted>
-            {ask.project_name} · {ask.route.join(" → ")}
-          </Muted>
-          <Field label="To">{ask.recipient ?? ask.route[ask.route.length - 1]}</Field>
-          {ask.subject && <Field label="Subject">{ask.subject}</Field>}
-          {ask.text && (
-            <Field label="Text, as it would go out">
-              <Quote>{ask.text}</Quote>
-            </Field>
-          )}
-          <Field label={`Mandate clause${ask.mandate_version ? ` (v${ask.mandate_version})` : ""}`}>{ask.clause}</Field>
+          <Muted>{ask.project_name}</Muted>
+          <Outgoing
+            label={ask.subject || ask.text ? say2.asItGoesOut : say2.whatItWouldDo}
+            to={say2.to(ask.recipient ?? ask.route[ask.route.length - 1])}
+            subject={ask.subject}
+            text={ask.text}
+            testId="outgoing"
+          />
           <ApproveButtons actionId={ask.id} version={ask.mandate_version} canApprove={ask.can_approve} approvers={ask.approvers} onDone={onClose} />
+          {ask.reason && <Field label={say2.why.ask}>{reasonSentence(ask.reason)}</Field>}
+          <Accordion renderAll overrides={{ Content: { style: { paddingLeft: 0, paddingRight: 0 } }, Header: { style: { paddingLeft: 0, paddingRight: 0 } } }}>
+            <Panel title={say.ask.details}>
+              <div style={{ display: "grid", gap: 16 }}>
+                <Field label={say.ask.route}>{ask.route.join(" → ")}</Field>
+                <Field label={say2.clause(ask.mandate_version)}>{ask.clause}</Field>
+              </div>
+            </Panel>
+          </Accordion>
         </>
       )}
     </Drawer>
@@ -249,10 +243,10 @@ function DraftDrawer({ draft, local, onClose }: { draft: DraftItem | null; local
         local && (
           <>
             <Button onClick={() => decide("confirm")} isLoading={busy} data-testid="confirm">
-              Confirm
+              {say.draft.confirm}
             </Button>
             <Button kind={KIND.secondary} onClick={() => decide("reject")} disabled={busy} data-testid="reject">
-              Reject
+              {say.draft.reject}
             </Button>
           </>
         )
@@ -261,7 +255,7 @@ function DraftDrawer({ draft, local, onClose }: { draft: DraftItem | null; local
       {draft && (
         <>
           <Muted>
-            {DRAFT_LABEL[draft.kind]} · {draft.project} · prepared by Claude {ago(draft.at)}
+            {say.draft.prepared(say.draftKinds[draft.kind], draft.project, ago(draft.at))}
           </Muted>
           <ul className={css({ margin: 0, paddingLeft: theme.sizing.scale600, display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: theme.sizing.scale200 })}>
             {draft.lines.map((l, i) => (
@@ -278,7 +272,7 @@ function DraftDrawer({ draft, local, onClose }: { draft: DraftItem | null; local
             ))}
           </ul>
           {draft.note && <Muted>{draft.note}</Muted>}
-          <Muted>Nothing changes until you confirm. Your confirmation is a record on the project's ledger.</Muted>
+          <Muted>{say.draft.footer}</Muted>
         </>
       )}
     </Drawer>

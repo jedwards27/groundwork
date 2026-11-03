@@ -19,6 +19,8 @@ import { MandateTab } from "./MandateTab";
 import { Overview } from "./Overview";
 import { useTutorial } from "./Tutorial";
 import { Chip, Drawer, Field, Muted, Page, Quote } from "./ui";
+import { project as say } from "@/copy/project";
+import { tutorial as t } from "@/copy/tutorial";
 
 const TABS = ["overview", "inbox", "actions", "mandate", "ledger"] as const;
 const PANEL = { TabPanel: { style: { paddingLeft: 0, paddingRight: 0, minWidth: 0 } } };
@@ -77,7 +79,7 @@ export function Project({ session }: { session: Session }) {
   if (site.isError)
     return (
       <Page>
-        <Muted>No project “{key}”.</Muted>
+        <Muted>{say.notFound(key)}</Muted>
       </Page>
     );
   if (!site.data || !chain.data)
@@ -103,10 +105,10 @@ export function Project({ session }: { session: Session }) {
   const legs = gate
     ? (events.data ?? []).filter((e) => e.status === "applied").flatMap((e) => e.impacts.filter((i) => i.item === gate.key).map((i) => ({ i, e })))
     : [];
-  const title = (label: string, n: number, testId: string) => (
+  const title = (label: string, n: number, testId: string, urgent = false) => (
     <span className={css({ display: "inline-flex", gap: theme.sizing.scale200, alignItems: "center" })} data-testid={testId}>
       {label}
-      {n > 0 && <Chip kind={label === "Actions" ? "yellow" : "gray"}>{n}</Chip>}
+      {n > 0 && <Chip kind={urgent ? "yellow" : "gray"}>{n}</Chip>}
     </span>
   );
 
@@ -118,7 +120,7 @@ export function Project({ session }: { session: Session }) {
           {key === DEMO_PROJECT && !tutorial.open && (
             <span className={css({ marginLeft: "auto" })}>
               <Button kind={KIND.secondary} size={SIZE.mini} onClick={tutorial.start} data-testid="tutorial-start">
-                Tutorial
+                {t.projectButton}
               </Button>
             </span>
           )}
@@ -152,7 +154,7 @@ export function Project({ session }: { session: Session }) {
               ":focus-visible": { outline: `2px solid ${theme.colors.borderSelected}` },
             })}
           >
-            <LabelSmall color={theme.colors.contentTertiary}>Waiting on</LabelSmall>
+            <LabelSmall color={theme.colors.contentTertiary}>{say.summary.waitingOn}</LabelSmall>
             <ParagraphSmall margin={0}>{gate.title}</ParagraphSmall>
             <ChevronRight size={18} color={theme.colors.contentTertiary} />
           </button>
@@ -169,53 +171,60 @@ export function Project({ session }: { session: Session }) {
             TabList: { style: { overflowX: "auto" } },
           }}
         >
-          <Tab key="overview" title="Overview" overrides={PANEL}>
+          <Tab key="overview" title={say.tabs.overview} overrides={PANEL}>
             <Overview chain={c} site={s} plan={p} />
           </Tab>
-          <Tab key="inbox" overrides={PANEL} title={title("Inbox", fresh, "tab-inbox")}>
+          <Tab key="inbox" overrides={PANEL} title={title(say.tabs.inbox, fresh, "tab-inbox")}>
             <InboxTab events={events.data ?? []} site={s} run={run} onPlay={play} claudePlans={claudePlans} onSeeActions={() => navigate(`/projects/${key}/actions`)} />
           </Tab>
-          <Tab key="actions" overrides={PANEL} title={title("Actions", asks, "tab-actions")}>
+          <Tab key="actions" overrides={PANEL} title={title(say.tabs.actions, asks, "tab-actions", true)}>
             <ActionsTab plan={p} site={s} chain={c} me={me.data ?? null} onOpenInbox={() => navigate(`/projects/${key}/inbox`)} />
           </Tab>
-          <Tab key="mandate" overrides={PANEL} title={title("Mandate", 0, "tab-mandate")}>
-            {mandate.data && <MandateTab site={key} mandate={mandate.data} compare={compare.data?.presets ?? []} me={me.data ?? null} />}
+          <Tab key="mandate" overrides={PANEL} title={title(say.tabs.mandate, 0, "tab-mandate")}>
+            {mandate.data && <MandateTab site={key} mandate={mandate.data} compare={compare.data?.presets ?? []} plan={p} me={me.data ?? null} />}
           </Tab>
-          <Tab key="ledger" overrides={PANEL} title={title("Ledger", 0, "tab-ledger")}>
+          <Tab key="ledger" overrides={PANEL} title={title(say.tabs.ledger, 0, "tab-ledger")}>
             <LedgerTab site={key} tamper={key === DEMO_PROJECT && !session.health.hosted} />
           </Tab>
         </Tabs>
       </div>
 
-      <Drawer open={why} onClose={() => setWhy(false)} title="What the date waits on" testId="why-drawer">
+      <Drawer open={why} onClose={() => setWhy(false)} title={say.why.title} testId="why-drawer">
         <Muted>
-          {ms.label}: forecast {fmtLong(ms.forecast_finish)}
-          {ms.forecast_low !== ms.forecast_high ? ` (somewhere from ${fmt(ms.forecast_low)} to ${fmt(ms.forecast_high)})` : ""}, target {fmtLong(ms.target_date)}.
+          {say.why.forecast(
+            ms.label,
+            fmtLong(ms.forecast_finish),
+            ms.forecast_low !== ms.forecast_high ? say.why.range(fmt(ms.forecast_low), fmt(ms.forecast_high)) : "",
+            fmtLong(ms.target_date),
+          )}
         </Muted>
-        <Field label="These steps decide the date, in order">
+        <Field label={say.why.pathLabel}>
           <ol className={css({ margin: 0, paddingLeft: theme.sizing.scale700, display: "grid", gap: theme.sizing.scale300 })} data-testid="path">
             {path.map((i) => (
               <li key={i.key}>
                 <ParagraphSmall margin={0}>
-                  {i.title} {i.key === c.gate && <Chip kind={i.finish_shift_days > 0 ? "red" : "gray"}>now</Chip>}
+                  {i.title} {i.key === c.gate && <Chip kind={i.finish_shift_days > 0 ? "red" : "gray"}>{say.why.now}</Chip>}
                 </ParagraphSmall>
                 <Muted>
-                  {party(i.owner)} · {i.status === "done" ? "done" : `due ${fmt(i.early_finish)}`}
-                  {i.finish_shift_days > 0 ? `, ${i.finish_shift_days} days later than planned` : ""}
+                  {party(i.owner)} · {i.status === "done" ? say.why.done : say.why.due(fmt(i.early_finish))}
+                  {i.finish_shift_days > 0 ? say.why.later(i.finish_shift_days) : ""}
                 </Muted>
               </li>
             ))}
           </ol>
         </Field>
-        <Muted>Everything else in the project has slack: it can slip a little without moving the date. The Overview tab shows it all.</Muted>
+        <Muted>{say.why.slack}</Muted>
         {legs.length > 0 && (
-          <Field label="Why it moved">
+          <Field label={say.why.movedLabel}>
             <Accordion>
               {legs.map(({ i, e }, n) => (
-                <Panel key={n} title={`${i.leg} (+${i.low} to ${i.high} days)`}>
+                <Panel key={n} title={say.why.moved(i.leg, i.low, i.high)}>
                   <Muted>
-                    From {party(e.from_party)}
-                    {e.forwarded_from ? `, forwarding ${party(e.forwarded_from)}` : ""}, {new Date(e.received_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                    {say.why.from(
+                      party(e.from_party),
+                      e.forwarded_from ? party(e.forwarded_from) : null,
+                      new Date(e.received_at).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+                    )}
                   </Muted>
                   <Quote>{e.body}</Quote>
                 </Panel>

@@ -4,7 +4,10 @@ import { timeMonth, timeWeek } from "d3-time";
 import { useMemo } from "react";
 import { fmt, parseDate } from "@/lib/format";
 import type { ChainView, ItemView } from "@/lib/types";
+import { project } from "@/copy/project";
 import { Muted } from "./ui";
+
+const say = project.overview.graph;
 
 const W = 900;
 const LEFT = 150;
@@ -94,7 +97,7 @@ export function Chain({ chain }: { chain: ChainView }) {
   return (
     <div>
       <div className={css({ overflowX: "auto" })}>
-        <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Dependency chain of ${chain.items.length} items`} className={css({ width: "100%", minWidth: "640px", display: "block" })}>
+        <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={say.aria(chain.items.length)} className={css({ width: "100%", minWidth: "640px", display: "block" })}>
           <defs>
             <marker id="gw-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
               <path d="M 0 0 L 10 5 L 0 10 z" fill={c.accent} />
@@ -136,9 +139,9 @@ export function Chain({ chain }: { chain: ChainView }) {
             })}
           </g>
           {[
-            { d: asOf, label: "today", c: c.fg, dash: "2 3" },
-            { d: target, label: `target ${fmt(chain.milestone.target_date)}`, c: c.dim, dash: "5 4" },
-            ...(+forecast !== +target ? [{ d: forecast, label: `forecast ${fmt(chain.milestone.forecast_finish)}`, c: late ? c.crit : c.accent, dash: "5 4" }] : []),
+            { d: asOf, label: say.today, c: c.fg, dash: "2 3" },
+            { d: target, label: say.target(fmt(chain.milestone.target_date)), c: c.dim, dash: "5 4" },
+            ...(+forecast !== +target ? [{ d: forecast, label: say.forecast(fmt(chain.milestone.forecast_finish)), c: late ? c.crit : c.accent, dash: "5 4" }] : []),
           ].map((m, n) => (
             <g key={m.label}>
               <line x1={x(m.d)} x2={x(m.d)} y1={TOP - 4} y2={n === 2 ? H - 18 : H - 32} stroke={m.c} strokeDasharray={m.dash} strokeWidth={1.4} opacity={0.85} />
@@ -154,14 +157,14 @@ export function Chain({ chain }: { chain: ChainView }) {
             return (
               <g key={item.key} transform={`translate(${nx} ${ny})`} data-key={item.key}>
                 <title>
-                  {`${item.title}\n${item.status.replace("_", " ")} · planned ${fmt(item.planned_finish, true)} · forecast ${fmt(item.early_finish, true)}` +
-                    (item.total_float !== null && item.total_float !== undefined ? ` · float ${item.total_float} bd` : "") +
+                  {say.tooltip(item.title, item.status.replace("_", " "), fmt(item.planned_finish, true), fmt(item.early_finish, true)) +
+                    (item.total_float !== null && item.total_float !== undefined ? say.float(item.total_float) : "") +
                     (item.notes ? `\n${item.notes}` : "")}
                 </title>
                 <rect width={NODE_W} height={NODE_H} rx={6} fill={box.fill} stroke={box.stroke} strokeWidth={box.width} />
                 <text x={8} y={13} fill={box.text} fontSize={10.5} fontWeight={box.bold ? 700 : 500} fontFamily={c.body}>{label}</text>
                 <text x={8} y={25} fill={item.finish_shift_days > 0 ? c.crit : c.dim} fontSize={9} fontFamily={c.mono}>
-                  {item.status === "done" ? "done · " : ""}
+                  {item.status === "done" ? say.done : ""}
                   {fmt(item.early_finish)}
                   {item.finish_shift_days > 0 ? ` (+${item.finish_shift_days}d)` : ""}
                   {clipped ? " →" : ""}
@@ -171,10 +174,7 @@ export function Chain({ chain }: { chain: ChainView }) {
           })}
         </svg>
       </div>
-      <Muted>
-        Each box is a step, placed by when it's due, in the row of whoever owes it. Blue boxes and arrows are the steps that decide
-        the date; amber is the one it waits on now. Grey ones are done. Hover a box for its dates.
-      </Muted>
+      <Muted>{say.legend}</Muted>
     </div>
   );
 }

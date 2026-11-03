@@ -17,6 +17,7 @@ from groundwork.config import get_settings
 from groundwork.db import models as m
 from groundwork.db import repo
 from groundwork.db.session import owner_session, require_org
+from groundwork.service import narration as say
 
 STALE_AFTER = timedelta(minutes=10)
 
@@ -48,7 +49,7 @@ def start_run(s: Session, site_key: str, event_key: str, person_id: uuid.UUID | 
         event_id=state.ids[f"event:{event_key}"],
         status="queued",
         created_by_person_id=person_id,
-        summary={"steps": [_step(1, "queued", f"Message received: {state.event(event_key).title}")]},
+        summary={"steps": [_step(1, "queued", say.received(state.event(event_key).title))]},
     )
     s.add(run)
     s.flush()

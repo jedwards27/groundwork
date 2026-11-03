@@ -6,7 +6,10 @@ import { Button, KIND } from "baseui/button";
 import { toaster } from "baseui/toast";
 import { useState } from "react";
 import { send } from "@/lib/client";
+import { project } from "@/copy/project";
 import { Muted } from "./ui";
+
+const say = project.approve;
 
 export function ApproveButtons({ actionId, version, canApprove, approvers, onDone }: {
   actionId: string;
@@ -23,7 +26,7 @@ export function ApproveButtons({ actionId, version, canApprove, approvers, onDon
     try {
       const r = await send<{ executed: string[] }>("POST", `actions/${actionId}/approvals`, { verdict, idempotency_key: crypto.randomUUID() });
       await qc.invalidateQueries();
-      toaster.positive(verdict === "approve" ? (r.executed.length ? "Approved. It ran in dry run: recorded, not sent." : "Approved.") : "Declined.", {});
+      toaster.positive(verdict === "approve" ? (r.executed.length ? say.approvedAndRan : say.approved) : say.declined, {});
       onDone();
     } catch (e) {
       toaster.negative((e as Error).message, {});
@@ -31,21 +34,18 @@ export function ApproveButtons({ actionId, version, canApprove, approvers, onDon
       setBusy(false);
     }
   };
-  if (!canApprove) return <Muted>Waiting for {approvers.join(" or ")}.</Muted>;
+  if (!canApprove) return <Muted>{say.waitingFor(approvers)}</Muted>;
   return (
     <div className={css({ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: theme.sizing.scale300 })}>
       <div className={css({ display: "flex", gap: theme.sizing.scale300 })}>
         <Button onClick={() => decide("approve")} isLoading={busy} data-testid="approve">
-          Approve
+          {say.approve}
         </Button>
         <Button kind={KIND.secondary} onClick={() => decide("decline")} disabled={busy} data-testid="decline">
-          Decline
+          {say.decline}
         </Button>
       </div>
-      <Muted>
-        Your approval is bound to this exact text{version ? ` and mandate v${version}` : ""}. Replies, forwards and auto-replies never approve
-        anything.
-      </Muted>
+      <Muted>{say.bound(version)}</Muted>
     </div>
   );
 }

@@ -4,9 +4,10 @@ import { Drawer as BaseDrawer } from "baseui/drawer";
 import { useStyletron } from "baseui";
 import { KIND, Tag } from "baseui/tag";
 import { StatefulTooltip } from "baseui/tooltip";
-import { LabelLarge, LabelSmall, ParagraphSmall, ParagraphXSmall } from "baseui/typography";
+import { LabelLarge, LabelMedium, LabelSmall, ParagraphSmall, ParagraphXSmall } from "baseui/typography";
 import type { ReactNode } from "react";
 import { DECISION_LABEL } from "@/lib/format";
+import { app } from "@/copy/app";
 
 export function Page({ children }: { children: ReactNode }) {
   const [css, theme] = useStyletron();
@@ -113,7 +114,7 @@ export function Empty({ children }: { children: ReactNode }) {
 }
 
 // ⓘ with an explanation on hover or focus.
-export function Hint({ text, label = "More" }: { text: ReactNode; label?: string }) {
+export function Hint({ text, label = app.common.more }: { text: ReactNode; label?: string }) {
   const [css, theme] = useStyletron();
   return (
     <StatefulTooltip content={<div className={css({ maxWidth: "320px" })}>{text}</div>} showArrow returnFocus autoFocus={false} placement="top">
@@ -235,7 +236,56 @@ export function Quote({ children, testId }: { children: ReactNode; testId?: stri
   );
 }
 
+// What an action would send, laid out like the message itself: who it's to, the subject, the text.
+// It leads the drawer, since it's the thing being approved.
+export function Outgoing({ label, to, subject, text, testId }: {
+  label: string;
+  to?: string | null;
+  subject?: string | null;
+  text?: string | null;
+  testId?: string;
+}) {
+  const [css, theme] = useStyletron();
+  return (
+    <div
+      data-testid={testId}
+      className={css({
+        border: `1px solid ${theme.colors.borderOpaque}`,
+        borderRadius: theme.borders.radius300,
+        padding: theme.sizing.scale500,
+        display: "grid",
+        gridTemplateColumns: "minmax(0, 1fr)",
+        gap: theme.sizing.scale300,
+      })}
+    >
+      <LabelSmall color={theme.colors.contentTertiary}>{label}</LabelSmall>
+      {to && <ParagraphSmall margin={0} color={theme.colors.contentSecondary}>{to}</ParagraphSmall>}
+      {subject && <LabelMedium>{subject}</LabelMedium>}
+      {text && (
+        <div className={css({ ...theme.typography.ParagraphSmall, whiteSpace: "pre-wrap", maxHeight: "320px", overflowY: "auto" })}>{text}</div>
+      )}
+    </div>
+  );
+}
+
 export function Mono({ children }: { children: ReactNode }) {
   const [css, theme] = useStyletron();
   return <span className={css({ ...theme.typography.MonoParagraphXSmall })}>{children}</span>;
+}
+
+// Text from the copy files (web/copy), where **this** is bold and `this` is code.
+export function Rich({ text }: { text: string }) {
+  return (
+    <>
+      {text.split(/(\*\*[^*]+\*\*|`[^`]+`)/).map((part, i) =>
+        part.startsWith("**") && part.endsWith("**") ? (
+          <b key={i}>{part.slice(2, -2)}</b>
+        ) : part.startsWith("`") && part.endsWith("`") ? (
+          <code key={i}>{part.slice(1, -1)}</code>
+        ) : (
+          part
+        ),
+      )}
+    </>
+  );
 }

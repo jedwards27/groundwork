@@ -208,6 +208,7 @@ export interface AskItem {
   title: string;
   kind: string | null;
   clause: string;
+  reason: string;
   mandate_version: number | null;
   route: string[];
   recipient: string | null;

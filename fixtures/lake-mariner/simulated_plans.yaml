@@ -5,7 +5,7 @@
 
 demo-monday:
   assessment: >-
-    The utility wants the electrical safety study redone and reviewed again, so the data hall is now forecast weeks
+    The utility wants the electrical safety study redone and reviewed again, so the data center is now forecast weeks
     late, and the utility's approval is still what the date waits on. TeraWulf also asks for a signed schedule
     acknowledgment; signing is never mine to do, so it goes to you.
   actions:
@@ -32,7 +32,7 @@ demo-monday:
         subject: "Please ask TeraWulf to confirm the power-on date"
         body: >-
           Morgan, given the utility's new review, could you ask TeraWulf's site project manager to confirm in writing
-          the current date for turning on power to our data hall? We plan our computer deliveries around it.
+          the current date for turning on power to our data center? We plan our computer deliveries around it.
       effect: {kind: none}
       proposed_autonomy: ask
       rationale: >-

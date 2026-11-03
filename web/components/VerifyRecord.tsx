@@ -9,7 +9,10 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router";
 import { get, send } from "@/lib/client";
 import type { HomeView, LedgerEntry, VerifyEntry } from "@/lib/types";
+import { app } from "@/copy/app";
 import { Field, Mono, Muted, Page } from "./ui";
+
+const c = app.verify;
 
 // Anyone holding a copy of a record (from a receipt, an export, a screenshot typed back in) can check
 // it against the ledger: the record's hash is recomputed, the chain up to it is walked, and the copy
@@ -38,7 +41,7 @@ export function VerifyRecord() {
   }, [entries, seq]);
   const label = (e: LedgerEntry) => {
     const p = e.payload as { ref?: string; title?: string };
-    return `#${e.seq} · ${e.type.replace(/_/g, " ")}${p.ref ? ` · ${p.ref}` : ""}${p.title ? ` · ${p.title}` : ""}`;
+    return c.recordOption(e.seq, e.type.replace(/_/g, " "), p.ref, p.title);
   };
   const selected = entries.find((e) => e.seq === seq);
   const verify = async () => {
@@ -50,13 +53,13 @@ export function VerifyRecord() {
       try {
         entry = JSON.parse(copy) as Record<string, unknown>;
       } catch {
-        setErr("The pasted copy is not valid JSON.");
+        setErr(c.notJson);
         return;
       }
       if (typeof entry.seq === "number") target = entry.seq;
     }
     if (target === null) {
-      setErr("Choose a record first.");
+      setErr(c.chooseRecord);
       return;
     }
     setBusy(true);
@@ -72,12 +75,12 @@ export function VerifyRecord() {
   return (
     <Page>
       <HeadingSmall marginTop={0} marginBottom={theme.sizing.scale300}>
-        Verify a receipt
+        {c.title}
       </HeadingSmall>
-      <Muted>Every proposal, decision, approval and outcome is a hash-chained record. Check one, or a copy someone sent you.</Muted>
+      <Muted>{c.intro}</Muted>
       <div className={css({ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: theme.sizing.scale200, marginTop: theme.sizing.scale700, maxWidth: "640px" })}>
         {projects.length > 1 && (
-          <FormControl label="Project">
+          <FormControl label={c.project}>
             <Select
               options={projects.map((p) => ({ id: p.project, label: p.name }))}
               value={project ? [{ id: project, label: projects.find((p) => p.project === project)?.name ?? project }] : []}
@@ -91,7 +94,7 @@ export function VerifyRecord() {
             />
           </FormControl>
         )}
-        <FormControl label="Record">
+        <FormControl label={c.record}>
           <Select
             options={entries.map((e) => ({ id: e.seq, label: label(e) }))}
             value={selected ? [{ id: selected.seq, label: label(selected) }] : []}
@@ -100,20 +103,20 @@ export function VerifyRecord() {
             overrides={{ Root: { props: { "data-testid": "verify-select" } } }}
           />
         </FormControl>
-        <FormControl label="Or paste a copy of a record (JSON)" caption="For example from a receipt someone sent you. Leave it empty to recompute the stored record.">
+        <FormControl label={c.paste} caption={c.pasteCaption}>
           <Textarea value={copy} onChange={(e) => setCopy((e.target as HTMLTextAreaElement).value)} rows={6} overrides={{ Input: { props: { "data-testid": "verify-copy" }, style: { fontFamily: theme.typography.MonoParagraphSmall.fontFamily } } }} />
         </FormControl>
         {err && <ParagraphSmall color={theme.colors.contentNegative}>{err}</ParagraphSmall>}
         <div className={css({ display: "flex", gap: theme.sizing.scale300, flexWrap: "wrap" })}>
           <Button onClick={verify} isLoading={busy} data-testid="verify-run">
-            Verify
+            {c.run}
           </Button>
           <Button kind={KIND.secondary} onClick={() => selected && setCopy(JSON.stringify(selected, null, 2))} disabled={!selected}>
-            Paste the stored record
+            {c.pasteStored}
           </Button>
           {copy && (
             <Button kind={KIND.tertiary} onClick={() => setCopy("")}>
-              Clear
+              {c.clear}
             </Button>
           )}
         </div>
@@ -132,12 +135,10 @@ export function VerifyRecord() {
           })}
         >
           <HeadingSmall margin={0} data-testid="verify-verdict">
-            {result.match ? "Match" : "Mismatch"}
+            {result.match ? c.match : c.mismatch}
           </HeadingSmall>
           <ParagraphSmall margin={0}>
-            {result.match
-              ? "The record hashes to what the ledger holds, and every record before it links to the one after."
-              : "Something differs from what was recorded. The ledger is append-only, so a mismatch means the copy or the stored record was changed."}
+            {result.match ? c.matchBody : c.mismatchBody}
           </ParagraphSmall>
           {result.problems.map((p) => (
             <ParagraphSmall key={p} margin={0} color={theme.colors.contentNegative}>
@@ -146,15 +147,12 @@ export function VerifyRecord() {
           ))}
           {result.found && (
             <>
-              <Field label="Record">
-                #{result.seq} · {result.type} ·{" "}
-                {result.mandate_version ? `issued under mandate v${result.mandate_version}` : "not tied to a mandate decision"}
-              </Field>
-              <Field label="Stored hash">
+              <Field label={c.record}>{c.recordLine(result.seq, result.type, result.mandate_version)}</Field>
+              <Field label={c.storedHash}>
                 <Mono>{result.stored_hash}</Mono>
               </Field>
               {result.copy_hash && (
-                <Field label="Your copy">
+                <Field label={c.yourCopy}>
                   <Mono>{result.copy_hash}</Mono>
                 </Field>
               )}

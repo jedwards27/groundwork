@@ -234,8 +234,9 @@ def decide(action: ProposedAction, ctx: RequestContext, mandate: Mandate) -> Dec
         if rule.channels is not None and channel != Channel.none and channel not in rule.channels:
             continue
         if rule.direct_only and not direct:
+            via = [p for p in ctx.path if p != ctx.asks_party] or list(ctx.path)
             blocked.append(
-                f"it asks {ctx.asks_party} through {' → '.join(ctx.path)}, which the {mandate.preset} "
+                f"it asks {ctx.asks_party} through {' → '.join(via)}, which the {mandate.preset} "
                 f"mandate only allows with approval"
             )
             blocked_clause = blocked_clause or (

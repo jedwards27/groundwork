@@ -1,0 +1,246 @@
+// Everything a project's page says: the date at the top, the "What the date waits on" drawer, and
+// the Overview, Inbox, Actions, Mandate and Ledger tabs. The approve drawer's words are here too
+// (home uses the same ones). Edit freely. **Like this** makes text bold.
+//
+// Some text comes from the project itself rather than from here: step names, emails and the demo's
+// plan are in fixtures/lake-mariner; what a run says as it works is in
+// backend/groundwork/service/narration.py; the mandate's rules and the gateway's reasons are written
+// by the gateway (backend/groundwork/policy), since they are part of the record.
+
+export const project = {
+  notFound: (key: string) => `No project “${key}”.`,
+
+  summary: {
+    waitingOn: "Waiting on",
+  },
+
+  tabs: { overview: "Overview", inbox: "Inbox", actions: "Actions", mandate: "Mandate", ledger: "Ledger" },
+
+  why: {
+    title: "What the date waits on",
+    forecast: (label: string, forecast: string, range: string, target: string) => `${label}: forecast ${forecast}${range}, target ${target}.`,
+    range: (low: string, high: string) => ` (somewhere from ${low} to ${high})`,
+    pathLabel: "These steps decide the date, in order",
+    now: "now",
+    done: "done",
+    due: (date: string) => `due ${date}`,
+    later: (days: number) => `, ${days} days later than planned`,
+    slack: "Everything else in the project has slack: it can slip a little without moving the date. The Overview tab shows it all.",
+    movedLabel: "Why it moved",
+    moved: (leg: string, low: number, high: number) => `${leg} (+${low} to ${high} days)`,
+    from: (party: string, forwarding: string | null, date: string) => `From ${party}${forwarding ? `, forwarding ${forwarding}` : ""}, ${date}`,
+  },
+
+  overview: {
+    graph: {
+      title: "What depends on what",
+      hint: "Every step in the project and what it waits on, laid out on the calendar.",
+      legend:
+        "Each box is a step, placed by when it's due, in the row of whoever owes it. Blue boxes and arrows are the steps that decide the date; amber is the one it waits on now. Grey ones are done. Hover a box for its dates.",
+      aria: (n: number) => `What depends on what, ${n} steps`,
+      today: "today",
+      target: (date: string) => `target ${date}`,
+      forecast: (date: string) => `forecast ${date}`,
+      done: "done · ",
+      tooltip: (title: string, status: string, planned: string, forecast: string) => `${title}\n${status} · planned ${planned} · forecast ${forecast}`,
+      float: (days: number) => ` · float ${days} bd`,
+    },
+    winBack: {
+      title: "Days the plan can win back",
+      about: (days: number) => `${days} days back if you approve and they agree`,
+      aboutNoPlan: "After a message comes in and Groundwork plans",
+      target: "Target",
+      ifNothing: "If nothing is done",
+      forecastNow: "Forecast now",
+      withWhatRan: "With what already ran",
+      ifApproved: "If you approve the asks",
+      ifTheyAgree: "If they agree too",
+      late: (days: number) => `+${days} d`,
+      early: (days: number) => `${days} d early`,
+      onTime: "on time",
+      note: "Days past the target, worked out from the schedule. Days that depend on someone else agreeing are counted only once they do.",
+    },
+    holidays: {
+      title: "Holidays that cost days",
+      about: "Days off that fall on the steps that decide the date",
+    },
+    about: {
+      title: "About this project",
+      aboutFallback: "Facts, each with its source",
+      source: (provenance: string, source: string | null) => `${provenance}${source ? `. Source: ${source}` : ""}`,
+      workingFor: (party: string) => `Working for ${party}. Every number carries its source.`,
+    },
+  },
+
+  inbox: {
+    kinds: {
+      schedule_change: "Schedule change",
+      evidence: "Evidence",
+      acknowledgment: "Auto-reply",
+      injection: "Injection test",
+      progress: "Progress",
+    } as Record<string, string>,
+    filters: { all: "All", new: "New", schedule: "Schedule changes", evidence: "Evidence" },
+    filterCount: (label: string, n: number) => `${label} · ${n}`,
+    empty: "No messages here.",
+    publicSource: "Public source",
+    forwarding: (party: string) => ` · forwarding ${party}`,
+    forwardingComma: (party: string) => `, forwarding ${party}`,
+    demo: "Demo",
+    demoTip: "Always plays the same hand-written plan, so the walkthrough is repeatable.",
+    played: "Played",
+    play: "Play",
+    playThis: "Play this message",
+    claudePlans: "Claude plans this",
+    claudePlansTip: "Ask Claude in the app to play it. Claude writes the plan; Groundwork's gateway decides each action.",
+    message: "Message",
+    datesItMoves: "Dates it moves",
+    moves: (low: number, high: number) => `+${low} to ${high} days`,
+  },
+
+  run: {
+    working: "Groundwork is working on it",
+    stopped: "The run stopped",
+    done: "What Groundwork did",
+    // Shown above the steps of a demo message, which plays a written plan instead of a live model.
+    simulated: "A simulated agent: it plays a written plan, one step at a time as a live run would. Your rules, the record and the report check are real.",
+    finished: (steps: number) =>
+      `Done. This one email became ${steps} next steps, and your rules decided each one. The Actions tab lists them.`,
+    seeSteps: (steps: number) => `See the ${steps} next steps`,
+    nothingToDo: "Done. Nothing in this one needed a next step.",
+    interrupted: "Everything it did up to that point is on the ledger. Play the message again to retry.",
+  },
+
+  actions: {
+    kinds: {
+      send: "Send", chase: "Chase", schedule: "Schedule", reserve: "Reserve", commit: "Commit spend", draft: "Draft",
+      legal: "Legal draft", file: "File", escalate: "Report to you", record: "Record", pay: "Pay", sign: "Sign", delete: "Delete",
+    } as Record<string, string>,
+    filters: { all: "All", allow: "Allow", ask: "Ask", deny: "Deny" },
+    filterCount: (label: string, n: number) => `${label} · ${n}`,
+    outcome: { executed: "Ran · dry run", pending: "Waiting for you", declined: "Declined", refused: "Not run" },
+    noPlan: "No plan yet. Play a message from the inbox.",
+    openInbox: "Open the inbox",
+    nothingHere: "Nothing here.",
+    scripted: "Scripted plan",
+    scriptedTip:
+      "Written by hand so the demo runs the same way every time; no model is running. The gateway's decisions, the ledger and the report check are live code.",
+    plannedBy: (model: string) => `Planned by ${model}.`,
+    reportOk: "Report matches the ledger",
+    reportBad: "Report disagrees with the ledger",
+    reportTip: "The agent's own account of what it did, asked and was denied, checked line by line against the ledger.",
+    to: (name: string) => ` · to ${name}`,
+    held: "Held",
+    heldTip: (proposed: string, decided: string) => `The agent proposed “${proposed}”; the mandate says “${decided}”. The gateway held it.`,
+    reportTitle: "The agent's report beside the ledger",
+    reportLine: (said: string, held: string) => `Report: ${said} · Ledger: ${held}`,
+    notMentioned: "not mentioned",
+    buckets: { did: "did", asked: "asked a person", refused: "denied", failed: "failed" } as Record<string, string>,
+  },
+
+  // The drawer for one action, on the Actions tab and from Needs you on home. What would go out comes
+  // first, then the decision; the route, clause and the agent's reasoning sit under Details.
+  action: {
+    asItGoesOut: "As it would go out",
+    whatItWouldDo: "What it would do",
+    to: (name: string) => `To ${name}`,
+    sign: (document: string) => `Sign: ${document}`,
+    why: { auto: "Why it could go ahead", ask: "Why it needs you", refuse: "Why it's denied" } as Record<string, string>,
+    details: "Details",
+    route: "Route",
+    clause: (version: number | null) => `Mandate clause${version ? ` (v${version})` : ""}`,
+    gateway: "The gateway",
+    agentWhy: "Why the agent proposed it",
+    ifItWorks: "If it works",
+    effectVerbs: { duration_reduction: "shorten", lag_reduction: "shorten the wait before", parallelize: "overlap" } as Record<string, string>,
+    effect: (verb: string, item: string, other: string | null, days: number) =>
+      `${verb} “${item}”${other ? ` with “${other}”` : ""} by ${days} business days.`,
+    notCounted: (why: string) => `Not counted: ${why}`,
+    onlyIfTheyAgree: (days: number) => `Counts only if they agree, no sooner than ${days} business days from now.`,
+    ourOwn: "Our own action.",
+    decided: (verdict: "approve" | "decline", person: string, when: string, key: string) =>
+      `${verdict === "approve" ? "Approved" : "Declined"} by ${person}, ${when} (key ${key})`,
+    ranDry: (detail: string, ref: string) => `Ran in dry run: ${detail} (${ref}). Nothing was sent.`,
+  },
+
+  approve: {
+    approve: "Approve",
+    decline: "Decline",
+    waitingFor: (names: string[]) => `Waiting for ${names.join(" or ")}.`,
+    bound: (version: number | null) =>
+      `Your approval is bound to this exact text${version ? ` and mandate v${version}` : ""}. Replies, forwards and auto-replies never approve anything.`,
+    approvedAndRan: "Approved. It ran in dry run: recorded, not sent.",
+    approved: "Approved.",
+    declined: "Declined.",
+  },
+
+  mandate: {
+    templateLabel: "Mandate template",
+    preview: "preview",
+    version: (v: number) => `v${v}`,
+    hint: "A template sets what may run on its own, what must ask a named person, and what is denied. Paying, signing and deleting are denied under every template.",
+    issue: (v: number) => `Issue v${v}`,
+    previewTitle: (template: string) => `Previewing ${template}`,
+    previewChanges: "On the latest plan, it would change:",
+    previewNoChange: "On the latest plan, it would change nothing.",
+    previewNoPlan: "Play a message first to see what it would change.",
+    previewNote: "Nothing changes until you issue it.",
+    rulesTitle: (v: number) => `Your rules now (v${v})`,
+    compare: "Compare templates on the latest plan",
+    current: " (now)",
+    daysBack: (days: number) => `${days} days back if they agree`,
+    allow: (n: number) => `Allow ${n}`,
+    ask: (n: number) => `Ask ${n}`,
+    deny: (n: number) => `Deny ${n}`,
+    held: (n: number) => `Held ${n}`,
+    heldTip: "Times the agent proposed more autonomy than this template allows.",
+    versions: "Versions",
+    versionRow: (v: number, template: string) => `v${v} · ${template}`,
+    footer: "Same plan, different authority: the gateway decides open actions again; it never re-plans, and what already ran stays on the record.",
+    confirmTitle: (v: number, template: string) => `Issue mandate v${v}: ${template}`,
+    confirmBody:
+      "Open actions are decided again under the new version, and any that may now run on their own run in dry run. The new version is a record on the ledger, issued by you.",
+    cancel: "Cancel",
+    issued: (v: number) => `Mandate v${v} issued.`,
+    decidedAgain: (moves: string) => ` Decided again: ${moves}.`,
+    move: (ref: string, from: string, to: string) => `${ref} ${from} → ${to}`,
+    noneChanged: " No open action changed.",
+    ranDry: (refs: string) => ` Ran in dry run: ${refs}.`,
+  },
+
+  ledger: {
+    intact: (n: number) => `Intact · ${n} ${n === 1 ? "record" : "records"}`,
+    intactTip:
+      "Each record is sealed to the one before it with a fingerprint (a hash). Editing any past record, even with access to the database, breaks the seal. Groundwork checks it every time you open this tab.",
+    broken: "Edited after the fact",
+    verifyReceipt: "Verify a receipt",
+    empty: "No records yet.",
+    notSent: "Not sent · dry run",
+    notSentTip: "It would have been sent; nothing left in dry run.",
+    receipt: "Receipt",
+    tryToBreak: "Try to break it",
+    tryToBreakBody:
+      'Edit one recorded decision the way someone with full database access could. The tag above turns to "Edited after the fact". Restore puts the demo back the way it started.',
+    tamper: "Tamper with one record",
+    tampered: (seq: number) => `Record #${seq} was edited behind the ledger's back.`,
+    restore: "Restore",
+    restored: "The demo is back the way it started.",
+    record: (seq: number) => `Record #${seq}`,
+    verifyRecord: "Verify this record",
+    what: "What",
+    clause: "Mandate clause",
+    wouldHaveSent: "Would have been sent (dry run: nothing left)",
+    text: "Text",
+    hash: "Hash",
+    linksTo: "Links to",
+    receiptIntro: "A signed summary of the ledger, from its first record to its latest, that anyone can check.",
+    violations: "Violations",
+    violationsLine: (count: number, definition: string) => `${count} (${definition})`,
+    chain: "Chain",
+    chainLine: (ok: boolean, records: number) => `${ok ? "verified" : "FAILED"} · ${records} records`,
+    mandate: "Mandate",
+    mandateLine: (v: number, template: string) => `v${v} · ${template}`,
+    doesNotProve: "What this does not prove",
+    download: "Download the receipt",
+  },
+};

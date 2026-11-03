@@ -10,7 +10,11 @@ import { useNavigate } from "react-router";
 import { get, send } from "@/lib/client";
 import { DECISION_LABEL, TEMPLATE_LABEL } from "@/lib/format";
 import type { Attestation, LedgerEntry, Verify } from "@/lib/types";
+import { app } from "@/copy/app";
+import { project } from "@/copy/project";
 import { Chip, Drawer, Empty, Field, Grow, Line, Mono, Muted, Quote, Row } from "./ui";
+
+const say = project.ledger;
 
 function what(e: LedgerEntry): string {
   const p = e.payload as Record<string, unknown>;
@@ -41,29 +45,25 @@ export function LedgerTab({ site, tamper }: { site: string; tamper: boolean }) {
         <span data-testid="verify">
           {v &&
             (v.ok ? (
-              <Chip
-                kind="green"
-                tip="Each record is sealed to the one before it with a fingerprint (a hash). Editing any past record, even with access to the database, breaks the seal. Groundwork checks it every time you open this tab."
-                testId="chain-ok"
-              >
-                Intact · {v.count} {v.count === 1 ? "record" : "records"}
+              <Chip kind="green" tip={say.intactTip} testId="chain-ok">
+                {say.intact(v.count)}
               </Chip>
             ) : (
               <Chip kind="red" tip={v.problems.join(" ")} testId="chain-broken">
-                Edited after the fact
+                {say.broken}
               </Chip>
             ))}
         </span>
         <span className={css({ marginLeft: "auto" })}>
           <Button kind={KIND.tertiary} size={SIZE.mini} onClick={() => navigate(`/verify?project=${site}`)} data-testid="verify-receipt">
-            Verify a receipt
+            {say.verifyReceipt}
           </Button>
         </span>
       </div>
       {v && !v.ok && <Muted testId="verify-problem">{v.problems[0]}</Muted>}
 
       <div>
-        {shown.length === 0 && <Empty>No records yet.</Empty>}
+        {shown.length === 0 && <Empty>{say.empty}</Empty>}
         {shown.map((e) => (
           <Row key={e.seq} onClick={() => setOpen(e.seq)} testId={`record-${e.seq}`}>
             <span className={css({ width: "40px", flex: "0 0 auto" })}>
@@ -75,28 +75,25 @@ export function LedgerTab({ site, tamper }: { site: string; tamper: boolean }) {
                 {e.type.replace(/_/g, " ")}
               </Muted>
             </Grow>
-            {e.dry_run && <Chip tip="It would have been sent; nothing left in dry run.">Not sent · dry run</Chip>}
+            {e.dry_run && <Chip tip={say.notSentTip}>{say.notSent}</Chip>}
             <ChevronRight size={20} color={theme.colors.contentTertiary} />
           </Row>
         ))}
         {entries.length > 20 && (
           <Button kind={KIND.tertiary} size={SIZE.compact} onClick={() => setAll(!all)}>
-            {all ? "Show fewer" : `Show all ${entries.length}`}
+            {all ? app.common.showFewer : app.common.showAll(entries.length)}
           </Button>
         )}
       </div>
 
       <Accordion>
-        <Panel title="Receipt">
+        <Panel title={say.receipt}>
           <Receipt site={site} />
         </Panel>
         {tamper && (
-          <Panel title="Try to break it">
+          <Panel title={say.tryToBreak}>
             <div className={css({ display: "grid", gap: theme.sizing.scale300 })}>
-              <ParagraphSmall margin={0}>
-                Edit one recorded decision the way someone with full database access could. The tag above turns to "Edited after the fact".
-                Restore puts the demo back the way it started.
-              </ParagraphSmall>
+              <ParagraphSmall margin={0}>{say.tryToBreakBody}</ParagraphSmall>
               <div className={css({ display: "flex", gap: theme.sizing.scale300 })}>
                 <Button
                   kind={KIND.secondary}
@@ -106,14 +103,14 @@ export function LedgerTab({ site, tamper }: { site: string; tamper: boolean }) {
                     try {
                       const r = await send<{ edited_seq: number }>("POST", "demo/tamper");
                       await qc.invalidateQueries();
-                      toaster.warning(`Record #${r.edited_seq} was edited behind the ledger's back.`, {});
+                      toaster.warning(say.tampered(r.edited_seq), {});
                       window.scrollTo({ top: 0, behavior: "smooth" });
                     } catch (e) {
                       toaster.negative((e as Error).message, {});
                     }
                   }}
                 >
-                  Tamper with one record
+                  {say.tamper}
                 </Button>
                 <Button
                   kind={KIND.tertiary}
@@ -123,13 +120,13 @@ export function LedgerTab({ site, tamper }: { site: string; tamper: boolean }) {
                     try {
                       await send("POST", "demo/reset");
                       await qc.invalidateQueries();
-                      toaster.positive("The demo is back the way it started.", {});
+                      toaster.positive(say.restored, {});
                     } catch (e) {
                       toaster.negative((e as Error).message, {});
                     }
                   }}
                 >
-                  Restore
+                  {say.restore}
                 </Button>
               </div>
             </div>
@@ -140,12 +137,12 @@ export function LedgerTab({ site, tamper }: { site: string; tamper: boolean }) {
       <Drawer
         open={!!entry}
         onClose={() => setOpen(null)}
-        title={entry ? `Record #${entry.seq}` : ""}
+        title={entry ? say.record(entry.seq) : ""}
         testId="record-drawer"
         footer={
           entry && (
             <Button kind={KIND.secondary} onClick={() => navigate(`/verify?project=${site}&record=${entry.seq}`)} data-testid="verify-record">
-              Verify this record
+              {say.verifyRecord}
             </Button>
           )
         }
@@ -155,18 +152,18 @@ export function LedgerTab({ site, tamper }: { site: string; tamper: boolean }) {
             <Muted>
               {entry.type.replace(/_/g, " ")} · {new Date(entry.recorded_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
             </Muted>
-            <Field label="What">{what(entry)}</Field>
-            {typeof entry.payload.clause === "string" && entry.payload.clause && <Field label="Mandate clause">{entry.payload.clause}</Field>}
+            <Field label={say.what}>{what(entry)}</Field>
+            {typeof entry.payload.clause === "string" && entry.payload.clause && <Field label={say.clause}>{entry.payload.clause}</Field>}
             {(entry.subject || entry.text) && (
-              <Field label={entry.dry_run ? "Would have been sent (dry run: nothing left)" : "Text"}>
+              <Field label={entry.dry_run ? say.wouldHaveSent : say.text}>
                 {entry.subject && <ParagraphSmall margin={0}>{entry.subject}</ParagraphSmall>}
                 {entry.text && <Quote>{entry.text}</Quote>}
               </Field>
             )}
-            <Field label="Hash">
+            <Field label={say.hash}>
               <Mono>{entry.hash}</Mono>
             </Field>
-            <Field label="Links to">
+            <Field label={say.linksTo}>
               <Mono>{entry.prev_hash}</Mono>
             </Field>
           </>
@@ -180,7 +177,7 @@ function Receipt({ site }: { site: string }) {
   const [css, theme] = useStyletron();
   const q = useQuery({ queryKey: ["attestation", site], queryFn: () => get<Attestation>(`sites/${site}/attestation`) });
   const a = q.data?.attestation;
-  if (!a) return <Empty>Loading…</Empty>;
+  if (!a) return <Empty>{app.common.loading}</Empty>;
   const download = () => {
     const url = URL.createObjectURL(new Blob([JSON.stringify(q.data, null, 2)], { type: "application/json" }));
     const link = document.createElement("a");
@@ -191,19 +188,13 @@ function Receipt({ site }: { site: string }) {
   };
   return (
     <div className={css({ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: theme.sizing.scale300 })} data-testid="receipt">
-      <Muted>A signed summary of the ledger, from its first record to its latest, that anyone can check.</Muted>
-      <Field label="Violations">
-        <span data-testid="violations">
-          {a.violations.count} ({a.violations.definition})
-        </span>
+      <Muted>{say.receiptIntro}</Muted>
+      <Field label={say.violations}>
+        <span data-testid="violations">{say.violationsLine(a.violations.count, a.violations.definition)}</span>
       </Field>
-      <Field label="Chain">
-        {a.ledger.chain_verified ? "verified" : "FAILED"} · {a.ledger.entries} records
-      </Field>
-      <Field label="Mandate">
-        v{a.mandate.version} · {TEMPLATE_LABEL[a.mandate.preset] ?? a.mandate.preset}
-      </Field>
-      <Field label="What this does not prove">
+      <Field label={say.chain}>{say.chainLine(a.ledger.chain_verified, a.ledger.entries)}</Field>
+      <Field label={say.mandate}>{say.mandateLine(a.mandate.version, TEMPLATE_LABEL[a.mandate.preset] ?? a.mandate.preset)}</Field>
+      <Field label={say.doesNotProve}>
         {a.what_this_does_not_prove.map((x) => (
           <ParagraphSmall key={x} margin={0}>
             {x}
@@ -212,7 +203,7 @@ function Receipt({ site }: { site: string }) {
       </Field>
       <div>
         <Button kind={KIND.secondary} size={SIZE.compact} onClick={download}>
-          Download the receipt
+          {say.download}
         </Button>
       </div>
     </div>

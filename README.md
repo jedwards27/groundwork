@@ -27,7 +27,16 @@ Everything stays in dry run. If Claude tries to send project mail through anothe
 
 **Backtesting a past project.** Start it with `/groundwork:new-project` as of the date you want to begin, using only what was known then. Then replay its messages in date order. Each recorded message moves the project's date forward to the message's date. `check_overdue` moves the date forward by itself and lists work past due with no word, so Groundwork can plan chases. A message can report progress: an item done or started, with its date. It can also report date changes. Both wait for your confirmation in the app, and until then `status` shows the forecast "if confirmed" beside the confirmed one. Links Claude inferred rather than read in a source are flagged, and you can confirm or remove them. `docs/DATA-BOUNDARY.md` covers what leaves your machine, and ADR 0008 covers the design.
 
-**Hosted fallback:** if you'd rather not install anything, the same demo runs in the browser at https://groundwork-demo.fly.dev (not deployed yet; it goes live with `make deploy`, see `docs/HOSTING.md`).
+**Hosted fallback:** if you'd rather not install anything, the same demo runs in the browser at https://groundwork-demo.fly.dev (not deployed yet; it goes live with `make deploy`, see `docs/HOSTING.md`). It's for the demo only; see the next section.
+
+## Keep your data on your laptop
+
+For a real project, run Groundwork on your own computer. Both ways run all of it there: the server, the web app, the database and the ledger.
+
+- **The Claude plugin** (above). Your projects live under `~/.groundwork`, and the app answers only on 127.0.0.1. What reaches Anthropic is what your own Claude session reads with your connectors and what Groundwork's tools return to it, under your account's terms. The Groundwork server itself makes no network calls.
+- **`make dev`** (below). Your projects live in your local Postgres. Nothing leaves your machine unless you set `ANTHROPIC_API_KEY`; then the planner receives what `docs/DATA-BOUNDARY.md` lists.
+
+The hosted demo is for trying Lake Mariner without installing anything. It has no accounts, holds only the demo, and deletes each visitor's copy after 12 hours, so don't put a real project there. ADR 0010 explains the choice.
 
 ## Run it locally
 
@@ -50,11 +59,11 @@ Docker, untested because the author's machine has no Docker: `sh scripts/new-env
 
 ## The tutorial and the two-minute demo
 
-Click **Start the tutorial** at the top of the home view (or **Tutorial** next to Lake Mariner). A short dialog sets the scene: Anthropic is bringing the Lake Mariner data center online, and you're Jordan, its project manager. A small panel then walks through each feature in fourteen steps: the date and what it waits on, the graph of what depends on what, an email arriving and Groundwork working through it, allow, ask and deny, approving the ask on the project's Actions tab, the mandate and the ledger. Each step points at one thing on the page and you click it yourself, tabs included, so you get around the app the way you would without the tutorial; steps that only explain have Next, and Back steps through what you've seen. While you read the ledger, a second email plays in the background, so the home view you return to has asks waiting and a second run listed. Closing the panel pauses it, and opening it again (from the home view, the badge or the menu under your name) picks up where you left off. It ends with creating your first project, here or in the Claude app; once finished, home stops offering it. The model scorecard and the blind arm stay in the evals (below) and the API, not the app.
+Click **Start the tutorial** at the top of the home view (or **Tutorial** next to Lake Mariner). A short dialog sets the scene: Anthropic is bringing the Lake Mariner data center online, and you're Jordan, its project manager. A small panel then walks through each feature in fifteen steps: the date and what it waits on, the graph of what depends on what, an email arriving and Groundwork working through it (a demo message plays a written plan, one step at a time, labeled as a simulated agent), allow, ask and deny, approving the ask on the project's Actions tab, the mandate and the ledger. Each step points at one thing on the page and you click it yourself, tabs included, so you get around the app the way you would without the tutorial; steps that only explain have Next, and Back steps through what you've seen. While you read the ledger, a second email plays in the background, so the home view you return to has asks waiting and a second run under Activity. Closing the panel pauses it, and opening it again (from the home view, the badge or the menu under your name) picks up at the furthest step you reached; the menu can also start it over. It ends with "That's the whole tour!": start your own project, or keep exploring the demo. Once finished, home stops offering it. The model scorecard and the blind arm stay in the evals (below) and the API, not the app.
 
 The demo by hand: open **Lake Mariner**, then its **Inbox** tab, and play the first message, **"Demo: the utility wants another review"**. It plays the same hand-written plan every time; the gateway, ledger and report check are live code.
 
-1. **The forecast moves.** The data hall is now forecast for Apr 13, 2027, 50 days late, still waiting on the utility's approval of the power settings. **Waiting on** opens the steps the date depends on and why it moved, each delay citing the email it came from. When the run is done, **See the 3 next steps** opens the Actions tab.
+1. **The forecast moves.** The data center is now forecast for Apr 13, 2027, 50 days late, still waiting on the utility's approval of the power settings. **Waiting on** opens the steps the date depends on and why it moved, each delay citing the email it came from. When the run is done, **See the 3 next steps** opens the Actions tab.
 2. **Allow.** A weekly status request to Fluidstack, the tenant. The mandate allows it on its own; it runs in dry run, so it's recorded and not sent.
 3. **Ask.** Asking the landlord, through Fluidstack, to confirm the power-on date. Anything to the landlord waits for you, so it's under **Needs you** on the home view.
 4. **Deny.** The landlord also asks you to sign a revised schedule. Signing is never Groundwork's to do, so it's denied and left to you, and the agent's report says so.
@@ -63,6 +72,19 @@ The demo by hand: open **Lake Mariner**, then its **Inbox** tab, and play the fi
 Then try event A (the same delay, with a fuller plan), the auto-reply that says "approved, please proceed" and changes nothing, the switchgear vendor's message with an instruction for AI hidden in it, approving from the home view, a new template in the Mandate tab, and **Try to break it** at the bottom of the Ledger tab.
 
 **Your own project, on the website.** **New project** on the home view opens a short form: what finishing means and when, who you're waiting on, and what has to happen in what order. "Check the forecast" shows the forecast and what sets the date before anything is saved; "Create the project" makes it, as a project of its own with its own ledger. In the hosted demo it lives in your private copy and is deleted with it. To have Groundwork read your mail and chase what's late, use the plugin.
+
+## Changing the words
+
+Every word the app shows lives in a handful of files, so copy can change without touching code:
+
+- `web/copy/tutorial.ts`: the tutorial, its card on home and its start and end dialogs.
+- `web/copy/home.ts`: the home page (Needs you, Projects, Activity).
+- `web/copy/project.ts`: a project's page and its five tabs, including the approve drawer.
+- `web/copy/newProject.ts`: the New project form and its example.
+- `web/copy/app.ts`: the header and account menu, shared labels, and the Verify a receipt page.
+- `backend/groundwork/service/narration.py`: what a run says, step by step, in the Inbox.
+
+The demo's own content (step names, emails, the scripted plans) is in `fixtures/lake-mariner/`. The mandate's rules and the gateway's reasons are written by the gateway (`backend/groundwork/policy/`), since they are part of the record. After editing a `web/copy` file, `make web-build` rebuilds the app.
 
 ## Evals
 
@@ -153,7 +175,7 @@ It validates the folder, lists every problem at once if there are any, and other
 
 ## Docs
 
-- `docs/decisions/`: ADRs 0001 to 0009.
+- `docs/decisions/`: ADRs 0001 to 0010.
 - `docs/HOSTING.md`: deploying, checking and running the hosted demo.
 - `docs/LEDGER.md`: the ledger's hash format, a test vector, and what verification does and does not catch.
 - `docs/PRACTITIONER-QUESTIONS.md`: the 20 questions that confirm or correct the fixture's assumptions.

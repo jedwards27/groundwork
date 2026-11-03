@@ -1,3 +1,5 @@
+import { app } from "@/copy/app";
+
 // Dates in the API are ISO strings (YYYY-MM-DD). Parse them as local calendar dates, never as UTC
 // instants, so "2027-01-12" never renders as January 11.
 export function parseDate(s: string | null | undefined): Date | null {
@@ -33,16 +35,12 @@ export function time(iso: string): string {
   return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 }
 
-export const PROVENANCE_LABEL: Record<string, string> = {
-  public: "public",
-  synthetic: "synthetic",
-  assumption_to_verify: "assumption to verify",
-};
+export const PROVENANCE_LABEL = app.provenance;
 
 // The API keeps its own values (auto / ask / refuse, autonomous); the page shows the product's words.
-export const DECISION_LABEL: Record<string, string> = { auto: "allow", ask: "ask", refuse: "deny" };
+export const DECISION_LABEL = app.decision;
 
-export const TEMPLATE_LABEL: Record<string, string> = { supervised: "Supervised", standard: "Standard", autonomous: "Auto" };
+export const TEMPLATE_LABEL = app.template;
 
 // Gateway reasons are written over keys (the gateway is generic); show names instead.
 export function humanize(text: string, names: Record<string, string>): string {
@@ -52,20 +50,27 @@ export function humanize(text: string, names: Record<string, string>): string {
   return text.replace(re, (k) => names[k] ?? k);
 }
 
+// A gateway reason as a sentence: without its "Needs approval:" prefix, capitalized, with a period.
+export function reasonSentence(text: string): string {
+  const r = text.replace(/^Needs approval: /, "");
+  const sentence = r.charAt(0).toUpperCase() + r.slice(1);
+  return /[.!?]$/.test(sentence) ? sentence : `${sentence}.`;
+}
+
 // "3 min ago", "2 h ago", "Nov 2" for timestamps.
 export function ago(iso: string): string {
   const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60_000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins} min ago`;
-  if (mins < 24 * 60) return `${Math.round(mins / 60)} h ago`;
+  if (mins < 1) return app.time.justNow;
+  if (mins < 60) return app.time.minutesAgo(mins);
+  if (mins < 24 * 60) return app.time.hoursAgo(Math.round(mins / 60));
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
 export function lateness(days: number | null | undefined): { text: string; late: boolean } {
   const d = days ?? 0;
-  if (d > 0) return { text: `${d} days late`, late: true };
-  if (d < 0) return { text: `${-d} days early`, late: false };
-  return { text: "on time", late: false };
+  if (d > 0) return { text: app.lateness.late(d), late: true };
+  if (d < 0) return { text: app.lateness.early(-d), late: false };
+  return { text: app.lateness.onTime, late: false };
 }
 
 // The demo project. Its messages have hand-written plans, so the app can play them without Claude;
