@@ -1,5 +1,6 @@
 // Everything the tutorial says: the card on home, the start dialog, each step, and the end.
-// Edit freely. **Like this** makes text bold. In each step, `cta` is the instruction in the panel
+// Edit freely. **Like this** makes text bold and [like this](https://example.com) makes a link.
+// In each step, `cta` is the instruction in the panel
 // and `bubble` is the short label that points at the thing to click.
 
 export const tutorial = {
@@ -131,6 +132,6 @@ export const tutorial = {
     // Shown under the buttons: on your own computer (the plugin), or on the hosted demo.
     localNote: "Or, in Claude, run /groundwork:new-project and describe the project. Claude drafts it; you confirm it here.",
     hostedNote:
-      "Want a project's data to stay on your own computer? Install the Groundwork plugin in the Claude app: it runs everything on your laptop. Then run /groundwork:new-project.",
+      "Want a project's data to stay on your own computer? [Download the Groundwork plugin](https://github.com/jedwards27/groundwork/releases/latest/download/groundwork-plugin.zip) for the Claude app, which runs everything on your laptop. The [install steps](https://github.com/jedwards27/groundwork#try-it-in-the-claude-app-the-plugin) take a minute.",
   },
 };

@@ -14,11 +14,13 @@ The main way to try Groundwork is as a plugin inside the Claude app. It runs on 
 
 **You need:** [uv](https://docs.astral.sh/uv/) (`curl -LsSf https://astral.sh/uv/install.sh | sh`). The first launch takes about a minute while uv fetches Python 3.12 and an embedded Postgres; later launches take seconds.
 
-1. **Build the plugin:** `make plugin` writes `dist/groundwork-plugin.zip`.
+1. **Get the plugin:** download [groundwork-plugin.zip](https://github.com/jedwards27/groundwork/releases/latest/download/groundwork-plugin.zip) from the [latest release](https://github.com/jedwards27/groundwork/releases/latest), or build it with `make plugin` (writes `dist/groundwork-plugin.zip`; needs Node 20 or newer).
 2. **Install it in one of two places:**
-   - **Cowork:** Customize, then Plugins, then upload the zip.
-   - **Claude Code:** unzip it and run `claude --plugin-dir dist/groundwork-plugin`.
+   - **The Claude desktop app (Cowork):** Customize, then Plugins, then upload the zip.
+   - **Claude Code:** run `unzip groundwork-plugin.zip`, then `claude --plugin-dir groundwork-plugin`.
 3. **Set up and play:** run `/groundwork:setup` to say who you are, then `/groundwork:demo` for the two-minute demo.
+
+**Setting it up with an agent?** Check that `uv` is installed, download and unzip the release zip, and then hand back to the person: they upload the zip in the Claude desktop app, or start Claude Code with `--plugin-dir`. A running session can't load a plugin into itself.
 
 You approve asks, confirm drafts and check receipts in the Groundwork app: the same web app as the hosted demo, served on your computer. Claude gives you its link, which signs you in; the app answers only on your computer. Other skills:
 - `/groundwork:new-project` starts tracking one of your own projects from a few sentences, a spreadsheet or your email.

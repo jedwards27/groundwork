@@ -273,19 +273,22 @@ export function Mono({ children }: { children: ReactNode }) {
   return <span className={css({ ...theme.typography.MonoParagraphXSmall })}>{children}</span>;
 }
 
-// Text from the copy files (web/copy), where **this** is bold and `this` is code.
+// Text from the copy files (web/copy), where **this** is bold, `this` is code and [this](https://…) is a link.
 export function Rich({ text }: { text: string }) {
   return (
     <>
-      {text.split(/(\*\*[^*]+\*\*|`[^`]+`)/).map((part, i) =>
-        part.startsWith("**") && part.endsWith("**") ? (
-          <b key={i}>{part.slice(2, -2)}</b>
-        ) : part.startsWith("`") && part.endsWith("`") ? (
-          <code key={i}>{part.slice(1, -1)}</code>
-        ) : (
-          part
-        ),
-      )}
+      {text.split(/(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\(https?:\/\/[^)\s]+\))/).map((part, i) => {
+        const link = /^\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)$/.exec(part);
+        if (link)
+          return (
+            <a key={i} href={link[2]} target="_blank" rel="noreferrer">
+              {link[1]}
+            </a>
+          );
+        if (part.startsWith("**") && part.endsWith("**")) return <b key={i}>{part.slice(2, -2)}</b>;
+        if (part.startsWith("`") && part.endsWith("`")) return <code key={i}>{part.slice(1, -1)}</code>;
+        return part;
+      })}
     </>
   );
 }

@@ -302,6 +302,11 @@ async function clickThrough(page: Page): Promise<void> {
   await ui(page, "tutorial-next").click();
   await expect(ui(page, "tutorial-title")).toHaveText("That's the whole tour!");
   await expect(ui(page, "tutorial-finish")).toBeVisible();
+  // In the browser (not the plugin's own app), the tour points to the plugin download.
+  await expect(ui(page, "tutorial-finish").getByRole("link", { name: "Download the Groundwork plugin" })).toHaveAttribute(
+    "href",
+    "https://github.com/jedwards27/groundwork/releases/latest/download/groundwork-plugin.zip",
+  );
   await ui(page, "tutorial-new-project").click();
   await expect(page).toHaveURL(/\/projects\/new$/);
   await expect(ui(page, "tutorial")).toBeHidden();
