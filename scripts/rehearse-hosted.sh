@@ -58,8 +58,8 @@ uv run groundwork preflight
 echo "4/5 release: migrate and seed"
 uv run groundwork release
 
-echo "5/5 the hosted profile on :8100 (IPv6, as on Fly)"
-uv run groundwork serve --host :: --port 8100 &
+echo "5/5 the hosted profile on :8100 (all IPv4 interfaces, as on Fly)"
+uv run groundwork serve --host 0.0.0.0 --port 8100 &
 API_PID=$!
 echo "Groundwork (hosted profile): http://localhost:8100   Ctrl-C to stop"
 wait

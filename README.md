@@ -6,6 +6,8 @@ It reads a project's paper trail (utility studies, permits, landlord decisions, 
 
 The demo site is **Lake Mariner CB-5** (Barker, NY), seen from the end user's seat: TeraWulf is landlord and the utility's customer, Fluidstack is the lessee, and Anthropic is the end user, reaching the utility only through both. Public facts carry links; the schedule, inbox and people are synthetic and labeled.
 
+**Try it now:** https://groundwork-demo.fly.dev. Click **Start the tutorial** for a two-minute tour; there is no account to create. To run it yourself, see [Run it locally](#run-it-locally) (`make doctor`, then `make dev`) or the plugin below.
+
 ## Try it in the Claude app (the plugin)
 
 The main way to try Groundwork is as a plugin inside the Claude app. It runs on your computer, uses the connectors you already have, and needs no API key: Claude in the app writes the plans, and Groundwork's gateway, which is code outside the model, decides allow, ask or deny for each action.
@@ -27,7 +29,7 @@ Everything stays in dry run. If Claude tries to send project mail through anothe
 
 **Backtesting a past project.** Start it with `/groundwork:new-project` as of the date you want to begin, using only what was known then. Then replay its messages in date order. Each recorded message moves the project's date forward to the message's date. `check_overdue` moves the date forward by itself and lists work past due with no word, so Groundwork can plan chases. A message can report progress: an item done or started, with its date. It can also report date changes. Both wait for your confirmation in the app, and until then `status` shows the forecast "if confirmed" beside the confirmed one. Links Claude inferred rather than read in a source are flagged, and you can confirm or remove them. `docs/DATA-BOUNDARY.md` covers what leaves your machine, and ADR 0008 covers the design.
 
-**Hosted fallback:** if you'd rather not install anything, the same demo runs in the browser at https://groundwork-demo.fly.dev (not deployed yet; it goes live with `make deploy`, see `docs/HOSTING.md`). It's for the demo only; see the next section.
+**Hosted demo:** if you'd rather not install anything, the same demo runs in the browser at https://groundwork-demo.fly.dev (`docs/HOSTING.md` covers deploying it). It's for the demo only; see the next section.
 
 ## Keep your data on your laptop
 
