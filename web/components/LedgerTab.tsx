@@ -1,13 +1,14 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useStyletron } from "baseui";
 import { Accordion, Panel } from "baseui/accordion";
 import { Button, KIND, SIZE } from "baseui/button";
 import { ChevronRight } from "baseui/icon";
 import { Segment, SegmentedControl } from "baseui/segmented-control";
+import { toaster } from "baseui/toast";
 import { ParagraphSmall } from "baseui/typography";
 import { useState } from "react";
 import { useNavigate } from "react-router";
-import { get } from "@/lib/client";
+import { get, send } from "@/lib/client";
 import { DECISION_LABEL, TEMPLATE_LABEL } from "@/lib/format";
 import type { Attestation, LedgerEntry, ScoreRow, Verify } from "@/lib/types";
 import { Chip, Drawer, Empty, Field, Grow, Hint, Line, Mono, Muted, Quote, Row } from "./ui";
@@ -21,8 +22,10 @@ function what(e: LedgerEntry): string {
   return [p.ref, p.title ?? preset ?? p.event ?? p.subject, decision ?? p.verdict].filter(Boolean).join(" · ") || e.type.replace(/_/g, " ");
 }
 
-export function LedgerTab({ site }: { site: string }) {
+// `tamper`: the demo's "try to break it" control, on the demo project away from the hosted demo.
+export function LedgerTab({ site, tamper }: { site: string; tamper: boolean }) {
   const [css, theme] = useStyletron();
+  const qc = useQueryClient();
   const navigate = useNavigate();
   const [arm, setArm] = useState<Arm>("informed");
   const [all, setAll] = useState(false);
@@ -61,6 +64,9 @@ export function LedgerTab({ site }: { site: string }) {
           <Button kind={KIND.tertiary} size={SIZE.mini} onClick={() => verify.refetch()}>
             Verify again
           </Button>
+          <Button kind={KIND.tertiary} size={SIZE.mini} onClick={() => navigate(`/verify?project=${site}`)} data-testid="verify-receipt">
+            Verify a receipt
+          </Button>
         </span>
       </div>
       {v && !v.ok && <Muted testId="verify-problem">{v.problems[0]}</Muted>}
@@ -97,6 +103,35 @@ export function LedgerTab({ site }: { site: string }) {
         <Panel title="Receipt">
           <Receipt site={site} />
         </Panel>
+        {tamper && (
+          <Panel title="Try to break it">
+            <div className={css({ display: "grid", gap: theme.sizing.scale300 })}>
+              <ParagraphSmall margin={0}>
+                Edit one recorded decision the way someone with full database access could. The chain above turns to "Chain broken". Start
+                the demo over to restore it.
+              </ParagraphSmall>
+              <div>
+                <Button
+                  kind={KIND.secondary}
+                  size={SIZE.compact}
+                  data-testid="tamper"
+                  onClick={async () => {
+                    try {
+                      const r = await send<{ edited_seq: number }>("POST", "demo/tamper");
+                      await qc.invalidateQueries();
+                      toaster.warning(`Record #${r.edited_seq} was edited behind the ledger's back.`, {});
+                      window.scrollTo({ top: 0, behavior: "smooth" });
+                    } catch (e) {
+                      toaster.negative((e as Error).message, {});
+                    }
+                  }}
+                >
+                  Tamper with one record
+                </Button>
+              </div>
+            </div>
+          </Panel>
+        )}
       </Accordion>
 
       <Drawer

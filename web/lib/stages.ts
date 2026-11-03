@@ -4,13 +4,13 @@
 import type { ItemView } from "./types";
 
 const STAGES: { key: string; label: string; codes: string[] }[] = [
-  { key: "interconnection", label: "Interconnection", codes: ["protection_coordination_study", "protection_settings_submittal", "to_settings_acceptance", "revenue_metering", "to_witness_test"] },
+  { key: "interconnection", label: "Power hookup", codes: ["protection_coordination_study", "protection_settings_submittal", "to_settings_acceptance", "revenue_metering", "to_witness_test"] },
   { key: "permits", label: "Permits", codes: ["building_permit", "generator_air_permit", "site_plan_condition"] },
-  { key: "equipment", label: "Long-lead equipment", codes: ["power_transformer_delivery", "switchgear_delivery", "generator_delivery", "ups_battery_delivery", "cooling_equipment_delivery"] },
+  { key: "equipment", label: "Equipment", codes: ["power_transformer_delivery", "switchgear_delivery", "generator_delivery", "ups_battery_delivery", "cooling_equipment_delivery"] },
   { key: "install", label: "Installation", codes: ["electrical_install_complete", "mechanical_install_complete", "cx_l2"] },
   { key: "certificates", label: "Certificates", codes: ["electrical_cut_in_certificate", "temporary_certificate_of_occupancy"] },
-  { key: "commissioning", label: "Commissioning", codes: ["cx_l3", "cx_l4"] },
-  { key: "delivered", label: "Delivered", codes: ["lease_delivery_milestone"] },
+  { key: "commissioning", label: "Testing", codes: ["cx_l3", "cx_l4"] },
+  { key: "delivered", label: "Hand-over", codes: ["lease_delivery_milestone"] },
 ];
 
 export interface StageState {

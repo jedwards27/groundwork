@@ -25,7 +25,7 @@ from urllib.parse import urlsplit
 from fastapi import HTTPException, Request, Response, status
 from sqlalchemy import select
 
-from groundwork.api.auth import Identity, TokenError, mint_local, verify, verify_local
+from groundwork.api.auth import Identity, TokenError, mint_local, mint_many, verify, verify_local, verify_many
 from groundwork.config import get_settings
 from groundwork.db import models as m
 from groundwork.db.session import owner_session
@@ -89,10 +89,21 @@ def viewer_or_none(request: Request) -> Viewer | None:
         return None
     cfg = get_settings()
     secret = cfg.groundwork_dev_hmac_secret
+    ids: tuple[Identity, ...] | None = None
     try:
-        return Viewer((verify(token, secret=secret),))
+        ids = (verify(token, secret=secret),)
     except TokenError:
-        pass
+        try:
+            ids = verify_many(token, secret=secret)
+        except TokenError:
+            pass
+    if ids is not None:
+        # Reloading the demo gives its people new ids; a token naming people who are gone is a
+        # signed-out browser, which the app then signs in again.
+        with owner_session() as s:
+            alive = set(s.execute(select(m.Person.id).where(m.Person.id.in_([i.person_id for i in ids]))).scalars())
+        kept = tuple(i for i in ids if i.person_id in alive)
+        return Viewer(kept) if kept else None
     if not cfg.groundwork_local:
         return None
     try:
@@ -148,6 +159,13 @@ def set_cookie(request: Request, response: Response, token: str, ttl_hours: int)
     response.set_cookie(
         COOKIE, token, max_age=ttl_hours * 3600, httponly=True, samesite="lax", secure=secure, path="/"
     )
+
+
+def person_cookie(request: Request, response: Response, pairs: list[tuple[uuid.UUID, uuid.UUID]]) -> None:
+    """Sign this browser in as these (person, org) pairs: the first is the one it shows as "you"."""
+    cfg = get_settings()
+    token = mint_many(pairs, secret=cfg.groundwork_dev_hmac_secret, ttl_hours=cfg.token_ttl_hours)
+    set_cookie(request, response, token, cfg.token_ttl_hours)
 
 
 def local_cookie(request: Request, response: Response) -> None:

@@ -5,6 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="description" content="Projects that wait on outside organizations: what each one waits on, the forecast, and what Groundwork may do about it under your mandate." />
     <title>Groundwork</title>
+    <style>
+      /* The tutorial points at one thing at a time. */
+      [data-tour="on"] { outline: 3px solid #276ef1; outline-offset: 3px; border-radius: 6px; box-shadow: 0 0 0 8px rgba(39, 110, 241, 0.18); animation: gw-tour 1.6s ease-in-out infinite; }
+      @keyframes gw-tour { 50% { box-shadow: 0 0 0 12px rgba(39, 110, 241, 0.06); } }
+      @media (prefers-reduced-motion: reduce) { [data-tour="on"] { animation: none; } }
+    </style>
   </head>
   <body>
     <div id="root"></div>

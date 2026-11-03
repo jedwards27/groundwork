@@ -19,6 +19,7 @@ from groundwork.local import drafts, tools
 from groundwork.local.home import me
 from groundwork.policy import Mandate
 from groundwork.service import mandates as mandates_svc
+from groundwork.service import projects
 
 
 class ConfirmError(ValueError):
@@ -51,14 +52,10 @@ def decide(draft_id: str, verdict: Literal["confirm", "reject"]) -> str:
 
 def _confirm_project(d: dict[str, Any], by: str) -> str:
     bundle = load_site(d["payload"]["folder"])
-    with owner_session() as s:
-        taken = s.execute(select(m.Site).where(m.Site.key == bundle.site_key)).first() is not None
-        taken = taken or s.execute(select(m.Org).where(m.Org.name == bundle.org_name)).first() is not None
-        if taken:
-            drafts.resolve(d["id"], "rejected", by, why="a project with this name already exists")
-            return f"Not created: {bundle.site_name} already exists. Nothing was changed."
-        org_id = repo.seed_bundle(s, bundle, replace=False)
-        append(s, "project_created", {"project": bundle.site_key, "by": by, "items": len(bundle.items)}, org_id=org_id)
+    if projects.taken(bundle):
+        drafts.resolve(d["id"], "rejected", by, why="a project with this name already exists")
+        return f"Not created: {bundle.site_name} already exists. Nothing was changed."
+    projects.create(bundle, by=by)
     drafts.resolve(d["id"], "confirmed", by)
     return f"Created {bundle.site_name}."
 

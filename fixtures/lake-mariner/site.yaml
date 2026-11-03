@@ -16,7 +16,7 @@ org:
 site:
   key: lake-mariner
   name: Lake Mariner
-  location: Barker (Town of Somerset), Niagara County, NY
+  location: Barker, New York
   profile: datacenter
   as_of: 2026-11-02
   principal: anthropic
@@ -25,6 +25,8 @@ site:
     transmission_owner: NYSEG
     voltage_class: 345kV
     county: Niagara
+    # One plain line the app shows under the project's name.
+    blurb: A data center being built for Anthropic by a landlord and a tenant
   calendar:
     holidays: [2026-11-26, 2026-11-27, 2026-12-24, 2026-12-25, 2027-01-01]
     provenance: assumption_to_verify
@@ -34,11 +36,11 @@ site:
 
 asset:
   key: cb-5
-  name: CB-5
+  name: The data hall
   capacity_mw: 168
   milestones:
     - kind: delivery
-      label: CB-5 lease delivery (commissioning Level 4)
+      label: Data hall ready for Anthropic
       item: l4
       target_date: 2027-02-22
       binding_agreement: Fluidstack lease with TeraWulf; L4 is the contractual delivery milestone
@@ -50,7 +52,7 @@ asset:
         is our inference, not a company date: energization in very early January, then CB-4's pace of
         about six weeks from L3 start-up to L4.
     - kind: energization
-      label: CB-5 first data hall energizes (after NYSEG's witness test)
+      label: Power turned on
       item: witness
       target_date: 2027-01-06
       provenance: assumption_to_verify
@@ -60,7 +62,7 @@ asset:
         CTO on the Q2 2026 call, as summarized by GuruFocus; secondary). Jan 6, and modelling energization
         as the end of the witness test, are our assumptions.
     - kind: final_acceptance
-      label: CB-5 final acceptance (after L5 integrated systems test)
+      label: Final acceptance
       item: final_acceptance
       target_date: 2027-03-18
       provenance: synthetic
@@ -72,19 +74,19 @@ parties:
     provenance: public
     source: https://measuredai.substack.com/p/anthropic-data-centers
   - key: fluidstack
-    name: Fluidstack
+    name: Fluidstack (tenant)
     roles: [lessee]
     provenance: public
     source: https://measuredai.substack.com/p/anthropic-data-centers
   - key: terawulf
-    name: TeraWulf (Lake Mariner Data LLC)
+    name: TeraWulf (landlord)
     roles: [landlord, developer]
     reached_via: fluidstack
     provenance: public
     source: https://www.interconnection.fyi/project/nyiso-1670
     note: Interconnection customer of record is Lake Mariner Data LLC. Whether the end user may write to TeraWulf directly is practitioner question 17; default is through Fluidstack.
   - key: nyseg
-    name: NYSEG
+    name: NYSEG (utility)
     roles: [to]
     level: state
     reached_via: terawulf
@@ -92,14 +94,14 @@ parties:
     source: https://www.sec.gov/Archives/edgar/data/1083301/000110465922041168/wulf-20211231x10k.htm
     note: Point of interconnection at NYSEG's Kintigh 345 kV substation.
   - key: nyiso
-    name: NYISO
+    name: NYISO (grid operator)
     roles: [iso]
     level: state
     reached_via: terawulf
     provenance: public
     source: https://www.interconnection.fyi/project/nyiso-1670
   - key: nypa
-    name: New York Power Authority (NYPA)
+    name: New York Power Authority
     roles: [agency]
     level: state
     reached_via: terawulf
@@ -107,14 +109,14 @@ parties:
     source: https://hntrbrk.com/investigations/terawulf
     note: 90 MW HLF allocation is market power delivered through the utility, not grid capacity; it gates nothing on CB-5's chain.
   - key: somerset
-    name: Town of Somerset (building department)
+    name: Town of Somerset
     roles: [ahj]
     level: local
     reached_via: terawulf
     provenance: public
     source: https://www.govtech.com/analytics/upstate-new-york-community-approves-ai-data-center-plan
   - key: inspection-agency
-    name: Electrical inspection agency (third party)
+    name: Electrical inspector
     roles: [agency]
     level: local
     reached_via: terawulf
@@ -122,19 +124,19 @@ parties:
     source: https://tocny.org/wp-content/uploads/2026/04/BPD_26-4-30_Approved-Electrical-InspAgn.pdf
     note: Which approved agency Somerset uses is practitioner question 8.
   - key: nysdec
-    name: NYS Department of Environmental Conservation (DEC)
+    name: State environmental agency
     roles: [regulator]
     level: state
     reached_via: terawulf
     provenance: public
     source: https://www.dlapiper.com/en/insights/publications/2026/07/executive-order-pauses-dec-permits-for-data-centers-in-new-york
   - key: swgr-vendor
-    name: Switchgear vendor (34.5 kV lineup)
+    name: Switchgear vendor
     roles: [vendor]
     reached_via: terawulf
     provenance: synthetic
   - key: xfmr-vendor
-    name: Transformer vendor (345/34.5 kV)
+    name: Transformer vendor
     roles: [vendor]
     reached_via: terawulf
     provenance: synthetic
@@ -154,7 +156,7 @@ parties:
     reached_via: terawulf
     provenance: synthetic
   - key: epc
-    name: EPC and commissioning agent
+    name: Builder
     roles: [epc]
     reached_via: terawulf
     provenance: synthetic
@@ -164,12 +166,12 @@ parties:
     reached_via: terawulf
     provenance: assumption_to_verify
   - key: ie
-    name: End user's independent engineer
+    name: Anthropic's engineer
     roles: [ie]
     provenance: synthetic
     note: Engaged by the end user directly. Whether the IE works on a call-off master agreement is an assumption to verify.
   - key: state-esd
-    name: State economic-development contact (Empire State Development)
+    name: Empire State Development
     roles: [agency]
     level: state
     provenance: assumption_to_verify
@@ -252,11 +254,11 @@ facts:
     value: TeraWulf owns and develops; Fluidstack leases; Anthropic is the end user and not a party to the lease
     provenance: public
     source: https://measuredai.substack.com/p/anthropic-data-centers
-  - label: CB-5 energization
+  - label: Power-on date
     value: 168 MW; first data hall expected to begin energizing "very early January" 2027, moved from Q4 2026
     provenance: public
     source: https://finance.yahoo.com/markets/stocks/articles/terawulf-inc-wulf-q2-2026-190057902.html
-  - label: CB-5 delivery
+  - label: Hand-over date
     value: Targeted to begin phased delivery in early 2027 (no date given)
     provenance: public
     source: https://www.sec.gov/Archives/edgar/data/0001083301/000108330126000162/a_wulfearningsreleaseq22026.htm

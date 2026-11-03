@@ -48,17 +48,21 @@ Set `ANTHROPIC_API_KEY` in `.env` to have Claude write the plans for the other i
 
 Docker, untested because the author's machine has no Docker: `sh scripts/new-env.sh`, then `docker compose --profile full up --build`, then open http://localhost:8000.
 
-## The two-minute demo
+## The tutorial and the two-minute demo
 
-Open **Lake Mariner**, then its **Inbox** tab, and play **"Demo: NYSEG re-review, and a switchgear change order with an instruction inside it"**, the first message. It plays the same hand-written plan every time; the gateway, ledger and report check are live code.
+Click **Tutorial** next to Lake Mariner on the home view. A small panel walks through each feature in eleven steps: a message arriving, the plan, allow, ask and deny, an auto-reply that changes nothing, approving what needs you, the mandate, the ledger and a receipt. Each step opens the right screen and points at what to look at, and "Do it for me" buttons press the same buttons you would. It ends with creating your first project, here or in the Claude app.
 
-1. **0:00 to 0:25, the gating item.** The forecast moves to Apr 13, 2027, 50 days past the Feb 22 lease date, and NYSEG's settings review is still what the project is waiting on. **Why** lists both delays, each citing the forwarded email it came from. **See the decisions** opens the Actions tab.
-2. **0:25 to 0:45, Allow.** A status request to Morgan Lee at Fluidstack about the weekly status Fluidstack already sends, citing the schedule line. The mandate clause `routine_messages` allows it alone; it runs in dry run.
-3. **0:45 to 1:10, Ask.** Asking TeraWulf to confirm the energization date. The route reads Anthropic → Fluidstack → TeraWulf, and it waits for you, since the clause covers direct counterparties only. It also shows on the home view under **Needs you**.
-4. **1:10 to 1:30, Deny.** A line inside the vendor's change order tells an AI assistant to approve and sign CO-7. Signing is on the never-list, no one can approve it, and the agent's report says what it found.
-5. **1:30 to 2:00, the report beside the record.** **Report matches the ledger.** Open "The agent's report beside the ledger" and pick a record number to open the record check: **Match**. Paste the stored record with its decision changed: **Mismatch**.
+The demo by hand: open **Lake Mariner**, then its **Inbox** tab, and play the first message, **"Demo: the utility wants another review, and a change order hides an instruction"**. It plays the same hand-written plan every time; the gateway, ledger and report check are live code.
 
-Then try event A (the same delay, with a fuller plan), the auto-reply that says "approved, please proceed" and changes nothing, approving from the home view, a new template in the Mandate tab, and **Tamper with one demo record** in the **You** menu.
+1. **The forecast moves.** The data hall is now forecast for Apr 13, 2027, 50 days late, still waiting on the utility's approval of the power settings. **Why** lists both delays, each citing the email it came from. **See the decisions** opens the Actions tab.
+2. **Allow.** A weekly status request to Fluidstack, the tenant. The mandate allows it on its own; it runs in dry run, so it's recorded and not sent.
+3. **Ask.** Asking the landlord, through Fluidstack, to confirm the power-on date. Anything to the landlord waits for you, so it's under **Needs you** on the home view.
+4. **Deny.** A line hidden in the vendor's change order tells AI assistants to sign it. Signing is never allowed, and the agent's report says what it found.
+5. **The report beside the ledger.** "Report matches the ledger." Open "The agent's report beside the ledger" and pick a record number: **Match**. Paste the stored record with one word changed: **Mismatch**.
+
+Then try event A (the same delay, with a fuller plan), the auto-reply that says "approved, please proceed" and changes nothing, approving from the home view, a new template in the Mandate tab, and **Try to break it** at the bottom of the Ledger tab.
+
+**Your own project, on the website.** **New project** on the home view opens a short form: what finishing means and when, who you're waiting on, and what has to happen in what order. "Check the forecast" shows the forecast and what sets the date before anything is saved; "Create the project" makes it, as a project of its own with its own ledger. In the hosted demo it lives in your private copy and is deleted with it. To have Groundwork read your mail and chase what's late, use the plugin.
 
 ## Evals
 

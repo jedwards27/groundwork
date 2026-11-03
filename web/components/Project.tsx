@@ -16,6 +16,7 @@ import { InboxTab, type RunState } from "./InboxTab";
 import { LedgerTab } from "./LedgerTab";
 import { MandateTab } from "./MandateTab";
 import { Overview } from "./Overview";
+import { useTutorial } from "./Tutorial";
 import { Chip, Drawer, Field, Hint, Muted, Page, Quote } from "./ui";
 
 const TABS = ["overview", "inbox", "actions", "mandate", "ledger"] as const;
@@ -36,6 +37,7 @@ export function Project({ session }: { session: Session }) {
   const me = useQuery({ queryKey: ["me", key], queryFn: () => get<Me>(`sites/${key}/me`) });
   const [run, setRun] = useState<RunState | null>(null);
   const [why, setWhy] = useState(false);
+  const tutorial = useTutorial();
   const source = useRef<EventSource | null>(null);
   useEffect(() => () => source.current?.close(), []);
   useEffect(() => {
@@ -96,7 +98,7 @@ export function Project({ session }: { session: Session }) {
   const legs = gate
     ? (events.data ?? []).filter((e) => e.status === "applied").flatMap((e) => e.impacts.filter((i) => i.item === gate.key).map((i) => ({ i, e })))
     : [];
-  const subtitle = [s.asset, s.capacity_mw ? `${s.capacity_mw} MW` : "", s.location].filter(Boolean).join(" · ");
+  const subtitle = [s.attrs.blurb, s.location].filter(Boolean).join(" · ");
   const title = (label: string, n: number, testId: string) => (
     <span className={css({ display: "inline-flex", gap: theme.sizing.scale200, alignItems: "center" })} data-testid={testId}>
       {label}
@@ -107,7 +109,16 @@ export function Project({ session }: { session: Session }) {
   return (
     <Page>
       <section data-testid="summary">
-        <Muted>{subtitle}</Muted>
+        <div className={css({ display: "flex", alignItems: "center", gap: theme.sizing.scale300 })}>
+          <Muted>{subtitle}</Muted>
+          {key === DEMO_PROJECT && !tutorial.active && (
+            <span className={css({ marginLeft: "auto" })}>
+              <Button kind={KIND.secondary} size={SIZE.mini} onClick={tutorial.start} data-testid="tutorial-start">
+                Tutorial
+              </Button>
+            </span>
+          )}
+        </div>
         <LabelSmall color={theme.colors.contentTertiary} marginTop={theme.sizing.scale600}>
           Forecast · {ms.label}
         </LabelSmall>
@@ -161,7 +172,7 @@ export function Project({ session }: { session: Session }) {
             {mandate.data && <MandateTab site={key} mandate={mandate.data} compare={compare.data?.presets ?? []} me={me.data ?? null} />}
           </Tab>
           <Tab key="ledger" overrides={PANEL} title={title("Ledger", 0, "tab-ledger")}>
-            <LedgerTab site={key} />
+            <LedgerTab site={key} tamper={key === DEMO_PROJECT && !session.health.hosted} />
           </Tab>
         </Tabs>
       </div>

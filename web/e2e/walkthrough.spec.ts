@@ -46,6 +46,8 @@ async function menu(page: Page, item: RegExp): Promise<void> {
   await page.getByRole("option", { name: item }).click();
 }
 
+const ui = (page: Page, id: string) => page.locator(`[data-testid="${id}"]`);
+
 // Every test starts signed out on a clean copy of the demo. With sandboxes, signing in already gives
 // a fresh private copy. Without them, reload the shared demo project as its lead.
 test.beforeEach(async ({ page, context, baseURL }) => {
@@ -59,7 +61,7 @@ test.beforeEach(async ({ page, context, baseURL }) => {
 
 test("the two-minute demo: Allow, Ask through the lessee, Deny, the report beside the ledger, and a record anyone can verify", async ({ page }) => {
   await open(page, `/projects/${SITE}`);
-  await expect(page.getByTestId("gate")).toContainText("NYSEG");
+  await expect(page.getByTestId("gate")).toContainText("Utility approves the power settings");
   await play(page, "demo-monday");
 
   // Allow: a status request the mandate already allows, with the clause it relied on.
@@ -73,7 +75,7 @@ test("the two-minute demo: Allow, Ask through the lessee, Deny, the report besid
   // Ask: the landlord-bound request, routed Anthropic -> Fluidstack -> TeraWulf, waiting for you.
   await expect(page.getByTestId("decision-a2")).toHaveText("Ask");
   await page.getByTestId("action-a2").click();
-  await expect(drawer).toContainText("Anthropic → Fluidstack → TeraWulf");
+  await expect(drawer).toContainText("Anthropic → Fluidstack (tenant) → TeraWulf (landlord)");
   await expect(drawer.getByTestId("approve")).toBeVisible();
   await page.keyboard.press("Escape");
 
@@ -153,7 +155,9 @@ test("two visitors at once each get a private copy", async ({ page, browser }) =
   try {
     await open(page, `/projects/${SITE}`);
     await open(bob, `/projects/${SITE}`);
-    await expect(page.getByTestId("sandbox")).toBeVisible();
+    await page.getByTestId("you").click();
+    await expect(page.getByTestId("account-menu")).toContainText("your copy is deleted in");
+    await page.keyboard.press("Escape");
     const start = await api<Chain>(bob, `sites/${SITE}/chain`);
     await play(page, "event-a");
 
@@ -174,11 +178,12 @@ test("tampering with one ledger record fails verification; reset restores the de
   await tab(page, "Ledger");
   await expect(page.getByTestId("chain-ok")).toBeVisible();
 
-  await menu(page, /Tamper with one demo record/);
+  await page.getByRole("button", { name: "Try to break it" }).click();
+  await page.getByTestId("tamper").click();
   await expect(page.getByTestId("chain-broken")).toBeVisible();
   await expect(page.getByTestId("verify-problem")).toContainText("contents do not match its hash");
 
-  await menu(page, /Reset the demo project|Start over/);
+  await menu(page, /Start the demo over/);
   await expect(page.getByTestId("chain-ok")).toHaveText("Verified · 1 record");
 });
 
@@ -207,4 +212,53 @@ test("a new mandate version decides open actions again; what already ran stays o
   const moved = open_.filter((ref) => after.actions.find((a) => a.ref === ref)?.state !== "pending");
   expect(moved.length, "Auto lets at least one held action run").toBeGreaterThan(0);
   expect((await api<Verify>(page, `sites/${SITE}/ledger/verify`)).ok).toBe(true);
+});
+
+test("the tutorial walks through the demo and ends at your first project", async ({ page }) => {
+  await open(page);
+  await ui(page, "tutorial-badge").locator('[data-baseweb="tag"]').click();
+  await ui(page, "tutorial-begin").click();
+  const panel = ui(page, "tutorial");
+  await expect(ui(page, "tutorial-count")).toHaveText(/1 of 11/);
+  await expect(page.locator('[data-tour="on"]')).toHaveAttribute("data-testid", "project-lake-mariner");
+
+  const next = () => ui(page, "tutorial-next").click();
+  const act = () => ui(page, "tutorial-act").click();
+  await next(); // the forecast
+  await next(); // a message arrives
+  await act(); // play it: the next step points at its steps as they stream
+  await expect(ui(page, "tutorial-title")).toHaveText("Groundwork makes a plan");
+  await act(); // see the decisions
+  await expect(page).toHaveURL(/\/projects\/lake-mariner\/actions$/);
+  await expect(ui(page, "decision-a2")).toHaveText("Ask");
+  await next(); // try to fool it
+  await act(); // the auto-reply plays and changes nothing
+  await next(); // what needs you
+  await act(); // open the ask
+  await ui(page, "ask-drawer").getByTestId("approve").click();
+  await expect(ui(page, "ask-a2")).toBeHidden();
+  await next(); // the mandate
+  await next(); // the ledger
+  await expect(ui(page, "chain-ok")).toBeVisible();
+  await next(); // check a receipt
+  await act();
+  await expect(ui(page, "verify-verdict")).toHaveText("Match");
+  await next(); // start your own project
+  await expect(ui(page, "tutorial-finish")).toBeVisible();
+  await ui(page, "tutorial-new-project").click();
+  await expect(page).toHaveURL(/\/projects\/new$/);
+  await expect(panel).toBeHidden();
+});
+
+test("a new project from the website: check its forecast, then create it", async ({ page }) => {
+  await open(page, "/projects/new");
+  await ui(page, "use-example").click();
+  await ui(page, "check-forecast").click();
+  await expect(ui(page, "project-preview")).toContainText("Waiting on: Cabinets delivered");
+  await expect(ui(page, "project-preview")).toContainText("days late");
+  await ui(page, "create-project").click();
+  await expect(page).toHaveURL(/\/projects\/kitchen-remodel$/);
+  await expect(ui(page, "gate")).toContainText("Cabinets delivered");
+  await page.getByTestId("home-link").click();
+  await expect(ui(page, "project-kitchen-remodel")).toBeVisible();
 });

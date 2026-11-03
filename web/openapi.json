@@ -80,6 +80,88 @@
     }
    }
   },
+  "/projects/preview": {
+   "post": {
+    "summary": "Preview",
+    "description": "What the project would look like: its forecast and what sets the date. Nothing is saved.",
+    "operationId": "preview_projects_preview_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/NewProject"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Preview Projects Preview Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/projects": {
+   "post": {
+    "summary": "Create",
+    "description": "Create the project the person checked. A ledger record says who created it.",
+    "operationId": "create_projects_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/NewProject"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Create Projects Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/health": {
    "get": {
     "summary": "Health",
@@ -1983,6 +2065,102 @@
     ],
     "title": "ItemForecastView"
    },
+   "ItemIn": {
+    "properties": {
+     "key": {
+      "type": "string",
+      "title": "Key",
+      "description": "Short lowercase key, unique in the project."
+     },
+     "title": {
+      "type": "string",
+      "title": "Title"
+     },
+     "kind": {
+      "type": "string",
+      "enum": [
+       "study",
+       "approval",
+       "permit",
+       "inspection",
+       "test",
+       "delivery",
+       "milestone",
+       "notice",
+       "agreement",
+       "consent",
+       "financing",
+       "land"
+      ],
+      "title": "Kind"
+     },
+     "owner": {
+      "type": "string",
+      "title": "Owner",
+      "description": "Party key responsible, or 'you' for the person's own side."
+     },
+     "status": {
+      "type": "string",
+      "enum": [
+       "done",
+       "in_progress",
+       "not_started"
+      ],
+      "title": "Status"
+     },
+     "start": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Start"
+     },
+     "finish": {
+      "type": "string",
+      "format": "date",
+      "title": "Finish",
+      "description": "Planned finish (or the actual finish when done)."
+     },
+     "depends_on": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Depends On",
+      "description": "Item keys that must finish first, as a source states."
+     },
+     "assumed_depends_on": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Assumed Depends On",
+      "description": "Item keys you believe must finish first but no source states. Flagged for the person to confirm."
+     },
+     "source": {
+      "type": "string",
+      "title": "Source",
+      "description": "Where this came from: an email subject, a file, the person.",
+      "default": ""
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "key",
+     "title",
+     "kind",
+     "owner",
+     "status",
+     "finish"
+    ],
+    "title": "ItemIn"
+   },
    "ItemView": {
     "properties": {
      "key": {
@@ -2378,6 +2556,72 @@
     ],
     "title": "MilestoneView"
    },
+   "NewProject": {
+    "properties": {
+     "draft": {
+      "$ref": "#/components/schemas/ProjectDraft"
+     },
+     "your_name": {
+      "type": "string",
+      "maxLength": 80,
+      "title": "Your Name",
+      "description": "Who the project belongs to (the demo only).",
+      "default": "You"
+     }
+    },
+    "type": "object",
+    "required": [
+     "draft"
+    ],
+    "title": "NewProject"
+   },
+   "PartyIn": {
+    "properties": {
+     "key": {
+      "type": "string",
+      "title": "Key",
+      "description": "Short lowercase key, for example 'gc' or 'city-permits'."
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "role": {
+      "type": "string",
+      "enum": [
+       "contractor",
+       "designer",
+       "consultant",
+       "vendor",
+       "landlord",
+       "lender",
+       "ahj",
+       "agency",
+       "regulator",
+       "developer",
+       "operator",
+       "community"
+      ],
+      "title": "Role",
+      "description": "ahj is the permit office; agency is an inspector or utility."
+     },
+     "people": {
+      "items": {
+       "$ref": "#/components/schemas/PersonIn"
+      },
+      "type": "array",
+      "title": "People"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "key",
+     "name",
+     "role"
+    ],
+    "title": "PartyIn"
+   },
    "PartyView": {
     "properties": {
      "key": {
@@ -2449,6 +2693,30 @@
     ],
     "title": "PartyView"
    },
+   "PersonIn": {
+    "properties": {
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "email": {
+      "type": "string",
+      "title": "Email",
+      "default": ""
+     },
+     "title": {
+      "type": "string",
+      "title": "Title",
+      "default": ""
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "name"
+    ],
+    "title": "PersonIn"
+   },
    "PersonView": {
     "properties": {
      "key": {
@@ -2494,6 +2762,91 @@
      "event"
     ],
     "title": "PlayEvent"
+   },
+   "ProjectDraft": {
+    "properties": {
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "location": {
+      "type": "string",
+      "title": "Location",
+      "default": ""
+     },
+     "as_of": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "As Of",
+      "description": "The project's current date; today if empty. Set it in the past to backtest."
+     },
+     "finish_label": {
+      "type": "string",
+      "title": "Finish Label",
+      "description": "What finishing means, for example 'Kitchen usable' or 'Store opens'."
+     },
+     "finish_item": {
+      "type": "string",
+      "title": "Finish Item",
+      "description": "Key of the item that marks the finish."
+     },
+     "finish_target": {
+      "type": "string",
+      "format": "date",
+      "title": "Finish Target",
+      "description": "The date the finish is promised or hoped for."
+     },
+     "parties": {
+      "items": {
+       "$ref": "#/components/schemas/PartyIn"
+      },
+      "type": "array",
+      "title": "Parties"
+     },
+     "your_side": {
+      "items": {
+       "$ref": "#/components/schemas/PersonIn"
+      },
+      "type": "array",
+      "title": "Your Side",
+      "description": "Other people on the person's own side (a partner, a colleague). Never approvers."
+     },
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/ItemIn"
+      },
+      "type": "array",
+      "title": "Items"
+     },
+     "template": {
+      "type": "string",
+      "enum": [
+       "supervised",
+       "standard",
+       "auto"
+      ],
+      "title": "Template",
+      "default": "supervised"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "name",
+     "finish_label",
+     "finish_item",
+     "finish_target",
+     "parties",
+     "items"
+    ],
+    "title": "ProjectDraft"
    },
    "ReferenceRowView": {
     "properties": {

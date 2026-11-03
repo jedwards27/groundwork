@@ -4,14 +4,27 @@ import { Button, KIND, SIZE } from "baseui/button";
 import { ChevronRight } from "baseui/icon";
 import { Skeleton } from "baseui/skeleton";
 import { toaster } from "baseui/toast";
+import { KIND as TAG, Tag } from "baseui/tag";
 import { LabelMedium } from "baseui/typography";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { get, send } from "@/lib/client";
-import { ago, fmt, lateness } from "@/lib/format";
+import { ago, DEMO_PROJECT, fmt, lateness } from "@/lib/format";
 import type { AskItem, DraftItem, HomeView, Session } from "@/lib/types";
 import { ApproveButtons } from "./Approve";
+import { useTutorial } from "./Tutorial";
 import { Chip, Drawer, Empty, Field, Grow, Line, Muted, Page, Quote, Row, Section } from "./ui";
+
+// "Did 1 · asked you about 1 · refused 1", leaving out what's zero.
+function did(c: { allow: number; ask: number; deny: number }): string {
+  const parts = [
+    c.allow ? `did ${c.allow} on its own` : "",
+    c.ask ? `asked you about ${c.ask}` : "",
+    c.deny ? `refused ${c.deny}` : "",
+  ].filter(Boolean);
+  const text = parts.join(", ") || "nothing to do";
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
 
 const DRAFT_LABEL: Record<DraftItem["kind"], string> = {
   project: "New project",
@@ -28,6 +41,7 @@ export function Home({ session }: { session: Session }) {
   const [ask, setAsk] = useState<AskItem | null>(null);
   const [draft, setDraft] = useState<DraftItem | null>(null);
   const [allRuns, setAllRuns] = useState(false);
+  const tutorial = useTutorial();
   const h = home.data;
   if (!h)
     return (
@@ -36,7 +50,7 @@ export function Home({ session }: { session: Session }) {
       </Page>
     );
   const waiting = h.asks.length + h.drafts.length;
-  const runs = allRuns ? h.runs : h.runs.slice(0, 5);
+  const runs = allRuns ? h.runs : h.runs.slice(0, 3);
   return (
     <Page>
       <Section
@@ -71,14 +85,40 @@ export function Home({ session }: { session: Session }) {
         ))}
       </Section>
 
-      <Section title="Projects" testId="projects">
+      <Section
+        title="Projects"
+        testId="projects"
+        right={
+          <Button kind={KIND.secondary} size={SIZE.mini} onClick={() => navigate("/projects/new")} data-testid="new-project">
+            New project
+          </Button>
+        }
+      >
         {h.projects.length === 0 && <Empty>No projects yet. Ask Claude to start one from your email or a few sentences.</Empty>}
         {h.projects.map((p) => {
           const late = lateness(p.days_late);
           return (
             <Row key={p.project} onClick={() => navigate(`/projects/${p.project}`)} testId={`project-${p.project}`}>
               <Grow>
-                <LabelMedium>{p.name}</LabelMedium>
+                <span className={css({ display: "flex", alignItems: "center", gap: theme.sizing.scale300 })}>
+                  <LabelMedium>{p.name}</LabelMedium>
+                  {p.project === DEMO_PROJECT && (
+                    <span data-testid="tutorial-badge">
+                      <Tag
+                        closeable={false}
+                        kind={TAG.blue}
+                        size="small"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          tutorial.start();
+                        }}
+                        overrides={{ Root: { style: { margin: 0 } } }}
+                      >
+                        Tutorial
+                      </Tag>
+                    </span>
+                  )}
+                </span>
                 <Muted>
                   {p.finish}
                   {p.sets_the_date ? ` · waiting on ${p.sets_the_date}` : ""}
@@ -95,10 +135,10 @@ export function Home({ session }: { session: Session }) {
       </Section>
 
       <Section
-        title="Recent runs"
-        hint="Each run is one message played: the plan, the gateway's decisions and the agent's report, checked against the ledger."
+        title="What Groundwork did"
+        hint="When a message comes in, Groundwork plans what to do next. It does what your mandate allows, asks you about the rest, and refuses what's never allowed."
         right={
-          h.runs.length > 5 && (
+          h.runs.length > 3 && (
             <Button kind={KIND.tertiary} size={SIZE.mini} onClick={() => setAllRuns(!allRuns)}>
               {allRuns ? "Show fewer" : "Show all"}
             </Button>
@@ -106,29 +146,18 @@ export function Home({ session }: { session: Session }) {
         }
         testId="runs"
       >
-        {h.runs.length === 0 && <Empty>No runs yet. Open a project and play a message from its inbox.</Empty>}
+        {h.runs.length === 0 && <Empty>Nothing yet. When a message comes in, what Groundwork did about it shows here.</Empty>}
         {runs.map((r) => (
           <Row key={r.run} onClick={() => navigate(`/projects/${r.project}/actions`)} testId="run">
             <Grow>
               <Line>{r.message}</Line>
-              <Muted>
-                {r.project_name} · {ago(r.at)}
-                <span className={css({ "@media (min-width: 640px)": { display: "none" } })}>
-                  {" "}
-                  · allow {r.counts.allow}, ask {r.counts.ask}, deny {r.counts.deny}
-                </span>
-              </Muted>
+              <Muted>{did(r.counts)} · {r.project_name} · {ago(r.at)}</Muted>
             </Grow>
-            <div className={css({ display: "none", gap: theme.sizing.scale200, flex: "0 0 auto", "@media (min-width: 640px)": { display: "flex" } })}>
-              {r.counts.allow > 0 && <Chip kind="green">Allow {r.counts.allow}</Chip>}
-              {r.counts.ask > 0 && <Chip kind="yellow">Ask {r.counts.ask}</Chip>}
-              {r.counts.deny > 0 && <Chip kind="red">Deny {r.counts.deny}</Chip>}
-              {r.report_ok === false && (
-                <Chip kind="red" tip="The agent's report disagrees with the ledger.">
-                  Report ✗
-                </Chip>
-              )}
-            </div>
+            {r.report_ok === false && (
+              <Chip kind="red" tip="Groundwork's own account of what it did doesn't match the ledger.">
+                Doesn't add up
+              </Chip>
+            )}
             <ChevronRight size={20} color={theme.colors.contentTertiary} />
           </Row>
         ))}

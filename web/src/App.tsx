@@ -4,7 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { Route, Routes } from "react-router";
 import { Header } from "@/components/Header";
 import { Home } from "@/components/Home";
+import { NewProject } from "@/components/NewProject";
 import { Project } from "@/components/Project";
+import { TutorialProvider } from "@/components/Tutorial";
 import { Empty, Page } from "@/components/ui";
 import { VerifyRecord } from "@/components/VerifyRecord";
 import { get, send } from "@/lib/client";
@@ -56,10 +58,11 @@ export function App() {
       </Page>
     );
   return (
-    <>
+    <TutorialProvider session={s}>
       <Header session={s} />
       <Routes>
         <Route path="/" element={<Home session={s} />} />
+        <Route path="/projects/new" element={<NewProject session={s} />} />
         <Route path="/projects/:key/:tab?" element={<Project session={s} />} />
         <Route path="/verify" element={<VerifyRecord />} />
         <Route
@@ -72,6 +75,6 @@ export function App() {
         />
       </Routes>
       <ToasterContainer autoHideDuration={6000} placement="bottomRight" />
-    </>
+    </TutorialProvider>
   );
 }

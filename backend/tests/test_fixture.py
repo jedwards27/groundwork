@@ -82,7 +82,7 @@ def test_event_a_two_legs_reach_delivery(state):
     assert c.gate == "to_accept"
     assert c.critical_path == ["to_accept", "witness", "l3", "l4"]
     reason = next(i for i in f.items if i.key == "to_accept").reason
-    assert "re-runs the coordination" in reason and "re-review" in reason
+    assert "redoes the electrical safety study" in reason and "reviews it again" in reason
 
 
 def test_event_b_runs_through_witness_and_installation(state):

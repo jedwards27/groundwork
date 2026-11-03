@@ -22,6 +22,7 @@ from groundwork import __version__
 from groundwork.api.auth import Identity
 from groundwork.api.deps import db, identity
 from groundwork.api.home import router as home_router
+from groundwork.api.projects import router as projects_router
 from groundwork.api.viewer import Viewer, csrf_problem, lead, set_cookie, viewer, viewer_or_none
 from groundwork.config import get_settings, hosted_problems
 from groundwork.db import models as m
@@ -71,6 +72,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 app.include_router(home_router)
+app.include_router(projects_router)
 
 
 @app.middleware("http")
@@ -522,20 +524,23 @@ def _demo_org_id() -> uuid.UUID:
 
 
 def _demo_sign_in(request: Request, fresh: bool) -> dict[str, Any]:
-    """A token for the demo project's lead: the one person a visitor is in the demo. With sandboxes
-    on, a visitor without a live sandbox gets a new one; a visitor who has one stays in it; `fresh`
-    starts over in a new one and deletes the old one."""
-    from groundwork.api.auth import mint
+    """A token for the demo project's lead: the one person a visitor is in the demo, followed by
+    any projects of their own they created here. With sandboxes on, a visitor without a live sandbox
+    gets a new one; a visitor who has one stays in it; `fresh` starts over in a new one and deletes
+    the old one (their own projects stay)."""
+    from groundwork.api.auth import mint_many
 
     cfg = get_settings()
     org_id = _demo_org_id()
+    current_viewer = viewer_or_none(request)
+    ids = list(current_viewer.identities) if current_viewer and not current_viewer.local else []
+    # A visitor is "me" in the projects they created, and the demo's lead in its copy.
+    with owner_session() as s:
+        mine = set(s.execute(select(m.Person.id).where(m.Person.id.in_([i.person_id for i in ids]), m.Person.key == "me")).scalars())
+    own = [i for i in ids if i.person_id in mine]
+    demo = [i for i in ids if i.person_id not in mine]
     if cfg.groundwork_sandboxes:
-        current_viewer = viewer_or_none(request)
-        current = (
-            current_viewer.identities[0].org_id
-            if current_viewer and len(current_viewer.identities) == 1 and sandboxes.live(current_viewer.identities[0].org_id)
-            else None
-        )
+        current = demo[0].org_id if demo and sandboxes.live(demo[0].org_id) else None
         if current is None or fresh:
             try:
                 org_id = sandboxes.create()
@@ -550,8 +555,9 @@ def _demo_sign_in(request: Request, fresh: bool) -> dict[str, Any]:
         if person is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "the demo project has no lead approver")
         pid, key, name = person.id, person.key, person.name
+    pairs = [(pid, org_id)] + [(i.person_id, i.org_id) for i in own]
     return {
-        "token": mint(pid, org_id, secret=cfg.groundwork_dev_hmac_secret, ttl_hours=cfg.token_ttl_hours),
+        "token": mint_many(pairs, secret=cfg.groundwork_dev_hmac_secret, ttl_hours=cfg.token_ttl_hours),
         "person": key,
         "name": name,
         "ttl_hours": cfg.token_ttl_hours,
@@ -573,11 +579,14 @@ def get_session(request: Request) -> dict[str, Any]:
     if v is not None and v.identities:
         with owner_session() as s:
             people = [(i, s.get(m.Person, i.person_id)) for i in v.identities]
-            ident, person = next(((i, p) for i, p in people if p is not None and p.key == "me"), people[0])
+            # On a person's computer they are "me"; a visitor is first of all the demo's lead.
+            mine = [(i, p) for i, p in people if p is not None and p.key == "me"]
+            ident, person = mine[0] if v.local and mine else people[0]
             org = s.get(m.Org, ident.org_id)
             if person is not None and org is not None:
                 you = {
                     "name": person.name,
+                    "email": person.email,
                     "person": person.key,
                     "approver": person.approver,
                     # In the demo you act as its fictional lead; the app says so.
@@ -602,11 +611,12 @@ def start_session(request: Request, response: Response, body: DemoSignIn | None 
 
 
 def _demo_identity(v: Viewer) -> Identity:
-    """The viewer's identity in the demo project (their sandbox, or the shared demo org)."""
+    """The viewer's identity in the demo project (their sandbox, or the shared demo org). A visitor's
+    token names it first; on a person's computer it is the org the fixture was loaded into."""
+    if not v.local and v.identities:
+        return v.identities[0]
     with owner_session() as s:
         demo = s.execute(select(m.Org.id).where(m.Org.name == get_settings().groundwork_demo_org)).scalars().all()
-    if len(v.identities) == 1:
-        return v.identities[0]
     found = next((i for i in v.identities if i.org_id in demo), None)
     if found is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "the demo project is not on this computer")
@@ -695,7 +705,7 @@ def admin_tamper(request: Request, x_admin_token: str | None = Header(default=No
     if cfg.groundwork_hosted or not cfg.groundwork_admin_token or x_admin_token != cfg.groundwork_admin_token:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "admin token required; never available when hosted")
     v = viewer_or_none(request)
-    if v is not None and len(v.identities) == 1:
+    if v is not None and not v.local and v.identities:
         return {"edited_seq": _tamper(v.identities[0].org_id)}
     with owner_session() as s:
         org = s.execute(select(m.Org).where(m.Org.name == cfg.groundwork_demo_org)).scalar_one_or_none()

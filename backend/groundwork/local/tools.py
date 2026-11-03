@@ -32,6 +32,7 @@ from groundwork.schemas.plan import Arm, Report
 from groundwork.service import actions as actions_svc
 from groundwork.service import mandates as mandates_svc
 from groundwork.service import overview, pipeline, planctx, runs, views
+from groundwork.service import projects as projects_svc
 
 DECISION_WORD = overview.DECISION_WORD
 SURFACE = "the Claude app"
@@ -636,11 +637,7 @@ def change_links(
     return {"draft": d["id"], "confirm_on": page_url(), "next": "Ask the person to confirm in the Groundwork app."}
 
 
-class PersonIn(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    name: str
-    email: str = ""
-    title: str = ""
+PersonIn = projects_svc.PersonIn
 
 
 def add_people(project: str, party: str, people: list[PersonIn], why: str) -> dict[str, Any]:
@@ -700,139 +697,19 @@ def draft_mandate(project: str, words: str, terms: MandateTerms) -> dict[str, An
 
 
 # --- new projects ------------------------------------------------------------------------------
-class PartyIn(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    key: str = Field(description="Short lowercase key, for example 'gc' or 'city-permits'.")
-    name: str
-    role: Literal[
-        "contractor", "designer", "consultant", "vendor", "landlord", "lender", "ahj", "agency", "regulator", "developer", "operator", "community"
-    ] = Field(description="ahj is the permit office; agency is an inspector or utility.")
-    people: list[PersonIn] = Field(default_factory=list)
-
-
-class ItemIn(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    key: str = Field(description="Short lowercase key, unique in the project.")
-    title: str
-    kind: Literal["study", "approval", "permit", "inspection", "test", "delivery", "milestone", "notice", "agreement", "consent", "financing", "land"]
-    owner: str = Field(description="Party key responsible, or 'you' for the person's own side.")
-    status: Literal["done", "in_progress", "not_started"]
-    start: date | None = None
-    finish: date = Field(description="Planned finish (or the actual finish when done).")
-    depends_on: list[str] = Field(default_factory=list, description="Item keys that must finish first, as a source states.")
-    assumed_depends_on: list[str] = Field(
-        default_factory=list,
-        description="Item keys you believe must finish first but no source states. Flagged for the person to confirm.",
-    )
-    source: str = Field(default="", description="Where this came from: an email subject, a file, the person.")
-
-
-class ProjectDraft(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    name: str
-    location: str = ""
-    as_of: date | None = Field(default=None, description="The project's current date; today if empty. Set it in the past to backtest.")
-    finish_label: str = Field(description="What finishing means, for example 'Kitchen usable' or 'Store opens'.")
-    finish_item: str = Field(description="Key of the item that marks the finish.")
-    finish_target: date = Field(description="The date the finish is promised or hoped for.")
-    parties: list[PartyIn]
-    your_side: list[PersonIn] = Field(
-        default_factory=list, description="Other people on the person's own side (a partner, a colleague). Never approvers."
-    )
-    items: list[ItemIn]
-    template: Literal["supervised", "standard", "auto"] = "supervised"
-
-
-def _local_timezone() -> str:
-    try:
-        from pathlib import Path
-
-        target = str(Path("/etc/localtime").resolve())
-        return target.split("zoneinfo/", 1)[1]
-    except (OSError, IndexError):
-        return "UTC"
+PartyIn = projects_svc.PartyIn
+ItemIn = projects_svc.ItemIn
+ProjectDraft = projects_svc.ProjectDraft
 
 
 def _project_folder(d: ProjectDraft, key: str) -> Any:
-    import csv
-    import io
-
-    import yaml
-
     from groundwork.local.home import home
-    from groundwork.policy.terms import TEMPLATES
 
     who = me()
     if who is None:
         raise ToolError("run setup first, so Groundwork knows who approves on your projects")
-    folder = home() / "projects" / key
-    folder.mkdir(parents=True, exist_ok=True)
-    parties: list[dict[str, Any]] = [
-        {"key": "you", "name": who.organization or who.name, "roles": ["owner"], "provenance": "synthetic"}
-    ]
-    people: list[dict[str, Any]] = [{"key": "me", "party": "you", "name": who.name, "email": who.email, "approver": True}]
-    for i, x in enumerate(d.your_side, start=1):
-        people.append({"key": f"you-{i}", "party": "you", "name": x.name, "title": x.title, "email": x.email.lower()})
-    for p in d.parties:
-        parties.append({"key": p.key, "name": p.name, "roles": [p.role], "provenance": "synthetic"})
-        for i, x in enumerate(p.people, start=1):
-            people.append({"key": f"{p.key}-{i}", "party": p.key, "name": x.name, "title": x.title, "email": x.email.lower()})
-    assumed = [f"{b}>{it.key}" for it in d.items for b in it.assumed_depends_on]
-    doc = {
-        "org": {"name": f"Groundwork project: {d.name}", "timezone": _local_timezone()},
-        "site": {
-            "key": key,
-            "name": d.name,
-            "location": d.location,
-            "profile": "general",
-            "as_of": (d.as_of or date.today()).isoformat(),
-            "principal": "you",
-            "attrs": {"live": "true", **({"assumed_links": ";".join(assumed)} if assumed else {})},
-            "calendar": {"holidays": []},
-        },
-        "asset": {
-            "key": "project",
-            "name": d.name,
-            "milestones": [
-                {
-                    "kind": "substantial_completion",
-                    "label": d.finish_label,
-                    "item": d.finish_item,
-                    "target_date": d.finish_target.isoformat(),
-                    "provenance": "synthetic",
-                }
-            ],
-        },
-        "parties": parties,
-        "people": people,
-        "mandate": {"preset": TEMPLATES[d.template], "approvers": ["me"]},
-    }
-    (folder / "site.yaml").write_text(yaml.safe_dump(doc, sort_keys=False))
-    out = io.StringIO()
-    cols = ["key", "title", "kind", "owner", "performer", "status", "planned_start", "planned_finish", "actual_finish", "calendar", "predecessors", "provenance", "source", "notes"]
-    w = csv.DictWriter(out, fieldnames=cols)
-    w.writeheader()
-    for it in d.items:
-        w.writerow(
-            {
-                "key": it.key,
-                "title": it.title,
-                "kind": it.kind,
-                "owner": it.owner,
-                "performer": it.owner,
-                "status": it.status,
-                "planned_start": it.start.isoformat() if it.start else "",
-                "planned_finish": it.finish.isoformat(),
-                "actual_finish": it.finish.isoformat() if it.status == "done" else "",
-                "calendar": "calendar",
-                "predecessors": ";".join([*it.depends_on, *it.assumed_depends_on]),
-                "provenance": "synthetic",
-                "source": it.source,
-                "notes": "",
-            }
-        )
-    (folder / "schedule.csv").write_text(out.getvalue())
-    return folder
+    owner = projects_svc.Owner(who.name, who.email, who.organization)
+    return projects_svc.write_folder(d, key, home() / "projects" / key, owner, f"Groundwork project: {d.name}")
 
 
 def start_project(draft: ProjectDraft) -> dict[str, Any]:

@@ -107,7 +107,7 @@ def test_the_scripted_demo_plays_through_the_tools_and_waits_for_a_person(page):
     decisions = {a["ref"]: a["decision"] for a in result["actions"]}
     assert decisions == {"a1": "allow", "a2": "ask", "a3": "deny"}
     a2 = next(a for a in result["actions"] if a["ref"] == "a2")
-    assert a2["route"] == ["Anthropic", "Fluidstack", "TeraWulf (Lake Mariner Data LLC)"]
+    assert a2["route"] == ["Anthropic", "Fluidstack (tenant)", "TeraWulf (landlord)"]
     assert "direct counterparties only" in a2["clause"]
     assert result["report_check"]["ok"] is True
     assert [a["ref"] for a in tools.pending()["asks"]] == ["a2"]
@@ -115,7 +115,7 @@ def test_the_scripted_demo_plays_through_the_tools_and_waits_for_a_person(page):
     # In the app, you approve as the demo's lead, the one approver its mandate names.
     ask = client.get("/api/home").json()["asks"][0]
     assert ask["ref"] == "a2" and ask["can_approve"] and ask["approvers"] == ["Dana Ortiz"]
-    assert ask["route"] == ["Anthropic", "Fluidstack", "TeraWulf (Lake Mariner Data LLC)"]
+    assert ask["route"] == ["Anthropic", "Fluidstack (tenant)", "TeraWulf (landlord)"]
     action_id = _action_id("a2")
     assert client.get("/p/not-the-token/").status_code == 404
     approve = {"verdict": "approve", "idempotency_key": "k1"}
@@ -522,3 +522,17 @@ def test_people_on_your_side_route_their_mail_to_the_project(page):
     with org_session(_org("kitchen-remodel")) as s:
         sam = s.execute(select(m.Person).where(m.Person.email == "sam@home.test")).scalar_one()
         assert sam.approver is False
+
+
+def test_a_project_made_in_the_app_on_this_computer_is_yours(page):
+    from tests.test_projects_web import kitchen
+
+    client, _ = page
+    body = kitchen("Bathroom refresh")
+    assert client.post("/api/projects", json=body, headers=ORIGIN).status_code == 409  # no named person yet
+    tools.setup("Jude Test", "jude@example.test")
+    made = client.post("/api/projects", json=body, headers=ORIGIN)
+    assert made.status_code == 200, made.text
+    assert "bathroom-refresh" in tools._index()
+    assert client.get("/api/sites/bathroom-refresh/me").json()["name"] == "Jude Test"
+    assert tools.status("bathroom-refresh")["mandate"]["template"] == "Supervised"

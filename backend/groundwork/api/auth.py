@@ -4,6 +4,10 @@ Format ``gw1.<kid>.<payload>.<sig>``: payload is base64url JSON ``{"pid","org","
 HMAC-SHA256 over ``gw1.<kid>.<payload>`` with the secret in ``GROUNDWORK_DEV_HMAC_SECRET``. The
 ``kid`` is derived from the secret, so rotating the secret invalidates every token.
 
+A token may also name several (person, org) pairs (payload ``{"ids":[[pid, org], ...],"exp"}``): a
+hosted visitor who created a project of their own acts in their copy of the demo and in that
+project, each its own org.
+
 A local token (payload ``{"scope":"local","exp"}``) names no person: it says "the person at this
 computer", who owns every project on it. Only the plugin's local runtime mints or accepts one, after
 the random page token proves the browser was opened from this computer (``api/viewer.py``).
@@ -50,7 +54,7 @@ def key_id(secret: str) -> str:
     return "dev-" + hashlib.sha256(secret.encode()).hexdigest()[:8]
 
 
-def _sign(claims: dict[str, str], *, secret: str, ttl_hours: int, now: datetime | None) -> str:
+def _sign(claims: dict[str, Any], *, secret: str, ttl_hours: int, now: datetime | None) -> str:
     if not secret:
         raise TokenError("GROUNDWORK_DEV_HMAC_SECRET is not set (run `make setup`)")
     now = now or datetime.now(UTC)
@@ -66,6 +70,16 @@ def mint(
     person_id: uuid.UUID, org_id: uuid.UUID, *, secret: str, ttl_hours: int, now: datetime | None = None
 ) -> str:
     return _sign({"pid": str(person_id), "org": str(org_id)}, secret=secret, ttl_hours=ttl_hours, now=now)
+
+
+def mint_many(
+    pairs: list[tuple[uuid.UUID, uuid.UUID]], *, secret: str, ttl_hours: int, now: datetime | None = None
+) -> str:
+    """One token for several (person, org) pairs; a single pair mints an ordinary person token."""
+    if len(pairs) == 1:
+        return mint(pairs[0][0], pairs[0][1], secret=secret, ttl_hours=ttl_hours, now=now)
+    ids = [[str(p), str(o)] for p, o in pairs]
+    return _sign({"ids": ids}, secret=secret, ttl_hours=ttl_hours, now=now)
 
 
 def mint_local(*, secret: str, ttl_hours: int, now: datetime | None = None) -> str:
@@ -96,6 +110,13 @@ def verify(token: str, *, secret: str, now: datetime | None = None) -> Identity:
     if "pid" not in data:
         raise TokenError("not a person token")
     return Identity(uuid.UUID(data["pid"]), uuid.UUID(data["org"]), kid, exp)
+
+
+def verify_many(token: str, *, secret: str, now: datetime | None = None) -> tuple[Identity, ...]:
+    kid, data, exp = _claims(token, secret=secret, now=now)
+    if "ids" not in data:
+        raise TokenError("not a multi-org token")
+    return tuple(Identity(uuid.UUID(p), uuid.UUID(o), kid, exp) for p, o in data["ids"])
 
 
 def verify_local(token: str, *, secret: str, now: datetime | None = None) -> tuple[str, datetime]:

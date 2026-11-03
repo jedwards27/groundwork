@@ -42,6 +42,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview
+         * @description What the project would look like: its forecast and what sets the date. Nothing is saved.
+         */
+        post: operations["preview_projects_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create
+         * @description Create the project the person checked. A ledger record says who created it.
+         */
+        post: operations["create_projects_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -815,6 +855,55 @@ export interface components {
             reason: string;
             reference: components["schemas"]["ReferenceView"] | null;
         };
+        /** ItemIn */
+        ItemIn: {
+            /**
+             * Key
+             * @description Short lowercase key, unique in the project.
+             */
+            key: string;
+            /** Title */
+            title: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "study" | "approval" | "permit" | "inspection" | "test" | "delivery" | "milestone" | "notice" | "agreement" | "consent" | "financing" | "land";
+            /**
+             * Owner
+             * @description Party key responsible, or 'you' for the person's own side.
+             */
+            owner: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "done" | "in_progress" | "not_started";
+            /** Start */
+            start?: string | null;
+            /**
+             * Finish
+             * Format: date
+             * @description Planned finish (or the actual finish when done).
+             */
+            finish: string;
+            /**
+             * Depends On
+             * @description Item keys that must finish first, as a source states.
+             */
+            depends_on?: string[];
+            /**
+             * Assumed Depends On
+             * @description Item keys you believe must finish first but no source states. Flagged for the person to confirm.
+             */
+            assumed_depends_on?: string[];
+            /**
+             * Source
+             * @description Where this came from: an email subject, a file, the person.
+             * @default
+             */
+            source: string;
+        };
         /** ItemView */
         ItemView: {
             /** Key */
@@ -961,6 +1050,34 @@ export interface components {
              */
             note: string;
         };
+        /** NewProject */
+        NewProject: {
+            draft: components["schemas"]["ProjectDraft"];
+            /**
+             * Your Name
+             * @description Who the project belongs to (the demo only).
+             * @default You
+             */
+            your_name: string;
+        };
+        /** PartyIn */
+        PartyIn: {
+            /**
+             * Key
+             * @description Short lowercase key, for example 'gc' or 'city-permits'.
+             */
+            key: string;
+            /** Name */
+            name: string;
+            /**
+             * Role
+             * @description ahj is the permit office; agency is an inspector or utility.
+             * @enum {string}
+             */
+            role: "contractor" | "designer" | "consultant" | "vendor" | "landlord" | "lender" | "ahj" | "agency" | "regulator" | "developer" | "operator" | "community";
+            /** People */
+            people?: components["schemas"]["PersonIn"][];
+        };
         /** PartyView */
         PartyView: {
             /** Key */
@@ -990,6 +1107,21 @@ export interface components {
              */
             note: string;
         };
+        /** PersonIn */
+        PersonIn: {
+            /** Name */
+            name: string;
+            /**
+             * Email
+             * @default
+             */
+            email: string;
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+        };
         /** PersonView */
         PersonView: {
             /** Key */
@@ -1007,6 +1139,52 @@ export interface components {
         PlayEvent: {
             /** Event */
             event: string;
+        };
+        /** ProjectDraft */
+        ProjectDraft: {
+            /** Name */
+            name: string;
+            /**
+             * Location
+             * @default
+             */
+            location: string;
+            /**
+             * As Of
+             * @description The project's current date; today if empty. Set it in the past to backtest.
+             */
+            as_of?: string | null;
+            /**
+             * Finish Label
+             * @description What finishing means, for example 'Kitchen usable' or 'Store opens'.
+             */
+            finish_label: string;
+            /**
+             * Finish Item
+             * @description Key of the item that marks the finish.
+             */
+            finish_item: string;
+            /**
+             * Finish Target
+             * Format: date
+             * @description The date the finish is promised or hoped for.
+             */
+            finish_target: string;
+            /** Parties */
+            parties: components["schemas"]["PartyIn"][];
+            /**
+             * Your Side
+             * @description Other people on the person's own side (a partner, a colleague). Never approvers.
+             */
+            your_side?: components["schemas"]["PersonIn"][];
+            /** Items */
+            items: components["schemas"]["ItemIn"][];
+            /**
+             * Template
+             * @default supervised
+             * @enum {string}
+             */
+            template: "supervised" | "standard" | "auto";
         };
         /** ReferenceRowView */
         ReferenceRowView: {
@@ -1224,6 +1402,76 @@ export interface operations {
                 content: {
                     "application/json": {
                         [key: string]: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_projects_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewProject"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_projects_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewProject"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
                     };
                 };
             };

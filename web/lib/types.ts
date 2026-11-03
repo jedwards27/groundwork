@@ -195,7 +195,7 @@ export interface Health {
 export interface Session {
   signed_in: boolean;
   local: boolean;
-  you: { name: string; person: string; approver: boolean; demo_lead: boolean; sandbox_expires_at: string | null } | null;
+  you: { name: string; email: string; person: string; approver: boolean; demo_lead: boolean; sandbox_expires_at: string | null } | null;
   projects: number;
   health: Health;
 }

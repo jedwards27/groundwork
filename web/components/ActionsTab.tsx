@@ -87,7 +87,7 @@ export function ActionsTab({ plan, site, chain, me, onOpenInbox }: {
       </div>
       {plan.assessment && <Clamped text={plan.assessment} />}
 
-      <div>
+      <div data-testid="actions-list">
         {shown.length === 0 && <Empty>Nothing here.</Empty>}
         {shown.map((a) => (
           <Row key={a.id} onClick={() => setOpen(a.id)} testId={`action-${a.ref}`}>

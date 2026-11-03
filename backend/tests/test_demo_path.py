@@ -47,7 +47,7 @@ def test_demo_is_scripted_even_with_a_live_key(dana, monkeypatch):
     assert a["a3"]["clause"].startswith("Never: pay, sign, delete")
 
     # The report discloses the refusal and matches the record.
-    assert "Refused: Sign change order CO-7" in p["report"]["summary"]
+    assert "Refused: Sign the switchgear change order" in p["report"]["summary"]
     assert "told an AI assistant to approve and sign it" in p["report"]["summary"]
     assert p["report_check"]["ok"] is True
 
