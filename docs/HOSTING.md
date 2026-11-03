@@ -37,7 +37,7 @@ browser ──HTTPS──▶ Groundwork (one Fly machine: the web app, and its A
 
 ## Check it
 
-- **The page.** Open the link: you land on the home view, signed in as the demo's lead. The account menu (your name, top right) says when your copy will be deleted. The Ledger tab says "Verified" and has no "Try to break it" panel.
+- **The page.** Open the link: you land on the home view, signed in as the demo's lead. The account menu (your name, top right) says when your copy will be deleted. The Ledger tab says "Intact" and has no "Try to break it" panel.
 - **Sandboxes.** Open the link in a private window too and play event A in one window. The other window's forecast does not move.
 - **Admin and tamper paths are refused.** Expect `403` from both:
 

@@ -1,15 +1,14 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useStyletron } from "baseui";
 import { Button, KIND, SIZE } from "baseui/button";
 import { ChevronDown } from "baseui/icon";
 import { StatefulMenu } from "baseui/menu";
 import { PLACEMENT, StatefulPopover } from "baseui/popover";
-import { toaster } from "baseui/toast";
 import { LabelLarge, LabelMedium, LabelSmall, ParagraphXSmall } from "baseui/typography";
 import { Link, useMatch, useNavigate } from "react-router";
-import { get, send } from "@/lib/client";
+import { get } from "@/lib/client";
 import type { Session, SiteView } from "@/lib/types";
-import { useTutorial } from "./Tutorial";
+import { STEPS, useTutorial } from "./Tutorial";
 
 type Item = { id: string; label: string };
 
@@ -21,7 +20,6 @@ function hoursLeft(iso: string): string {
 // The header holds the product, where you are, and you. Status lives where it applies, not here.
 export function Header({ session }: { session: Session }) {
   const [css, theme] = useStyletron();
-  const qc = useQueryClient();
   const navigate = useNavigate();
   const tutorial = useTutorial();
   const match = useMatch("/projects/:key/*");
@@ -35,20 +33,12 @@ export function Header({ session }: { session: Session }) {
       ? `Demo account · your copy is deleted in ${hoursLeft(you.sandbox_expires_at)}`
       : "Demo account";
 
-  const items: Item[] = [{ id: "tutorial", label: "Take the tutorial" }];
-  if ((session.health.sandboxes && !session.local) || you?.approver || session.local) items.push({ id: "reset", label: "Start the demo over" });
+  const items: Item[] = [
+    { id: "tutorial", label: tutorial.paused === null ? "Take the tutorial" : `Resume the tutorial (${tutorial.paused + 1} of ${STEPS.length})` },
+  ];
 
-  const act = async (id: string) => {
-    try {
-      if (id === "tutorial") tutorial.start();
-      if (id === "reset") {
-        await send("POST", "demo/reset");
-        await qc.invalidateQueries();
-        toaster.positive("The demo project starts over.", {});
-      }
-    } catch (e) {
-      toaster.negative((e as Error).message, {});
-    }
+  const act = (id: string) => {
+    if (id === "tutorial") tutorial.start();
   };
 
   const avatar = css({
@@ -110,7 +100,7 @@ export function Header({ session }: { session: Session }) {
                   items={items}
                   onItemSelect={({ item }) => {
                     close();
-                    void act((item as Item).id);
+                    act((item as Item).id);
                   }}
                   overrides={{ List: { style: { boxShadow: "none", outline: "none" } } }}
                 />

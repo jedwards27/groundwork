@@ -43,6 +43,16 @@ from groundwork.service.state import SiteState
 
 
 # --- helpers -----------------------------------------------------------------------------------
+def _day(value: Any) -> str:
+    """A date as people write it ("Feb 17, 2027"), from a date or an ISO string."""
+    from datetime import date as _date
+
+    if not value:
+        return "no date"
+    d = value if isinstance(value, _date) else _date.fromisoformat(str(value)[:10])
+    return f"{d:%b} {d.day}, {d.year}"
+
+
 def step(s: Session, run_id: uuid.UUID, kind: str, text: str, **extra: Any) -> None:
     run = s.get(m.Run, run_id)
     assert run is not None
@@ -228,8 +238,10 @@ def plan_phase(org_id: uuid.UUID, run_id: uuid.UUID, arm: Arm, tools: Tools) -> 
         step(
             s,
             run_id,
-            "plan",
-            f"{arm.value.capitalize()} arm: {label} proposed {len(result.plan.actions)} actions",
+            "plan" if arm.value == "informed" else "blind_plan",
+            f"Planned {len(result.plan.actions)} next step{'s' if len(result.plan.actions) != 1 else ''} ({label})"
+            if arm.value == "informed"
+            else f"Comparison plan without your rules: {len(result.plan.actions)} steps ({label})",
             arm=arm.value,
             planner=row.planner,
             model_id=row.model_id,
@@ -358,8 +370,9 @@ def decide_phase(org_id: uuid.UUID, run_id: uuid.UUID, plan_id: uuid.UUID, tools
             s,
             run_id,
             "decided" if arm == "informed" else "blind_decided",
-            f"{arm.capitalize()} arm, gateway under mandate v{mandate.version} ({mandate.preset}): {n['auto']} run alone, "
-            f"{n['ask']} ask a person, {n['refuse']} refused; {held} held (proposed more autonomy than allowed)",
+            f"Checked each against your rules: {n['auto']} can go ahead, {n['ask']} need{'s' if n['ask'] == 1 else ''} you, "
+            f"{n['refuse']} not allowed"
+            + (f". The AI wanted to do {held} on its own that your rules say need you, so the gateway held {'it' if held == 1 else 'them'}" if held else ""),
             arm=arm,
             counts=n,
             held=held,
@@ -433,7 +446,12 @@ def execute_phase(org_id: uuid.UUID, run_id: uuid.UUID, plan_id: uuid.UUID) -> N
             if latest is not None and latest.decision == "auto":
                 auto.append(row)
         done = execute_actions(s, auto, run_id)
-        step(s, run_id, "executed", f"Executed {len(done)} action(s) in dry run: {', '.join(done) or 'none'}")
+        step(
+            s,
+            run_id,
+            "executed",
+            f"Did {len(done)} on its own (a demo: recorded, not sent)" if done else "Nothing ran on its own",
+        )
 
 
 def report_phase(org_id: uuid.UUID, run_id: uuid.UUID, plan_id: uuid.UUID, tools: Tools) -> None:
@@ -451,9 +469,11 @@ def report_phase(org_id: uuid.UUID, run_id: uuid.UUID, plan_id: uuid.UUID, tools
                 s,
                 run_id,
                 "differential",
-                f"Delivery: unmitigated {d['unmitigated']}; with what ran {d['now']}; if you approve the queue "
-                f"{d['if_approved']}; if the counterparties agree {d['if_they_agree']} "
-                f"({d['recovered_if_they_agree']} days recovered)",
+                (
+                    f"If you approve what needs you and the others agree, the plan wins back {d['recovered_if_they_agree']} days"
+                    if d["recovered_if_they_agree"]
+                    else "The plan wins back no days by itself; it gets answers sooner"
+                ),
                 differential=d,
             )
         plan = Plan.model_validate(plan_row.content)
@@ -507,7 +527,7 @@ def _record_report(
         s,
         run_id,
         "report",
-        "Report matches the ledger" if check.ok else f"Report disagrees with the ledger: {check.as_dict()}",
+        "Wrote its report; it matches the record" if check.ok else f"Its report doesn't match the record: {check.as_dict()}",
         report_ok=check.ok,
     )
     return check
@@ -552,8 +572,7 @@ def acknowledgment_phase(org_id: uuid.UUID, run_id: uuid.UUID) -> None:
             s,
             run_id,
             "acknowledgment",
-            f"'{event.title}' from {event.from_party}: linked to {len(set(pending))} pending ask(s) for display. "
-            "No action changed state. Approvals come only from a named approver in Groundwork.",
+            "An automatic reply: kept as information. No action changed state; only you can approve.",
             linked=sorted(set(pending)),
         )
 
@@ -567,7 +586,7 @@ def _apply_message(org_id: uuid.UUID, run_id: uuid.UUID) -> tuple[str, str, bool
         run.status, run.started_at = "running", datetime.now(UTC)
         site, event = _site(s, run)
         site_key, event_key, event_kind, scripted = site.key, event.key, event.kind, event.scripted
-        step(s, run_id, "running", f"Reading '{event.title}'")
+        step(s, run_id, "running", "Reading it")
     with org_session(org_id) as s:
         state = repo.load_state(s, site_key)
         before = _milestone(state)
@@ -579,8 +598,12 @@ def _apply_message(org_id: uuid.UUID, run_id: uuid.UUID) -> tuple[str, str, bool
             s,
             run_id,
             "forecast",
-            f"{after['label']}: {before['forecast_finish']} -> {after['forecast_finish']} "
-            f"(range {after['forecast_low']} to {after['forecast_high']}); gating item: {after['gate_title']}",
+            (
+                f"Forecast moved from {_day(before['forecast_finish'])} to {_day(after['forecast_finish'])}"
+                if before["forecast_finish"] != after["forecast_finish"]
+                else f"Forecast unchanged: {_day(after['forecast_finish'])}"
+            )
+            + (f". Waiting on: {after['gate_title']}" if after.get("gate_title") else ""),
             before=before,
             after=after,
         )
@@ -614,7 +637,7 @@ def execute_run(org_id: uuid.UUID, run_id: uuid.UUID, *, force_simulated: bool =
                     )
         else:
             with org_session(org_id) as s:
-                step(s, run_id, "blind_skipped", "Blind arm skipped: it needs a live model.")
+                step(s, run_id, "blind_skipped", "Comparison plan skipped: it needs a live model.")
     except Exception as exc:  # noqa: BLE001 - any failure must land on the run row
         with org_session(org_id) as s:
             run = s.get(m.Run, run_id)
@@ -646,7 +669,7 @@ def _finish(org_id: uuid.UUID, run_id: uuid.UUID) -> None:
         run = s.get(m.Run, run_id)
         assert run is not None
         run.status, run.finished_at = "done", datetime.now(UTC)
-        step(s, run_id, "done", "Run complete")
+        step(s, run_id, "done", "Done")
 
 
 # --- plans written outside Groundwork (Claude in the app, through the plugin) -------------------
@@ -672,7 +695,7 @@ def play_external_plan(
             s,
             run_id,
             "plan",
-            f"Informed arm: {model_id} in {planner} proposed {len(plan.actions)} actions",
+            f"Planned {len(plan.actions)} next step{'s' if len(plan.actions) != 1 else ''} ({model_id} in {planner})",
             arm="informed",
             planner=planner,
             model_id=model_id,
@@ -685,7 +708,7 @@ def play_external_plan(
         run = s.get(m.Run, run_id)
         assert run is not None
         run.status = "waiting_model"
-        step(s, run_id, "waiting", "Waiting for the agent's report")
+        step(s, run_id, "waiting", "Waiting for Claude's report")
     return plan_id
 
 

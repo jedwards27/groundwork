@@ -118,8 +118,13 @@ test("event A: the forecast moves, the gateway holds one action, an auto-reply c
   await expect(page.getByTestId(`held-${held!.ref}`)).toBeVisible();
   await expect(page.getByTestId("report-verdict")).toHaveText("Report matches the ledger");
 
-  // "Approved, please proceed" arrives as an auto-reply. It is evidence, never an approval.
-  await play(page, "ack-approved");
+  // "Approved, please proceed" arrives as an auto-reply. It is evidence, never an approval, and it
+  // plans nothing, so its run ends without next steps to see.
+  await tab(page, "Inbox");
+  await page.getByTestId("play-ack-approved").click();
+  await expect(page.getByTestId("message-drawer").getByTestId("run-done")).toHaveText("Done. Nothing in this one needed a next step.");
+  await expect(page.getByTestId("message-drawer").getByTestId("see-actions")).toHaveCount(0);
+  await page.keyboard.press("Escape");
   const still = await api<Plan>(page, `sites/${SITE}/latest-plan`);
   expect(still.actions.find((a) => a.ref === held!.ref)?.state).toBe("pending");
 
@@ -137,7 +142,7 @@ test("event A: the forecast moves, the gateway holds one action, an auto-reply c
   const v = await api<Verify>(page, `sites/${SITE}/ledger/verify`);
   expect(v.ok).toBe(true);
   await page.goto(`/projects/${SITE}/ledger`);
-  await expect(page.getByTestId("chain-ok")).toHaveText(`Verified · ${v.count} records`);
+  await expect(page.getByTestId("chain-ok")).toHaveText(`Intact · ${v.count} records`);
 });
 
 test("a state change riding on the cookie needs this app's Origin", async ({ page, baseURL }) => {
@@ -165,7 +170,7 @@ test("two visitors at once each get a private copy", async ({ page, browser }) =
     const still = await api<Chain>(bob, `sites/${SITE}/chain`);
     expect(still.milestone.forecast_finish).toBe(start.milestone.forecast_finish);
     await bob.goto(`/projects/${SITE}/ledger`);
-    await expect(bob.getByTestId("chain-ok")).toHaveText("Verified · 1 record");
+    await expect(bob.getByTestId("chain-ok")).toHaveText("Intact · 1 record");
   } finally {
     await other.close();
   }
@@ -183,8 +188,8 @@ test("tampering with one ledger record fails verification; reset restores the de
   await expect(page.getByTestId("chain-broken")).toBeVisible();
   await expect(page.getByTestId("verify-problem")).toContainText("contents do not match its hash");
 
-  await menu(page, /Start the demo over/);
-  await expect(page.getByTestId("chain-ok")).toHaveText("Verified · 1 record");
+  await page.getByTestId("restore").click();
+  await expect(page.getByTestId("chain-ok")).toHaveText("Intact · 1 record");
 });
 
 test("a new mandate version decides open actions again; what already ran stays on the record", async ({ page }) => {
@@ -214,40 +219,108 @@ test("a new mandate version decides open actions again; what already ran stays o
   expect((await api<Verify>(page, `sites/${SITE}/ledger/verify`)).ok).toBe(true);
 });
 
-test("the tutorial walks through the demo and ends at your first project", async ({ page }) => {
+async function tutorial(page: Page): Promise<void> {
   await open(page);
-  await ui(page, "tutorial-badge").locator('[data-baseweb="tag"]').click();
+  await ui(page, "tutorial-card-start").click();
   await ui(page, "tutorial-begin").click();
-  const panel = ui(page, "tutorial");
-  await expect(ui(page, "tutorial-count")).toHaveText(/1 of 11/);
-  await expect(page.locator('[data-tour="on"]')).toHaveAttribute("data-testid", "project-lake-mariner");
+}
 
-  const next = () => ui(page, "tutorial-next").click();
-  const act = () => ui(page, "tutorial-act").click();
-  await next(); // the forecast
-  await next(); // a message arrives
-  await act(); // play it: the next step points at its steps as they stream
-  await expect(ui(page, "tutorial-title")).toHaveText("Groundwork makes a plan");
-  await act(); // see the decisions
-  await expect(page).toHaveURL(/\/projects\/lake-mariner\/actions$/);
-  await expect(ui(page, "decision-a2")).toHaveText("Ask");
-  await next(); // try to fool it
-  await act(); // the auto-reply plays and changes nothing
-  await next(); // what needs you
-  await act(); // open the ask
-  await ui(page, "ask-drawer").getByTestId("approve").click();
-  await expect(ui(page, "ask-a2")).toBeHidden();
-  await next(); // the mandate
-  await next(); // the ledger
-  await expect(ui(page, "chain-ok")).toBeVisible();
-  await next(); // check a receipt
-  await act();
-  await expect(ui(page, "verify-verdict")).toHaveText("Match");
-  await next(); // start your own project
+const TOTAL = 14;
+const step = (page: Page, n: number) => expect(ui(page, "tutorial-count")).toHaveText(new RegExp(`${n} of ${TOTAL}`));
+
+// Every click below is a real click: it fails if the tutorial's panel covers what it points at.
+async function clickThrough(page: Page): Promise<void> {
+  await step(page, 1);
+  await expect(ui(page, "tutorial-pointer")).toHaveText("Click Lake Mariner");
+  await expect(ui(page, "tutorial-cta")).toContainText("Click Lake Mariner");
+  await expect(ui(page, "tutorial").getByRole("button")).toHaveCount(1); // just the close button
+  await ui(page, "project-lake-mariner").click();
+  await step(page, 2);
+  await expect(page.locator('[data-tour="on"]')).toHaveAttribute("data-testid", "summary");
+  await ui(page, "gate").click();
+  await step(page, 3);
+  await expect(ui(page, "path").locator("li")).not.toHaveCount(0);
+  await ui(page, "tutorial-next").click();
+  await step(page, 4);
+  await expect(ui(page, "why-drawer")).toBeHidden(); // the step closed the drawer it no longer needs
+  await expect(page.locator('[data-tour="on"]')).toHaveAttribute("data-testid", "graph");
+  await ui(page, "tab-inbox").click();
+  await step(page, 5);
+  await ui(page, "play-demo-monday").click();
+  await step(page, 6);
+  await expect(ui(page, "run-done")).toBeVisible({ timeout: 90_000 });
+  await expect(ui(page, "tutorial-cta")).toHaveText("Done. Click See the 3 next steps.");
+  await ui(page, "see-actions").click();
+  await step(page, 7);
+  await expect(ui(page, "decision-a3")).toHaveText("Deny");
+
+  // Back goes over what you've seen, past the run's drawer, with Next instead of the click.
+  await ui(page, "tutorial-back").click();
+  await step(page, 5);
+  await expect(page).toHaveURL(new RegExp(`/projects/${SITE}/inbox$`));
+  await expect(ui(page, "tutorial-cta")).toBeHidden();
+  await ui(page, "tutorial-next").click();
+  await step(page, 6);
+  await ui(page, "tutorial-next").click();
+  await step(page, 7);
+  await expect(page).toHaveURL(new RegExp(`/projects/${SITE}/actions$`));
+
+  await ui(page, "tutorial-next").click();
+  await step(page, 8);
+  await ui(page, "action-a2").click();
+  await step(page, 9);
+  await ui(page, "action-drawer").getByTestId("approve").click();
+  await step(page, 10);
+  await expect(ui(page, "action-drawer")).toBeHidden();
+  await ui(page, "tab-mandate").click();
+  await step(page, 11);
+  await ui(page, "tab-ledger").click();
+  await step(page, 12);
+  await expect(ui(page, "chain-ok")).toHaveText(/Intact/);
+  await ui(page, "home-link").click();
+  await step(page, 13);
+  // A second email played in the background while you looked at the ledger: home has something new.
+  await expect(page.locator('[data-testid^="ask-b"]')).toHaveCount(3, { timeout: 90_000 });
+  await expect(ui(page, "runs").getByTestId("run")).toHaveCount(2);
+  await ui(page, "tutorial-next").click();
   await expect(ui(page, "tutorial-finish")).toBeVisible();
   await ui(page, "tutorial-new-project").click();
   await expect(page).toHaveURL(/\/projects\/new$/);
-  await expect(panel).toBeHidden();
+  await expect(ui(page, "tutorial")).toBeHidden();
+}
+
+test("the tutorial: you click through the app yourself, and it ends at your first project", async ({ page }) => {
+  await tutorial(page);
+  await clickThrough(page);
+  // Finished once, home stops offering it; the account menu still has it.
+  await page.getByTestId("home-link").click();
+  await expect(ui(page, "projects")).toBeVisible();
+  await expect(ui(page, "tutorial-card")).toBeHidden();
+});
+
+test("the tutorial fits a narrow window: its panel never covers what it points at", async ({ page }) => {
+  await page.setViewportSize({ width: 575, height: 560 });
+  await tutorial(page);
+  await clickThrough(page);
+});
+
+test("closing the tutorial pauses it; opening it again picks up where you left off", async ({ page }) => {
+  await tutorial(page);
+  await ui(page, "project-lake-mariner").click();
+  await step(page, 2);
+  await ui(page, "tutorial-close").click();
+  await expect(ui(page, "tutorial")).toBeHidden();
+  await expect(ui(page, "tutorial-pointer")).toBeHidden();
+  await page.getByTestId("home-link").click();
+  await expect(ui(page, "tutorial-card-start")).toHaveText("Resume");
+  await page.getByTestId("you").click();
+  await expect(page.getByRole("option", { name: new RegExp(`Resume the tutorial \\(2 of ${TOTAL}\\)`) })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await ui(page, "tutorial-card-start").click();
+  await step(page, 2);
+  await expect(page).toHaveURL(/\/projects\/lake-mariner$/);
+  await ui(page, "gate").click();
+  await step(page, 3);
 });
 
 test("a new project from the website: check its forecast, then create it", async ({ page }) => {

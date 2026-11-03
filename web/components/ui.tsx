@@ -194,7 +194,7 @@ export function Drawer({ open, onClose, title, children, footer, testId }: {
       size="min(560px, 100vw)"
       overrides={{ DrawerBody: { style: { marginTop: theme.sizing.scale800, marginLeft: theme.sizing.scale700, marginRight: theme.sizing.scale700 } } }}
     >
-      <div data-testid={testId} className={css({ display: "flex", flexDirection: "column", gap: theme.sizing.scale500, paddingBottom: theme.sizing.scale1200 })}>
+      <div data-testid={testId} className={css({ display: "flex", flexDirection: "column", gap: theme.sizing.scale500, paddingBottom: "120px" })}>
         <LabelLarge>{title}</LabelLarge>
         {children}
         {footer && <div className={css({ display: "flex", gap: theme.sizing.scale300, flexWrap: "wrap", marginTop: theme.sizing.scale300 })}>{footer}</div>}

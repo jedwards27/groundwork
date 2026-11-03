@@ -40,7 +40,7 @@ make doctor
 make dev
 ```
 
-`make dev` writes `.env` with fresh dev secrets, creates the database roles and databases, applies migrations, seeds Lake Mariner, installs the web app's packages, and serves **Groundwork on http://localhost:3000** with live reload (its API is on http://localhost:8000 under `/api`, docs at `/api/docs`). Ctrl-C stops both. You're signed in as **Dana Ortiz**, the demo project's lead and its one approver; there is no one else to choose. Then play the demo below.
+`make dev` writes `.env` with fresh dev secrets, creates the database roles and databases, applies migrations, seeds Lake Mariner, installs the web app's packages, and serves **Groundwork on http://localhost:3000** with live reload (its API is on http://localhost:8000 under `/api`, docs at `/api/docs`). Ctrl-C stops both. You're signed in as **Jordan Brooks**, the demo project's lead and its one approver; there is no one else to choose. Then play the demo below.
 
 `make web-build` builds the web app into `web/dist`, and from then on `make api` serves it too, on http://localhost:8000: one process, as in the plugin and the hosted demo (ADR 0009).
 
@@ -50,17 +50,17 @@ Docker, untested because the author's machine has no Docker: `sh scripts/new-env
 
 ## The tutorial and the two-minute demo
 
-Click **Tutorial** next to Lake Mariner on the home view. A small panel walks through each feature in eleven steps: a message arriving, the plan, allow, ask and deny, an auto-reply that changes nothing, approving what needs you, the mandate, the ledger and a receipt. Each step opens the right screen and points at what to look at, and "Do it for me" buttons press the same buttons you would. It ends with creating your first project, here or in the Claude app.
+Click **Start the tutorial** at the top of the home view (or **Tutorial** next to Lake Mariner). A short dialog sets the scene: Anthropic is bringing the Lake Mariner data center online, and you're Jordan, its project manager. A small panel then walks through each feature in fourteen steps: the date and what it waits on, the graph of what depends on what, an email arriving and Groundwork working through it, allow, ask and deny, approving the ask on the project's Actions tab, the mandate and the ledger. Each step points at one thing on the page and you click it yourself, tabs included, so you get around the app the way you would without the tutorial; steps that only explain have Next, and Back steps through what you've seen. While you read the ledger, a second email plays in the background, so the home view you return to has asks waiting and a second run listed. Closing the panel pauses it, and opening it again (from the home view, the badge or the menu under your name) picks up where you left off. It ends with creating your first project, here or in the Claude app; once finished, home stops offering it. The model scorecard and the blind arm stay in the evals (below) and the API, not the app.
 
-The demo by hand: open **Lake Mariner**, then its **Inbox** tab, and play the first message, **"Demo: the utility wants another review, and a change order hides an instruction"**. It plays the same hand-written plan every time; the gateway, ledger and report check are live code.
+The demo by hand: open **Lake Mariner**, then its **Inbox** tab, and play the first message, **"Demo: the utility wants another review"**. It plays the same hand-written plan every time; the gateway, ledger and report check are live code.
 
-1. **The forecast moves.** The data hall is now forecast for Apr 13, 2027, 50 days late, still waiting on the utility's approval of the power settings. **Why** lists both delays, each citing the email it came from. **See the decisions** opens the Actions tab.
+1. **The forecast moves.** The data hall is now forecast for Apr 13, 2027, 50 days late, still waiting on the utility's approval of the power settings. **Waiting on** opens the steps the date depends on and why it moved, each delay citing the email it came from. When the run is done, **See the 3 next steps** opens the Actions tab.
 2. **Allow.** A weekly status request to Fluidstack, the tenant. The mandate allows it on its own; it runs in dry run, so it's recorded and not sent.
 3. **Ask.** Asking the landlord, through Fluidstack, to confirm the power-on date. Anything to the landlord waits for you, so it's under **Needs you** on the home view.
-4. **Deny.** A line hidden in the vendor's change order tells AI assistants to sign it. Signing is never allowed, and the agent's report says what it found.
+4. **Deny.** The landlord also asks you to sign a revised schedule. Signing is never Groundwork's to do, so it's denied and left to you, and the agent's report says so.
 5. **The report beside the ledger.** "Report matches the ledger." Open "The agent's report beside the ledger" and pick a record number: **Match**. Paste the stored record with one word changed: **Mismatch**.
 
-Then try event A (the same delay, with a fuller plan), the auto-reply that says "approved, please proceed" and changes nothing, approving from the home view, a new template in the Mandate tab, and **Try to break it** at the bottom of the Ledger tab.
+Then try event A (the same delay, with a fuller plan), the auto-reply that says "approved, please proceed" and changes nothing, the switchgear vendor's message with an instruction for AI hidden in it, approving from the home view, a new template in the Mandate tab, and **Try to break it** at the bottom of the Ledger tab.
 
 **Your own project, on the website.** **New project** on the home view opens a short form: what finishing means and when, who you're waiting on, and what has to happen in what order. "Check the forecast" shows the forecast and what sets the date before anything is saved; "Create the project" makes it, as a project of its own with its own ledger. In the hosted demo it lives in your private copy and is deleted with it. To have Groundwork read your mail and chase what's late, use the plugin.
 

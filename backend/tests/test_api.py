@@ -10,7 +10,7 @@ from groundwork.db.session import owner_session
 pytestmark = pytest.mark.db
 
 
-def _token(org_id, person_key="dana"):
+def _token(org_id, person_key="jordan"):
     from sqlalchemy import select
 
     with owner_session() as s:
@@ -90,7 +90,7 @@ def test_demo_sign_in_is_off_by_default_and_signs_in_the_one_demo_person(seeded,
         try:
             assert c.get("/auth/personas").status_code == 404  # no choosing who to be
             tok = c.post("/auth/demo-login").json()["token"]
-            assert c.get("/me", headers={"Authorization": f"Bearer {tok}"}).json()["person"] == "dana"
+            assert c.get("/me", headers={"Authorization": f"Bearer {tok}"}).json()["person"] == "jordan"
             assert c.get("/session").json()["signed_in"] is False
 
             # A browser signs in with a cookie its scripts cannot read.
@@ -98,8 +98,8 @@ def test_demo_sign_in_is_off_by_default_and_signs_in_the_one_demo_person(seeded,
             assert r.status_code == 200 and "token" not in r.json()
             assert "httponly" in r.headers["set-cookie"].lower()
             s = c.get("/session").json()
-            assert s["signed_in"] and s["you"]["name"] == "Dana Ortiz" and s["you"]["demo_lead"] is True
-            assert c.get("/me").json()["person"] == "dana"
+            assert s["signed_in"] and s["you"]["name"] == "Jordan Brooks" and s["you"]["demo_lead"] is True
+            assert c.get("/me").json()["person"] == "jordan"
         finally:
             monkeypatch.delenv("GROUNDWORK_DEMO_LOGIN")
             gs.cache_clear()

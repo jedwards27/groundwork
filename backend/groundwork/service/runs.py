@@ -48,7 +48,7 @@ def start_run(s: Session, site_key: str, event_key: str, person_id: uuid.UUID | 
         event_id=state.ids[f"event:{event_key}"],
         status="queued",
         created_by_person_id=person_id,
-        summary={"steps": [_step(1, "queued", f"Event '{state.event(event_key).title}' received")]},
+        summary={"steps": [_step(1, "queued", f"Message received: {state.event(event_key).title}")]},
     )
     s.add(run)
     s.flush()

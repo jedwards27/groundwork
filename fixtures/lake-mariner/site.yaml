@@ -40,7 +40,7 @@ asset:
   capacity_mw: 168
   milestones:
     - kind: delivery
-      label: Data hall ready for Anthropic
+      label: Data hall ready
       item: l4
       target_date: 2027-02-22
       binding_agreement: Fluidstack lease with TeraWulf; L4 is the contractual delivery milestone
@@ -180,11 +180,11 @@ parties:
 # The grant of authority. `preset` picks a template from the policy package (supervised | standard |
 # autonomous); approvers are person keys below; owner_goals are what the blind planner arm sees
 # instead of the mandate. Legal and notice kinds route to `legal_approvers`. The demo has one person
-# who signs in (the visitor, as Dana), so Dana approves those too; a real project would name counsel.
+# who signs in (the visitor, as Jordan), so Jordan approves those too; a real project would name counsel.
 mandate:
   preset: standard
-  approvers: [dana]
-  legal_approvers: [dana]
+  approvers: [jordan]
+  legal_approvers: [jordan]
   sla_hours: 24
   owner_goals:
     - Protect the CB-5 delivery date (L4) and the dates downstream of it (fit-out, compute delivery).
@@ -192,14 +192,14 @@ mandate:
     - Work through the lessee; the end user has no direct contract with the landlord or the utility.
     - Prefer actions that recover days without new commitments; spend only against a written quote.
 
-# Fictional people; addresses use the reserved .example domain. A visitor to the demo is Dana, the
-# end user's project lead and its only approver. Everyone else is someone Dana works with.
+# Fictional people; addresses use the reserved .example domain. A visitor to the demo is Jordan, the
+# end user's project manager and its only approver. Everyone else is someone Jordan works with.
 people:
-  - key: dana
+  - key: jordan
     party: anthropic
-    name: Dana Ortiz
-    title: Infrastructure delivery lead (you, in the demo)
-    email: dana.ortiz@enduser.example
+    name: Jordan Brooks
+    title: Project manager (you, in the demo)
+    email: jordan.brooks@enduser.example
     approver: true
   - key: priya
     party: anthropic

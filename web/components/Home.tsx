@@ -5,14 +5,14 @@ import { ChevronRight } from "baseui/icon";
 import { Skeleton } from "baseui/skeleton";
 import { toaster } from "baseui/toast";
 import { KIND as TAG, Tag } from "baseui/tag";
-import { LabelMedium } from "baseui/typography";
+import { HeadingXSmall, LabelMedium, ParagraphSmall } from "baseui/typography";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { get, send } from "@/lib/client";
 import { ago, DEMO_PROJECT, fmt, lateness } from "@/lib/format";
 import type { AskItem, DraftItem, HomeView, Session } from "@/lib/types";
 import { ApproveButtons } from "./Approve";
-import { useTutorial } from "./Tutorial";
+import { STEPS, useTutorial } from "./Tutorial";
 import { Chip, Drawer, Empty, Field, Grow, Line, Muted, Page, Quote, Row, Section } from "./ui";
 
 // "Did 1 · asked you about 1 · refused 1", leaving out what's zero.
@@ -51,8 +51,35 @@ export function Home({ session }: { session: Session }) {
     );
   const waiting = h.asks.length + h.drafts.length;
   const runs = allRuns ? h.runs : h.runs.slice(0, 3);
+  const demo = h.projects.some((p) => p.project === DEMO_PROJECT);
   return (
     <Page>
+      {demo && !tutorial.open && !tutorial.done && (
+        <div
+          data-testid="tutorial-card"
+          className={css({
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            gap: theme.sizing.scale500,
+            padding: theme.sizing.scale700,
+            borderRadius: theme.borders.radius400,
+            background: theme.colors.backgroundAccentLight,
+          })}
+        >
+          <div className={css({ flex: "1 1 260px", display: "grid", gap: theme.sizing.scale200 })}>
+            <HeadingXSmall margin={0}>{tutorial.paused === null ? "New here? Take the two-minute tutorial" : "Pick up the tutorial"}</HeadingXSmall>
+            <ParagraphSmall margin={0} color={theme.colors.contentSecondary}>
+              {tutorial.paused === null
+                ? "See how Groundwork keeps a project's date on track, using the Lake Mariner demo."
+                : `You stopped at step ${tutorial.paused + 1} of ${STEPS.length}.`}
+            </ParagraphSmall>
+          </div>
+          <Button onClick={tutorial.start} data-testid="tutorial-card-start">
+            {tutorial.paused === null ? "Start the tutorial" : "Resume"}
+          </Button>
+        </div>
+      )}
       <Section
         title={waiting ? `Needs you · ${waiting}` : "Needs you"}
         hint="Asks wait for your approval; drafts are what Claude prepared and only you can make real."

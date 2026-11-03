@@ -27,7 +27,7 @@ def client(seeded, env):
     sandboxes.sweep(datetime.now(UTC) + timedelta(days=365))  # leave no sandbox for the next test
 
 
-def login(c: TestClient, person: str = "dana", token: str | None = None, fresh: bool = False) -> str:
+def login(c: TestClient, person: str = "jordan", token: str | None = None, fresh: bool = False) -> str:
     headers = {"Authorization": f"Bearer {token}"} if token else {}
     r = c.post("/auth/demo-login", json={"person": person, "fresh": fresh}, headers=headers)
     assert r.status_code == 200, r.text
@@ -68,9 +68,9 @@ def test_each_visitor_gets_a_private_sandbox(client):
 
 
 def test_switching_persona_stays_in_the_same_sandbox(client):
-    dana = login(client, "dana")
-    priya = login(client, "priya", token=dana)
-    assert get(client, dana, "/me").json()["org"] == get(client, priya, "/me").json()["org"]
+    jordan = login(client, "jordan")
+    priya = login(client, "priya", token=jordan)
+    assert get(client, jordan, "/me").json()["org"] == get(client, priya, "/me").json()["org"]
     assert sandbox_count() == 1
 
 
@@ -125,7 +125,7 @@ def test_the_shared_demo_org_is_never_discarded(client, seeded):
 def test_the_daily_sandbox_cap_returns_429(client, env):
     env(GROUNDWORK_SANDBOX_DAILY_CAP="1")
     login(client)
-    r = client.post("/auth/demo-login", json={"person": "dana"})
+    r = client.post("/auth/demo-login", json={"person": "jordan"})
     assert r.status_code == 429 and "sandboxes a day" in r.json()["detail"]
 
 

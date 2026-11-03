@@ -1,6 +1,7 @@
 import { useStyletron } from "baseui";
 import { Button, KIND, SIZE } from "baseui/button";
 import { ButtonGroup, MODE } from "baseui/button-group";
+import { Check } from "baseui/icon";
 import { Spinner } from "baseui/spinner";
 import { LabelSmall, ParagraphSmall } from "baseui/typography";
 import { useState } from "react";
@@ -133,32 +134,13 @@ export function InboxTab({ events, site, run, onPlay, claudePlans, onSeeActions 
               {KIND_LABEL[msg.kind] ?? msg.kind}
             </Muted>
             {thisRun && (
-              <Field label={thisRun.status === "running" ? "Working" : thisRun.status === "failed" ? "The run stopped" : "What happened"}>
-                <ol data-testid="steps" aria-live="polite" className={css({ margin: 0, paddingLeft: theme.sizing.scale800, display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: theme.sizing.scale200 })}>
-                  {thisRun.steps.map((s) => (
-                    <li key={s.i}>
-                      <ParagraphSmall margin={0}>{s.text}</ParagraphSmall>
-                    </li>
-                  ))}
-                </ol>
-                {thisRun.status === "running" && <Spinner $size="24px" />}
-                {thisRun.status === "done" && (
-                  <div className={css({ marginTop: theme.sizing.scale400 })}>
-                    <Button
-                      onClick={() => {
-                        setOpen(null);
-                        onSeeActions();
-                      }}
-                      data-testid="see-actions"
-                    >
-                      See the decisions
-                    </Button>
-                  </div>
-                )}
-                {thisRun.status === "failed" && (
-                  <Muted testId="run-interrupted">Everything it did up to that point is on the ledger. Play the message again to retry.</Muted>
-                )}
-              </Field>
+              <RunSteps
+                run={thisRun}
+                onSeeActions={() => {
+                  setOpen(null);
+                  onSeeActions();
+                }}
+              />
             )}
             {msg.body && (
               <Field label="Message">
@@ -178,5 +160,48 @@ export function InboxTab({ events, site, run, onPlay, claudePlans, onSeeActions 
         )}
       </Drawer>
     </div>
+  );
+}
+
+// The run as it happens, one plain line per step. The comparison plan made without the mandate is
+// kept on the ledger for the record but is not part of what the person follows here.
+function RunSteps({ run, onSeeActions }: { run: RunState; onSeeActions: () => void }) {
+  const [css, theme] = useStyletron();
+  const steps = run.steps.filter((s) => !s.kind.startsWith("blind"));
+  const running = run.status === "running";
+  const counts = steps.find((s) => s.kind === "decided")?.counts as { auto: number; ask: number; refuse: number } | undefined;
+  const total = counts ? counts.auto + counts.ask + counts.refuse : 0;
+  return (
+    <Field label={running ? "Groundwork is working on it" : run.status === "failed" ? "The run stopped" : "What Groundwork did"}>
+      <ol data-testid="steps" aria-live="polite" className={css({ listStyle: "none", margin: 0, padding: 0, display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: theme.sizing.scale300 })}>
+        {steps.map((s, n) => {
+          const current = running && n === steps.length - 1;
+          return (
+            <li key={s.i} className={css({ display: "flex", gap: theme.sizing.scale300, alignItems: "flex-start" })}>
+              <span className={css({ flex: "0 0 18px", display: "flex", justifyContent: "center", paddingTop: "2px" })}>
+                {current ? <Spinner $size="14px" $borderWidth="2px" /> : <Check size={18} color={theme.colors.contentPositive} />}
+              </span>
+              <ParagraphSmall margin={0}>{s.text}</ParagraphSmall>
+            </li>
+          );
+        })}
+      </ol>
+      {run.status === "done" && total > 0 && (
+        <div data-testid="run-done" className={css({ marginTop: theme.sizing.scale500, padding: theme.sizing.scale500, borderRadius: theme.borders.radius300, background: theme.colors.backgroundSecondary, display: "grid", gap: theme.sizing.scale400 })}>
+          <ParagraphSmall margin={0}>
+            Done. This one email became {total} next steps, and your rules decided each one. The Actions tab lists them.
+          </ParagraphSmall>
+          <div>
+            <Button size={SIZE.compact} onClick={onSeeActions} data-testid="see-actions">
+              See the {total} next steps
+            </Button>
+          </div>
+        </div>
+      )}
+      {run.status === "done" && total === 0 && <Muted testId="run-done">Done. Nothing in this one needed a next step.</Muted>}
+      {run.status === "failed" && (
+        <Muted testId="run-interrupted">Everything it did up to that point is on the ledger. Play the message again to retry.</Muted>
+      )}
+    </Field>
   );
 }

@@ -223,7 +223,7 @@ def hosted_bootstrap(
 
 @app.command()
 def token(
-    person: str = typer.Argument(..., help="Person key, e.g. dana"),
+    person: str = typer.Argument(..., help="Person key, e.g. jordan"),
     hours: int = typer.Option(0, help="Lifetime in hours (default from settings)"),
 ) -> None:
     """Mint a dev bearer token for a seeded person. Anyone with the signing secret can do this."""
@@ -298,8 +298,8 @@ def demo(
 
     org_id = _org_for_site(site)
     with org_session(org_id) as s:
-        dana = state.people[0].key if state.people else None
-        person_id = state.ids.get(f"person:{dana}") if dana else None
+        jordan = state.people[0].key if state.people else None
+        person_id = state.ids.get(f"person:{jordan}") if jordan else None
         run_id = runs.start_run(s, site, event, person_id)
     console.rule(f"[bold]Playing {event} as run {str(run_id)[:8]}")
     runs.execute_run(org_id, run_id)

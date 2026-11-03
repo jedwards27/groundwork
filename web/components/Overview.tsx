@@ -1,74 +1,45 @@
 import { useStyletron } from "baseui";
 import { Accordion, Panel } from "baseui/accordion";
-import { LabelXSmall, ParagraphSmall } from "baseui/typography";
+import { LabelMedium, ParagraphSmall } from "baseui/typography";
+import type { ReactNode } from "react";
 import { daysBetween, fmt, PROVENANCE_LABEL } from "@/lib/format";
-import { stages } from "@/lib/stages";
 import type { ChainView, PlanView, SiteView } from "@/lib/types";
 import { Chain } from "./Chain";
-import { Grow, Hint, Line, Muted, Row } from "./ui";
+import { Grow, Hint, Line, Muted, Row, Section } from "./ui";
+
+// A section title with one line saying what it is, so a closed accordion still explains itself.
+function Titled({ title, about }: { title: string; about: ReactNode }) {
+  const [css] = useStyletron();
+  return (
+    <span className={css({ display: "grid" })}>
+      <LabelMedium>{title}</LabelMedium>
+      <Muted>{about}</Muted>
+    </span>
+  );
+}
 
 export function Overview({ chain, site, plan }: { chain: ChainView; site: SiteView; plan: PlanView | null }) {
   const [css, theme] = useStyletron();
-  const st = stages(chain.items);
   const d = plan?.differential;
-  const open = chain.items.filter((i) => i.status !== "done").sort((a, b) => (a.early_finish < b.early_finish ? -1 : 1));
   const party = (k: string) => site.parties.find((p) => p.key === k)?.name ?? k;
-  const panel = { PanelContainer: { style: { borderBottomColor: theme.colors.borderOpaque } } };
   return (
     <div className={css({ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: theme.sizing.scale600 })}>
-      {st.length > 0 ? (
-        <ol
-          aria-label="Delivery stages"
-          data-testid="stages"
-          className={css({ display: "flex", gap: theme.sizing.scale300, listStyle: "none", margin: 0, padding: 0, overflowX: "auto" })}
-        >
-          {st.map((s) => {
-            const bar = {
-              done: theme.colors.contentPositive,
-              delayed: theme.colors.contentNegative,
-              active: theme.colors.contentAccent,
-              pending: theme.colors.borderOpaque,
-            }[s.status];
-            return (
-              <li key={s.key} className={css({ flex: "1 0 96px", borderTop: `3px solid ${bar}`, paddingTop: theme.sizing.scale200 })}>
-                <LabelXSmall>{s.label}</LabelXSmall>
-                <Muted>{s.note}</Muted>
-              </li>
-            );
-          })}
-        </ol>
-      ) : (
-        <div data-testid="waiting">
-          {open.slice(0, 6).map((i) => (
-            <Row key={i.key}>
-              <Grow>
-                <Line>{i.title}</Line>
-                <Muted>{party(i.owner)}</Muted>
-              </Grow>
-              <ParagraphSmall margin={0} color={i.finish_shift_days > 0 ? theme.colors.contentNegative : theme.colors.contentSecondary}>
-                {fmt(i.early_finish)}
-                {i.finish_shift_days > 0 ? ` (+${i.finish_shift_days} d)` : ""}
-              </ParagraphSmall>
-            </Row>
-          ))}
-        </div>
-      )}
-      <Accordion overrides={panel}>
+      <Section title="What depends on what" hint="Every step in the project and what it waits on, laid out on the calendar." testId="graph">
+        <Chain chain={chain} />
+      </Section>
+      <Accordion>
         <Panel
           title={
-            <span className={css({ display: "flex", gap: theme.sizing.scale300, alignItems: "center", width: "100%" })}>
-              What the plan changes
-              <Muted>{d ? `${d.recovered_if_they_agree} days back if they agree` : "after a message is played"}</Muted>
-            </span>
+            <Titled
+              title="Days the plan can win back"
+              about={d ? `${d.recovered_if_they_agree} days back if you approve and they agree` : "After a message comes in and Groundwork plans"}
+            />
           }
         >
           <Differential chain={chain} plan={plan} />
         </Panel>
-        <Panel title="Paper chain">
-          <Chain chain={chain} />
-        </Panel>
         {chain.calendar_losses.length > 0 && (
-          <Panel title="Hidden in the calendar">
+          <Panel title={<Titled title="Holidays that cost days" about="Days off that fall on the steps that decide the date" />}>
             {chain.calendar_losses.map((l, n) => (
               <ParagraphSmall key={n} marginTop={0}>
                 {l.sentence}
@@ -77,7 +48,7 @@ export function Overview({ chain, site, plan }: { chain: ChainView; site: SiteVi
           </Panel>
         )}
         {site.facts.length > 0 && (
-          <Panel title="Project facts">
+          <Panel title={<Titled title="About this project" about={site.attrs.blurb || "Facts, each with its source"} />}>
             {site.facts.map((f) => (
               <Row key={f.label}>
                 <Grow>
@@ -87,9 +58,7 @@ export function Overview({ chain, site, plan }: { chain: ChainView; site: SiteVi
                 <Hint text={`${PROVENANCE_LABEL[f.provenance] ?? f.provenance}${f.source ? `. Source: ${f.source}` : ""}`} />
               </Row>
             ))}
-            <Muted>
-              Working for {party(site.principal)}. Every number carries its source; assumptions are listed in docs/PRACTITIONER-QUESTIONS.md.
-            </Muted>
+            <Muted>Working for {party(site.principal)}. Every number carries its source.</Muted>
           </Panel>
         )}
       </Accordion>
@@ -104,20 +73,20 @@ function Differential({ chain, plan }: { chain: ChainView; plan: PlanView | null
   const t = theme.colors;
   const rows: { label: string; date: string | null; color: string; hatch?: boolean }[] = [
     { label: "Target", date: target, color: t.borderOpaque },
-    { label: d ? "Unmitigated" : "Forecast now", date: d ? d.unmitigated : (chain.milestone.forecast_finish ?? null), color: t.contentNegative },
+    { label: d ? "If nothing is done" : "Forecast now", date: d ? d.unmitigated : (chain.milestone.forecast_finish ?? null), color: t.contentNegative },
   ];
   if (d)
     rows.push(
-      { label: "With what ran", date: d.now, color: t.contentAccent },
+      { label: "With what already ran", date: d.now, color: t.contentAccent },
       { label: "If you approve the asks", date: d.if_approved, color: t.contentPositive },
-      { label: "If they agree", date: d.if_they_agree, color: t.contentPositive, hatch: true },
+      { label: "If they agree too", date: d.if_they_agree, color: t.contentPositive, hatch: true },
     );
   const deltas = rows.map((r) => daysBetween(target, r.date));
   const max = Math.max(1, ...deltas);
   return (
     <div data-testid="differential" className={css({ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: theme.sizing.scale300 })}>
       {rows.map((r, i) => (
-        <div key={r.label} className={css({ display: "grid", gridTemplateColumns: "150px 1fr 120px", gap: theme.sizing.scale400, alignItems: "center" })}>
+        <div key={r.label} className={css({ display: "grid", gridTemplateColumns: "160px 1fr 120px", gap: theme.sizing.scale400, alignItems: "center" })}>
           <ParagraphSmall margin={0}>{r.label}</ParagraphSmall>
           <div className={css({ height: "8px", background: t.backgroundSecondary, borderRadius: "4px", overflow: "hidden" })}>
             <div
@@ -134,9 +103,7 @@ function Differential({ chain, plan }: { chain: ChainView; plan: PlanView | null
         </div>
       ))}
       <Muted>
-        {d
-          ? `Days past the target, computed by the scheduler. Our own actions recover ${d.recovered_now}; approving the asks ${d.recovered_if_approved}; ${d.recovered_if_they_agree} come back only if they agree. Days that depend on another party are never counted when the request is sent.`
-          : "Play a message: the agent proposes a plan, the gateway decides what runs on its own, and the scheduler computes the days."}
+        Days past the target, worked out from the schedule. Days that depend on someone else agreeing are counted only once they do.
       </Muted>
     </div>
   );

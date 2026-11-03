@@ -5,11 +5,12 @@ import { Button, KIND, SIZE } from "baseui/button";
 import { Skeleton } from "baseui/skeleton";
 import { Tab, Tabs } from "baseui/tabs-motion";
 import { toaster } from "baseui/toast";
+import { ChevronRight } from "baseui/icon";
 import { HeadingLarge, LabelSmall, ParagraphSmall } from "baseui/typography";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { get, send, stream } from "@/lib/client";
-import { DEMO_PROJECT, fmt, fmtLong, lateness, PROVENANCE_LABEL } from "@/lib/format";
+import { DEMO_PROJECT, fmt, fmtLong, lateness } from "@/lib/format";
 import type { ChainView, CompareRow, EventView, MandateView, Me, PlanView, RunView, Session, SiteView, Step } from "@/lib/types";
 import { ActionsTab } from "./ActionsTab";
 import { InboxTab, type RunState } from "./InboxTab";
@@ -17,7 +18,7 @@ import { LedgerTab } from "./LedgerTab";
 import { MandateTab } from "./MandateTab";
 import { Overview } from "./Overview";
 import { useTutorial } from "./Tutorial";
-import { Chip, Drawer, Field, Hint, Muted, Page, Quote } from "./ui";
+import { Chip, Drawer, Field, Muted, Page, Quote } from "./ui";
 
 const TABS = ["overview", "inbox", "actions", "mandate", "ledger"] as const;
 const PANEL = { TabPanel: { style: { paddingLeft: 0, paddingRight: 0, minWidth: 0 } } };
@@ -90,6 +91,10 @@ export function Project({ session }: { session: Session }) {
   const ms = c.milestone;
   const late = lateness(ms.delta_days);
   const gate = c.items.find((i) => i.key === c.gate);
+  // The steps that decide the date, from what it waits on now to the finish.
+  const byKey = new Map(c.items.map((i) => [i.key, i]));
+  const fromGate = c.gate ? c.critical_path.slice(Math.max(0, c.critical_path.indexOf(c.gate))) : c.critical_path;
+  const path = fromGate.map((k) => byKey.get(k)).filter((i): i is NonNullable<typeof i> => !!i);
   const party = (k: string) => s.parties.find((p) => p.key === k)?.name ?? k;
   const p = plan.data ?? null;
   const asks = p ? p.actions.filter((a) => a.state === "pending").length : 0;
@@ -98,7 +103,6 @@ export function Project({ session }: { session: Session }) {
   const legs = gate
     ? (events.data ?? []).filter((e) => e.status === "applied").flatMap((e) => e.impacts.filter((i) => i.item === gate.key).map((i) => ({ i, e })))
     : [];
-  const subtitle = [s.attrs.blurb, s.location].filter(Boolean).join(" · ");
   const title = (label: string, n: number, testId: string) => (
     <span className={css({ display: "inline-flex", gap: theme.sizing.scale200, alignItems: "center" })} data-testid={testId}>
       {label}
@@ -110,8 +114,8 @@ export function Project({ session }: { session: Session }) {
     <Page>
       <section data-testid="summary">
         <div className={css({ display: "flex", alignItems: "center", gap: theme.sizing.scale300 })}>
-          <Muted>{subtitle}</Muted>
-          {key === DEMO_PROJECT && !tutorial.active && (
+          <LabelSmall color={theme.colors.contentTertiary}>{ms.label}</LabelSmall>
+          {key === DEMO_PROJECT && !tutorial.open && (
             <span className={css({ marginLeft: "auto" })}>
               <Button kind={KIND.secondary} size={SIZE.mini} onClick={tutorial.start} data-testid="tutorial-start">
                 Tutorial
@@ -119,9 +123,6 @@ export function Project({ session }: { session: Session }) {
             </span>
           )}
         </div>
-        <LabelSmall color={theme.colors.contentTertiary} marginTop={theme.sizing.scale600}>
-          Forecast · {ms.label}
-        </LabelSmall>
         <div className={css({ display: "flex", alignItems: "center", gap: theme.sizing.scale400, flexWrap: "wrap" })}>
           <HeadingLarge margin={0} data-testid="forecast">
             {fmtLong(ms.forecast_finish)}
@@ -129,23 +130,32 @@ export function Project({ session }: { session: Session }) {
           <Chip kind={late.late ? "red" : "green"} testId="lateness">
             {late.text}
           </Chip>
-          <Hint
-            text={`Target ${fmtLong(ms.target_date)} (${PROVENANCE_LABEL[ms.provenance] ?? ms.provenance}${ms.source ? `: ${ms.source}` : ""}). ${
-              ms.forecast_low !== ms.forecast_high ? `Range ${fmt(ms.forecast_low)} to ${fmt(ms.forecast_high)}. ` : ""
-            }${ms.days_remaining ?? "—"} days from ${fmtLong(c.as_of)}, the project's date.`}
-          />
         </div>
         {gate && (
-          <div className={css({ display: "flex", alignItems: "center", gap: theme.sizing.scale300, marginTop: theme.sizing.scale300, flexWrap: "wrap" })} data-testid="gate">
+          <button
+            type="button"
+            onClick={() => setWhy(true)}
+            data-testid="gate"
+            className={css({
+              all: "unset",
+              boxSizing: "border-box",
+              marginTop: theme.sizing.scale400,
+              display: "flex",
+              alignItems: "center",
+              gap: theme.sizing.scale300,
+              flexWrap: "wrap",
+              cursor: "pointer",
+              padding: `${theme.sizing.scale200} ${theme.sizing.scale300}`,
+              marginLeft: `-${theme.sizing.scale300}`,
+              borderRadius: theme.borders.radius200,
+              ":hover": { background: theme.colors.backgroundSecondary },
+              ":focus-visible": { outline: `2px solid ${theme.colors.borderSelected}` },
+            })}
+          >
             <LabelSmall color={theme.colors.contentTertiary}>Waiting on</LabelSmall>
-            <ParagraphSmall margin={0}>
-              {gate.title} · {party(gate.owner)}
-            </ParagraphSmall>
-            {gate.finish_shift_days > 0 && <Chip kind="red">slipped {gate.finish_shift_days} d</Chip>}
-            <Button kind={KIND.tertiary} size={SIZE.mini} onClick={() => setWhy(true)} data-testid="why">
-              Why
-            </Button>
-          </div>
+            <ParagraphSmall margin={0}>{gate.title}</ParagraphSmall>
+            <ChevronRight size={18} color={theme.colors.contentTertiary} />
+          </button>
         )}
       </section>
 
@@ -177,38 +187,41 @@ export function Project({ session }: { session: Session }) {
         </Tabs>
       </div>
 
-      <Drawer open={why} onClose={() => setWhy(false)} title={gate ? `Why ${gate.title} sets the date` : "Why"} testId="why-drawer">
-        {gate && (
-          <>
-            <Field label="Owner">{party(gate.owner)}</Field>
-            <Field label="Dates">
-              Planned {fmt(gate.planned_finish)}
-              {gate.finish_shift_days > 0 ? `, now forecast ${fmt(gate.early_finish)}` : ""}.{" "}
-              {(c.min_float ?? 0) >= 0 ? `${c.min_float} business days of float.` : `${-(c.min_float ?? 0)} business days behind the target.`}
-            </Field>
-            <Field label="Source">
-              {PROVENANCE_LABEL[gate.provenance] ?? gate.provenance}
-              {gate.source ? `: ${gate.source}` : ""}
-            </Field>
-            {legs.length > 0 && (
-              <Field label="Why it moved">
-                <Accordion>
-                  {legs.map(({ i, e }, n) => (
-                    <Panel
-                      key={n}
-                      title={`${i.leg} (+${i.low} to ${i.high} days)`}
-                    >
-                      <Muted>
-                        From {party(e.from_party)}
-                        {e.forwarded_from ? `, forwarding ${party(e.forwarded_from)}` : ""}, {new Date(e.received_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                      </Muted>
-                      <Quote>{e.body}</Quote>
-                    </Panel>
-                  ))}
-                </Accordion>
-              </Field>
-            )}
-          </>
+      <Drawer open={why} onClose={() => setWhy(false)} title="What the date waits on" testId="why-drawer">
+        <Muted>
+          {ms.label}: forecast {fmtLong(ms.forecast_finish)}
+          {ms.forecast_low !== ms.forecast_high ? ` (somewhere from ${fmt(ms.forecast_low)} to ${fmt(ms.forecast_high)})` : ""}, target {fmtLong(ms.target_date)}.
+        </Muted>
+        <Field label="These steps decide the date, in order">
+          <ol className={css({ margin: 0, paddingLeft: theme.sizing.scale700, display: "grid", gap: theme.sizing.scale300 })} data-testid="path">
+            {path.map((i) => (
+              <li key={i.key}>
+                <ParagraphSmall margin={0}>
+                  {i.title} {i.key === c.gate && <Chip kind={i.finish_shift_days > 0 ? "red" : "gray"}>now</Chip>}
+                </ParagraphSmall>
+                <Muted>
+                  {party(i.owner)} · {i.status === "done" ? "done" : `due ${fmt(i.early_finish)}`}
+                  {i.finish_shift_days > 0 ? `, ${i.finish_shift_days} days later than planned` : ""}
+                </Muted>
+              </li>
+            ))}
+          </ol>
+        </Field>
+        <Muted>Everything else in the project has slack: it can slip a little without moving the date. The Overview tab shows it all.</Muted>
+        {legs.length > 0 && (
+          <Field label="Why it moved">
+            <Accordion>
+              {legs.map(({ i, e }, n) => (
+                <Panel key={n} title={`${i.leg} (+${i.low} to ${i.high} days)`}>
+                  <Muted>
+                    From {party(e.from_party)}
+                    {e.forwarded_from ? `, forwarding ${party(e.forwarded_from)}` : ""}, {new Date(e.received_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                  </Muted>
+                  <Quote>{e.body}</Quote>
+                </Panel>
+              ))}
+            </Accordion>
+          </Field>
         )}
       </Drawer>
     </Page>

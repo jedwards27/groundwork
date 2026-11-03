@@ -73,7 +73,7 @@ def test_a_visitor_checks_the_forecast_then_creates_a_project_that_joins_their_s
     assert {x["project"] for x in visitor.get("/home").json()["projects"]} == {"lake-mariner", "kitchen-remodel"}
     me = visitor.get("/sites/kitchen-remodel/me").json()
     assert me["person"] == "me" and me["name"] == "Jude" and me["approver"] is True
-    assert visitor.get("/session").json()["you"]["name"] == "Dana Ortiz"  # still the demo's lead first
+    assert visitor.get("/session").json()["you"]["name"] == "Jordan Brooks"  # still the demo's lead first
     ledger = visitor.get("/sites/kitchen-remodel/ledger?arm=").json()["entries"]
     assert any(e["type"] == "project_created" and e["payload"]["by"] == "Jude" for e in ledger)
     assert visitor.post("/projects", json=kitchen(), headers=ORIGIN).status_code == 409  # same name again
@@ -130,4 +130,4 @@ def test_a_sign_in_whose_person_was_reloaded_away_counts_as_signed_out(visitor):
     reset.reset_fixtures()  # the demo's people get new ids
     assert visitor.get("/session").json()["signed_in"] is False
     assert visitor.get("/me").status_code == 401
-    assert visitor.post("/session", headers=ORIGIN).status_code == 200 and visitor.get("/me").json()["person"] == "dana"
+    assert visitor.post("/session", headers=ORIGIN).status_code == 200 and visitor.get("/me").json()["person"] == "jordan"

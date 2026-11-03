@@ -114,7 +114,7 @@ def test_the_scripted_demo_plays_through_the_tools_and_waits_for_a_person(page):
 
     # In the app, you approve as the demo's lead, the one approver its mandate names.
     ask = client.get("/api/home").json()["asks"][0]
-    assert ask["ref"] == "a2" and ask["can_approve"] and ask["approvers"] == ["Dana Ortiz"]
+    assert ask["ref"] == "a2" and ask["can_approve"] and ask["approvers"] == ["Jordan Brooks"]
     assert ask["route"] == ["Anthropic", "Fluidstack (tenant)", "TeraWulf (landlord)"]
     action_id = _action_id("a2")
     assert client.get("/p/not-the-token/").status_code == 404
@@ -408,7 +408,7 @@ def test_one_browser_sees_every_project_here_and_each_runs_in_its_own_org(page):
     home = client.get("/api/home").json()
     assert {p["project"] for p in home["projects"]} == {"lake-mariner", "kitchen-remodel"}
     assert client.get("/api/sites/kitchen-remodel/me").json()["person"] == "me"
-    assert client.get("/api/sites/lake-mariner/me").json()["person"] == "dana"  # the demo's lead
+    assert client.get("/api/sites/lake-mariner/me").json()["person"] == "jordan"  # the demo's lead
     assert client.get("/api/sites/nowhere/chain").status_code == 404
     drafts_home = client.get("/api/home").json()["drafts"]
     assert drafts_home == []  # the confirmed project draft is no longer waiting

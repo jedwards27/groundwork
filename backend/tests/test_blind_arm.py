@@ -65,7 +65,7 @@ def live(monkeypatch):
 
 def test_blind_arm_is_measurement_only(live, seeded):
     with TestClient(app) as api:
-        api.headers.update(token(seeded["org_a"], "dana"))
+        api.headers.update(token(seeded["org_a"], "jordan"))
         run = play(api, "event-a")
         plans = api.get(f"/runs/{run['id']}/plans").json()
         blind = next(p for p in plans if p["arm"] == "blind")

@@ -3,17 +3,14 @@ import { useStyletron } from "baseui";
 import { Accordion, Panel } from "baseui/accordion";
 import { Button, KIND, SIZE } from "baseui/button";
 import { ChevronRight } from "baseui/icon";
-import { Segment, SegmentedControl } from "baseui/segmented-control";
 import { toaster } from "baseui/toast";
 import { ParagraphSmall } from "baseui/typography";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { get, send } from "@/lib/client";
 import { DECISION_LABEL, TEMPLATE_LABEL } from "@/lib/format";
-import type { Attestation, LedgerEntry, ScoreRow, Verify } from "@/lib/types";
-import { Chip, Drawer, Empty, Field, Grow, Hint, Line, Mono, Muted, Quote, Row } from "./ui";
-
-type Arm = "informed" | "blind" | "all";
+import type { Attestation, LedgerEntry, Verify } from "@/lib/types";
+import { Chip, Drawer, Empty, Field, Grow, Line, Mono, Muted, Quote, Row } from "./ui";
 
 function what(e: LedgerEntry): string {
   const p = e.payload as Record<string, unknown>;
@@ -27,12 +24,11 @@ export function LedgerTab({ site, tamper }: { site: string; tamper: boolean }) {
   const [css, theme] = useStyletron();
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const [arm, setArm] = useState<Arm>("informed");
   const [all, setAll] = useState(false);
   const [open, setOpen] = useState<number | null>(null);
   const ledger = useQuery({
-    queryKey: ["ledger", site, arm],
-    queryFn: () => get<{ entries: LedgerEntry[] }>(`sites/${site}/ledger${arm === "all" ? "?arm=" : `?arm=${arm}`}`),
+    queryKey: ["ledger", site, "informed"],
+    queryFn: () => get<{ entries: LedgerEntry[] }>(`sites/${site}/ledger?arm=informed`),
   });
   const verify = useQuery({ queryKey: ["verify", site], queryFn: () => get<Verify>(`sites/${site}/ledger/verify`) });
   const v = verify.data;
@@ -42,28 +38,23 @@ export function LedgerTab({ site, tamper }: { site: string; tamper: boolean }) {
   return (
     <div className={css({ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: theme.sizing.scale400 })}>
       <div className={css({ display: "flex", gap: theme.sizing.scale300, alignItems: "center", flexWrap: "wrap" })}>
-        <div className={css({ width: "340px", maxWidth: "100%" })}>
-          <SegmentedControl activeKey={arm} onChange={({ activeKey }) => setArm(activeKey as Arm)} width="100%">
-            <Segment key="informed" label="Your plan" />
-            <Segment key="blind" label="Blind arm" />
-            <Segment key="all" label="Everything" />
-          </SegmentedControl>
-        </div>
-        <Hint text="The blind arm is the same model planning from your goals without seeing the mandate. The gap between the arms shows how much staying in scope comes from the model's own judgment rather than the written rules." />
-        <span className={css({ marginLeft: "auto", display: "flex", gap: theme.sizing.scale200, alignItems: "center" })} data-testid="verify">
+        <span data-testid="verify">
           {v &&
             (v.ok ? (
-              <Chip kind="green" tip={`Every record links to the one before it, and each hashes to what was stored. Head ${v.head_hash.slice(0, 12)}…`} testId="chain-ok">
-                Verified · {v.count} {v.count === 1 ? "record" : "records"}
+              <Chip
+                kind="green"
+                tip="Each record is sealed to the one before it with a fingerprint (a hash). Editing any past record, even with access to the database, breaks the seal. Groundwork checks it every time you open this tab."
+                testId="chain-ok"
+              >
+                Intact · {v.count} {v.count === 1 ? "record" : "records"}
               </Chip>
             ) : (
               <Chip kind="red" tip={v.problems.join(" ")} testId="chain-broken">
-                Chain broken
+                Edited after the fact
               </Chip>
             ))}
-          <Button kind={KIND.tertiary} size={SIZE.mini} onClick={() => verify.refetch()}>
-            Verify again
-          </Button>
+        </span>
+        <span className={css({ marginLeft: "auto" })}>
           <Button kind={KIND.tertiary} size={SIZE.mini} onClick={() => navigate(`/verify?project=${site}`)} data-testid="verify-receipt">
             Verify a receipt
           </Button>
@@ -82,7 +73,6 @@ export function LedgerTab({ site, tamper }: { site: string; tamper: boolean }) {
               <Line>{what(e)}</Line>
               <Muted>
                 {e.type.replace(/_/g, " ")}
-                {e.arm === "blind" ? " · blind arm" : ""}
               </Muted>
             </Grow>
             {e.dry_run && <Chip tip="It would have been sent; nothing left in dry run.">Not sent · dry run</Chip>}
@@ -97,9 +87,6 @@ export function LedgerTab({ site, tamper }: { site: string; tamper: boolean }) {
       </div>
 
       <Accordion>
-        <Panel title="How the model did">
-          <Scorecard site={site} />
-        </Panel>
         <Panel title="Receipt">
           <Receipt site={site} />
         </Panel>
@@ -107,10 +94,10 @@ export function LedgerTab({ site, tamper }: { site: string; tamper: boolean }) {
           <Panel title="Try to break it">
             <div className={css({ display: "grid", gap: theme.sizing.scale300 })}>
               <ParagraphSmall margin={0}>
-                Edit one recorded decision the way someone with full database access could. The chain above turns to "Chain broken". Start
-                the demo over to restore it.
+                Edit one recorded decision the way someone with full database access could. The tag above turns to "Edited after the fact".
+                Restore puts the demo back the way it started.
               </ParagraphSmall>
-              <div>
+              <div className={css({ display: "flex", gap: theme.sizing.scale300 })}>
                 <Button
                   kind={KIND.secondary}
                   size={SIZE.compact}
@@ -127,6 +114,22 @@ export function LedgerTab({ site, tamper }: { site: string; tamper: boolean }) {
                   }}
                 >
                   Tamper with one record
+                </Button>
+                <Button
+                  kind={KIND.tertiary}
+                  size={SIZE.compact}
+                  data-testid="restore"
+                  onClick={async () => {
+                    try {
+                      await send("POST", "demo/reset");
+                      await qc.invalidateQueries();
+                      toaster.positive("The demo is back the way it started.", {});
+                    } catch (e) {
+                      toaster.negative((e as Error).message, {});
+                    }
+                  }}
+                >
+                  Restore
                 </Button>
               </div>
             </div>
@@ -169,35 +172,6 @@ export function LedgerTab({ site, tamper }: { site: string; tamper: boolean }) {
           </>
         )}
       </Drawer>
-    </div>
-  );
-}
-
-function Scorecard({ site }: { site: string }) {
-  const q = useQuery({ queryKey: ["scorecard", site], queryFn: () => get<{ rows: ScoreRow[]; note: string }>(`sites/${site}/scorecard`) });
-  const rows = q.data?.rows ?? [];
-  const pct = (x: number) => `${Math.round(x * 1000) / 10}%`;
-  if (!rows.length) return <Empty>No plans yet.</Empty>;
-  return (
-    <div data-testid="scorecard">
-      {rows.map((r) => (
-        <Row key={`${r.arm}-${r.model_id}`}>
-          <Grow>
-            <Line>{r.label}</Line>
-            <Muted>
-              {r.model_id} · {r.proposals} proposals
-            </Muted>
-          </Grow>
-          <Chip kind={r.over_reach ? "red" : "gray"} tip="Proposed more autonomy than the mandate allows; the gateway held it.">
-            Held {r.over_reach} ({pct(r.over_reach_rate)})
-          </Chip>
-          <Chip tip="Asked when the mandate allowed acting.">Cautious {r.over_caution}</Chip>
-          <Chip kind={r.honest_rate === null || r.honest_rate === 1 ? "gray" : "red"} tip="Share of reports that match the ledger.">
-            Honest {r.honest_rate === null ? "—" : pct(r.honest_rate)}
-          </Chip>
-        </Row>
-      ))}
-      {q.data?.note && <Muted>{q.data.note}</Muted>}
     </div>
   );
 }
