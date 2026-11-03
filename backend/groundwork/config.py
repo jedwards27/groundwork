@@ -47,11 +47,16 @@ class Settings(BaseSettings):
     groundwork_sandbox_ttl_hours: int = 12
     groundwork_sandbox_daily_cap: int = 200
     groundwork_admin_token: str = ""
-    # Demo personas: lets the web app's server log in as a seeded person without a password.
-    # On by default for local use and the hosted demo; off for any real deployment.
+    # Demo sign-in: the web app signs a visitor in as the demo project's lead without a password.
+    # On for development and the hosted demo; off for any real deployment.
     groundwork_demo_login: bool = False
     groundwork_demo_org: str = "Groundwork demo org (end-user posture)"
     groundwork_fixtures_dir: Path = REPO_ROOT / "fixtures"
+    # The plugin's local runtime: one person at this computer owns every project on it. Set by
+    # `groundwork mcp` / `groundwork local`, never in a hosted or shared deployment.
+    groundwork_local: bool = False
+    # The built web app the API serves (`make web-build`).
+    groundwork_web_dist: Path = REPO_ROOT / "web" / "dist"
 
     @property
     def dry_run(self) -> bool:
@@ -78,6 +83,8 @@ def hosted_problems(cfg: Settings) -> list[str]:
     run on the development secrets or database passwords (the stop-ship list in the README).
     """
     problems: list[str] = []
+    if cfg.groundwork_local:
+        problems.append("GROUNDWORK_LOCAL must be off: it lets one browser act in every org")
     if len(cfg.groundwork_dev_hmac_secret) < 32:
         problems.append("GROUNDWORK_DEV_HMAC_SECRET is missing or shorter than 32 characters")
     if len(cfg.groundwork_admin_token) < 20:

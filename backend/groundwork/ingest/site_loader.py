@@ -61,9 +61,13 @@ ROLES = (
     "ie",
     "operator",
     "community",
+    "owner",
+    "contractor",
+    "designer",
+    "consultant",
 )
 LEVELS = ("federal", "state", "local", "none")
-EVENT_KINDS = ("schedule_change", "evidence", "acknowledgment", "injection")
+EVENT_KINDS = ("schedule_change", "progress", "evidence", "acknowledgment", "injection")
 MILESTONE_KINDS = ("energization", "delivery", "cod", "substantial_completion", "final_acceptance")
 _PRED = re.compile(r"^(?P<key>[\w-]+)(?:\s+(?P<kind>FS|SS|FF)(?P<lag>[+-]\d+)?(?P<unit>bd|cd)?)?$")
 

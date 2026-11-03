@@ -295,3 +295,13 @@ def test_every_decision_cites_its_clause():
 
     unlisted = decide(action(Executor.send_email), ctx("counterparty_routine"), PRESETS["supervised"])
     assert unlisted.decision == Autonomy.ask and unlisted.clause.startswith("Ask by default")
+
+
+def test_an_expired_mandate_asks_for_everything_it_used_to_allow():
+    expired = PRESETS["autonomous"].model_copy(update={"valid_until": date(2026, 11, 30)})
+    a = action(Executor.send_email)
+    assert decide(a, ctx("counterparty_routine", as_of=date(2026, 11, 30)), expired).decision == Autonomy.auto
+    late = decide(a, ctx("counterparty_routine", as_of=date(2026, 12, 1)), expired)
+    assert late.decision == Autonomy.ask and late.rule == "expired" and "2026-11-30" in late.clause
+    # The never list still comes first, expired or not.
+    assert decide(action(Executor.pay_invoice), ctx("counterparty_routine", as_of=date(2027, 1, 1)), expired).decision == Autonomy.refuse

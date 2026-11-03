@@ -4,6 +4,44 @@
  */
 
 export interface paths {
+    "/home": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Home */
+        get: operations["home_home_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/drafts/{draft_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Decide Draft
+         * @description Confirm or reject a draft. Only in the local runtime, where the person at this computer is
+         *     the named person Claude drafted for.
+         */
+        post: operations["decide_draft_drafts__draft_id__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -13,6 +51,23 @@ export interface paths {
         };
         /** Health */
         get: operations["health_health_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sites/{site}/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Me */
+        get: operations["me_sites__site__me_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -415,26 +470,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/auth/personas": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Personas
-         * @description Demo personas only (anyone with the link can act as them). Disabled unless GROUNDWORK_DEMO_LOGIN.
-         */
-        get: operations["personas_auth_personas_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/auth/demo-login": {
         parameters: {
             query?: never;
@@ -446,11 +481,76 @@ export interface paths {
         put?: never;
         /**
          * Demo Login
-         * @description Log in as a demo persona. With sandboxes on, a visitor without a live sandbox gets a new one;
-         *     a visitor who has one (their current token) stays in it when switching persona; `fresh` starts
-         *     over in a new sandbox and deletes the old one.
+         * @description A bearer token for the demo project's lead, for scripts. Browsers use POST /session.
          */
         post: operations["demo_login_auth_demo_login_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Session
+         * @description Who this browser is, if anyone, and how the server runs. Never an error.
+         */
+        get: operations["get_session_session_get"];
+        put?: never;
+        /**
+         * Start Session
+         * @description Sign this browser in to the demo (a cookie). Only where demo sign-in is on.
+         */
+        post: operations["start_session_session_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/demo/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Demo Reset
+         * @description Start the demo over. Hosted with sandboxes: a fresh private copy. Otherwise the demo
+         *     project is reloaded from its fixture (the approver's own projects are never touched).
+         */
+        post: operations["demo_reset_demo_reset_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/demo/tamper": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Demo Tamper
+         * @description Local and development only: edit one decision in the demo project's ledger the way someone
+         *     holding owner credentials could (trigger disabled, row edited, trigger re-enabled).
+         *     Verification then fails. Reset the demo to restore a clean chain. Refused when hosted.
+         */
+        post: operations["demo_tamper_demo_tamper_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -485,10 +585,8 @@ export interface paths {
         put?: never;
         /**
          * Admin Tamper
-         * @description Local demo only: edit one decision in a ledger the way someone holding owner credentials
-         *     could (trigger disabled, row edited, trigger re-enabled). Verification then fails. It edits the
-         *     caller's org when a valid token comes with the admin token, else the demo org. Refused in the
-         *     hosted profile. `POST /admin/reset` restores a clean chain.
+         * @description Scripts and tests: the same edit as /demo/tamper with the admin token. It edits the caller's
+         *     org when a valid token comes along, else the demo org. Refused in the hosted profile.
          */
         post: operations["admin_tamper_admin_tamper_post"];
         delete?: never;
@@ -575,15 +673,21 @@ export interface components {
             /** Scenario Events */
             scenario_events: string[];
         };
-        /** DemoLogin */
-        DemoLogin: {
-            /** Person */
-            person: string;
+        /** DemoSignIn */
+        DemoSignIn: {
             /**
              * Fresh
              * @default false
              */
             fresh: boolean;
+        };
+        /** DraftVerdict */
+        DraftVerdict: {
+            /**
+             * Verdict
+             * @enum {string}
+             */
+            verdict: "confirm" | "reject";
         };
         /** EventView */
         EventView: {
@@ -1075,6 +1179,65 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    home_home_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    decide_draft_drafts__draft_id__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DraftVerdict"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     health_health_get: {
         parameters: {
             query?: never;
@@ -1097,12 +1260,10 @@ export interface operations {
             };
         };
     };
-    me_me_get: {
+    me_sites__site__me_get: {
         parameters: {
             query?: never;
-            header?: {
-                authorization?: string | null;
-            };
+            header?: never;
             path?: never;
             cookie?: never;
         };
@@ -1117,13 +1278,24 @@ export interface operations {
                     "application/json": components["schemas"]["MeView"];
                 };
             };
-            /** @description Validation Error */
-            422: {
+        };
+    };
+    me_me_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["MeView"];
                 };
             };
         };
@@ -1131,9 +1303,7 @@ export interface operations {
     list_sites_sites_get: {
         parameters: {
             query?: never;
-            header?: {
-                authorization?: string | null;
-            };
+            header?: never;
             path?: never;
             cookie?: never;
         };
@@ -1148,23 +1318,12 @@ export interface operations {
                     "application/json": components["schemas"]["SiteSummary"][];
                 };
             };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
         };
     };
     get_site_sites__site__get: {
         parameters: {
             query?: never;
-            header?: {
-                authorization?: string | null;
-            };
+            header?: never;
             path: {
                 site: string;
             };
@@ -1197,9 +1356,7 @@ export interface operations {
             query?: {
                 scenario?: string[];
             };
-            header?: {
-                authorization?: string | null;
-            };
+            header?: never;
             path: {
                 site: string;
             };
@@ -1232,9 +1389,7 @@ export interface operations {
             query?: {
                 scenario?: string[];
             };
-            header?: {
-                authorization?: string | null;
-            };
+            header?: never;
             path: {
                 site: string;
             };
@@ -1269,9 +1424,7 @@ export interface operations {
             query?: {
                 scenario?: string[];
             };
-            header?: {
-                authorization?: string | null;
-            };
+            header?: never;
             path: {
                 site: string;
             };
@@ -1302,9 +1455,7 @@ export interface operations {
     list_events_sites__site__events_get: {
         parameters: {
             query?: never;
-            header?: {
-                authorization?: string | null;
-            };
+            header?: never;
             path: {
                 site: string;
             };
@@ -1335,9 +1486,7 @@ export interface operations {
     play_event_sites__site__events_post: {
         parameters: {
             query?: never;
-            header?: {
-                authorization?: string | null;
-            };
+            header?: never;
             path: {
                 site: string;
             };
@@ -1372,9 +1521,7 @@ export interface operations {
     get_run_runs__run_id__get: {
         parameters: {
             query?: never;
-            header?: {
-                authorization?: string | null;
-            };
+            header?: never;
             path: {
                 run_id: string;
             };
@@ -1407,7 +1554,6 @@ export interface operations {
             query?: never;
             header?: {
                 "last-event-id"?: string | null;
-                authorization?: string | null;
             };
             path: {
                 run_id: string;
@@ -1439,9 +1585,7 @@ export interface operations {
     get_mandate_sites__site__mandate_get: {
         parameters: {
             query?: never;
-            header?: {
-                authorization?: string | null;
-            };
+            header?: never;
             path: {
                 site: string;
             };
@@ -1474,9 +1618,7 @@ export interface operations {
     put_mandate_sites__site__mandate_put: {
         parameters: {
             query?: never;
-            header?: {
-                authorization?: string | null;
-            };
+            header?: never;
             path: {
                 site: string;
             };
@@ -1513,9 +1655,7 @@ export interface operations {
     compare_mandates_sites__site__mandate_compare_get: {
         parameters: {
             query?: never;
-            header?: {
-                authorization?: string | null;
-            };
+            header?: never;
             path: {
                 site: string;
             };
@@ -1551,9 +1691,7 @@ export interface operations {
                 arm?: string | null;
                 limit?: number;
             };
-            header?: {
-                authorization?: string | null;
-            };
+            header?: never;
             path: {
                 site: string;
             };
@@ -1586,9 +1724,7 @@ export interface operations {
     verify_ledger_sites__site__ledger_verify_get: {
         parameters: {
             query?: never;
-            header?: {
-                authorization?: string | null;
-            };
+            header?: never;
             path: {
                 site: string;
             };
@@ -1621,9 +1757,7 @@ export interface operations {
     verify_ledger_entry_sites__site__ledger_verify_entry_post: {
         parameters: {
             query?: never;
-            header?: {
-                authorization?: string | null;
-            };
+            header?: never;
             path: {
                 site: string;
             };
@@ -1660,9 +1794,7 @@ export interface operations {
     list_runs_sites__site__runs_get: {
         parameters: {
             query?: never;
-            header?: {
-                authorization?: string | null;
-            };
+            header?: never;
             path: {
                 site: string;
             };
@@ -1693,9 +1825,7 @@ export interface operations {
     get_run_plans_runs__run_id__plans_get: {
         parameters: {
             query?: never;
-            header?: {
-                authorization?: string | null;
-            };
+            header?: never;
             path: {
                 run_id: string;
             };
@@ -1728,9 +1858,7 @@ export interface operations {
     latest_plan_sites__site__latest_plan_get: {
         parameters: {
             query?: never;
-            header?: {
-                authorization?: string | null;
-            };
+            header?: never;
             path: {
                 site: string;
             };
@@ -1763,9 +1891,7 @@ export interface operations {
     pending_actions_sites__site__actions_pending_get: {
         parameters: {
             query?: never;
-            header?: {
-                authorization?: string | null;
-            };
+            header?: never;
             path: {
                 site: string;
             };
@@ -1798,9 +1924,7 @@ export interface operations {
     post_approval_actions__action_id__approvals_post: {
         parameters: {
             query?: never;
-            header?: {
-                authorization?: string | null;
-            };
+            header?: never;
             path: {
                 action_id: string;
             };
@@ -1837,9 +1961,7 @@ export interface operations {
     get_scorecard_sites__site__scorecard_get: {
         parameters: {
             query?: never;
-            header?: {
-                authorization?: string | null;
-            };
+            header?: never;
             path: {
                 site: string;
             };
@@ -1872,9 +1994,7 @@ export interface operations {
     get_attestation_sites__site__attestation_get: {
         parameters: {
             query?: never;
-            header?: {
-                authorization?: string | null;
-            };
+            header?: never;
             path: {
                 site: string;
             };
@@ -1907,9 +2027,7 @@ export interface operations {
     replay_run_runs__run_id__replay_get: {
         parameters: {
             query?: never;
-            header?: {
-                authorization?: string | null;
-            };
+            header?: never;
             path: {
                 run_id: string;
             };
@@ -1939,40 +2057,16 @@ export interface operations {
             };
         };
     };
-    personas_auth_personas_get: {
+    demo_login_auth_demo_login_post: {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
-                };
-            };
-        };
-    };
-    demo_login_auth_demo_login_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
+        requestBody?: {
             content: {
-                "application/json": components["schemas"]["DemoLogin"];
+                "application/json": components["schemas"]["DemoSignIn"] | null;
             };
         };
         responses: {
@@ -1998,12 +2092,111 @@ export interface operations {
             };
         };
     };
+    get_session_session_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    start_session_session_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["DemoSignIn"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    demo_reset_demo_reset_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    demo_tamper_demo_tamper_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
     get_evidence_sites__site__evidence__key__get: {
         parameters: {
             query?: never;
-            header?: {
-                authorization?: string | null;
-            };
+            header?: never;
             path: {
                 site: string;
                 key: string;
@@ -2039,7 +2232,6 @@ export interface operations {
             query?: never;
             header?: {
                 "x-admin-token"?: string | null;
-                authorization?: string | null;
             };
             path?: never;
             cookie?: never;

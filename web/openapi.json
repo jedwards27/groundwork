@@ -6,6 +6,80 @@
   "version": "0.1.0"
  },
  "paths": {
+  "/home": {
+   "get": {
+    "summary": "Home",
+    "operationId": "home_home_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Home Home Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/drafts/{draft_id}": {
+   "post": {
+    "summary": "Decide Draft",
+    "description": "Confirm or reject a draft. Only in the local runtime, where the person at this computer is\nthe named person Claude drafted for.",
+    "operationId": "decide_draft_drafts__draft_id__post",
+    "parameters": [
+     {
+      "name": "draft_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Draft Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/DraftVerdict"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": {
+          "type": "string"
+         },
+         "title": "Response Decide Draft Drafts  Draft Id  Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/health": {
    "get": {
     "summary": "Health",
@@ -26,28 +100,10 @@
     }
    }
   },
-  "/me": {
+  "/sites/{site}/me": {
    "get": {
     "summary": "Me",
-    "operationId": "me_me_get",
-    "parameters": [
-     {
-      "name": "authorization",
-      "in": "header",
-      "required": false,
-      "schema": {
-       "anyOf": [
-        {
-         "type": "string"
-        },
-        {
-         "type": "null"
-        }
-       ],
-       "title": "Authorization"
-      }
-     }
-    ],
+    "operationId": "me_sites__site__me_get",
     "responses": {
      "200": {
       "description": "Successful Response",
@@ -58,13 +114,21 @@
         }
        }
       }
-     },
-     "422": {
-      "description": "Validation Error",
+     }
+    }
+   }
+  },
+  "/me": {
+   "get": {
+    "summary": "Me",
+    "operationId": "me_me_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
       "content": {
        "application/json": {
         "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
+         "$ref": "#/components/schemas/MeView"
         }
        }
       }
@@ -76,45 +140,17 @@
    "get": {
     "summary": "List Sites",
     "operationId": "list_sites_sites_get",
-    "parameters": [
-     {
-      "name": "authorization",
-      "in": "header",
-      "required": false,
-      "schema": {
-       "anyOf": [
-        {
-         "type": "string"
-        },
-        {
-         "type": "null"
-        }
-       ],
-       "title": "Authorization"
-      }
-     }
-    ],
     "responses": {
      "200": {
       "description": "Successful Response",
       "content": {
        "application/json": {
         "schema": {
-         "type": "array",
          "items": {
           "$ref": "#/components/schemas/SiteSummary"
          },
+         "type": "array",
          "title": "Response List Sites Sites Get"
-        }
-       }
-      }
-     },
-     "422": {
-      "description": "Validation Error",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
         }
        }
       }
@@ -134,22 +170,6 @@
       "schema": {
        "type": "string",
        "title": "Site"
-      }
-     },
-     {
-      "name": "authorization",
-      "in": "header",
-      "required": false,
-      "schema": {
-       "anyOf": [
-        {
-         "type": "string"
-        },
-        {
-         "type": "null"
-        }
-       ],
-       "title": "Authorization"
       }
      }
     ],
@@ -203,22 +223,6 @@
        "default": [],
        "title": "Scenario"
       }
-     },
-     {
-      "name": "authorization",
-      "in": "header",
-      "required": false,
-      "schema": {
-       "anyOf": [
-        {
-         "type": "string"
-        },
-        {
-         "type": "null"
-        }
-       ],
-       "title": "Authorization"
-      }
      }
     ],
     "responses": {
@@ -270,22 +274,6 @@
        },
        "default": [],
        "title": "Scenario"
-      }
-     },
-     {
-      "name": "authorization",
-      "in": "header",
-      "required": false,
-      "schema": {
-       "anyOf": [
-        {
-         "type": "string"
-        },
-        {
-         "type": "null"
-        }
-       ],
-       "title": "Authorization"
       }
      }
     ],
@@ -341,22 +329,6 @@
        "default": [],
        "title": "Scenario"
       }
-     },
-     {
-      "name": "authorization",
-      "in": "header",
-      "required": false,
-      "schema": {
-       "anyOf": [
-        {
-         "type": "string"
-        },
-        {
-         "type": "null"
-        }
-       ],
-       "title": "Authorization"
-      }
      }
     ],
     "responses": {
@@ -395,22 +367,6 @@
       "schema": {
        "type": "string",
        "title": "Site"
-      }
-     },
-     {
-      "name": "authorization",
-      "in": "header",
-      "required": false,
-      "schema": {
-       "anyOf": [
-        {
-         "type": "string"
-        },
-        {
-         "type": "null"
-        }
-       ],
-       "title": "Authorization"
       }
      }
     ],
@@ -452,22 +408,6 @@
       "schema": {
        "type": "string",
        "title": "Site"
-      }
-     },
-     {
-      "name": "authorization",
-      "in": "header",
-      "required": false,
-      "schema": {
-       "anyOf": [
-        {
-         "type": "string"
-        },
-        {
-         "type": "null"
-        }
-       ],
-       "title": "Authorization"
       }
      }
     ],
@@ -518,22 +458,6 @@
        "type": "string",
        "format": "uuid",
        "title": "Run Id"
-      }
-     },
-     {
-      "name": "authorization",
-      "in": "header",
-      "required": false,
-      "schema": {
-       "anyOf": [
-        {
-         "type": "string"
-        },
-        {
-         "type": "null"
-        }
-       ],
-       "title": "Authorization"
       }
      }
     ],
@@ -592,22 +516,6 @@
        ],
        "title": "Last-Event-Id"
       }
-     },
-     {
-      "name": "authorization",
-      "in": "header",
-      "required": false,
-      "schema": {
-       "anyOf": [
-        {
-         "type": "string"
-        },
-        {
-         "type": "null"
-        }
-       ],
-       "title": "Authorization"
-      }
      }
     ],
     "responses": {
@@ -644,22 +552,6 @@
       "schema": {
        "type": "string",
        "title": "Site"
-      }
-     },
-     {
-      "name": "authorization",
-      "in": "header",
-      "required": false,
-      "schema": {
-       "anyOf": [
-        {
-         "type": "string"
-        },
-        {
-         "type": "null"
-        }
-       ],
-       "title": "Authorization"
       }
      }
     ],
@@ -700,22 +592,6 @@
       "schema": {
        "type": "string",
        "title": "Site"
-      }
-     },
-     {
-      "name": "authorization",
-      "in": "header",
-      "required": false,
-      "schema": {
-       "anyOf": [
-        {
-         "type": "string"
-        },
-        {
-         "type": "null"
-        }
-       ],
-       "title": "Authorization"
       }
      }
     ],
@@ -768,22 +644,6 @@
       "schema": {
        "type": "string",
        "title": "Site"
-      }
-     },
-     {
-      "name": "authorization",
-      "in": "header",
-      "required": false,
-      "schema": {
-       "anyOf": [
-        {
-         "type": "string"
-        },
-        {
-         "type": "null"
-        }
-       ],
-       "title": "Authorization"
       }
      }
     ],
@@ -854,22 +714,6 @@
        "default": 500,
        "title": "Limit"
       }
-     },
-     {
-      "name": "authorization",
-      "in": "header",
-      "required": false,
-      "schema": {
-       "anyOf": [
-        {
-         "type": "string"
-        },
-        {
-         "type": "null"
-        }
-       ],
-       "title": "Authorization"
-      }
      }
     ],
     "responses": {
@@ -910,22 +754,6 @@
       "schema": {
        "type": "string",
        "title": "Site"
-      }
-     },
-     {
-      "name": "authorization",
-      "in": "header",
-      "required": false,
-      "schema": {
-       "anyOf": [
-        {
-         "type": "string"
-        },
-        {
-         "type": "null"
-        }
-       ],
-       "title": "Authorization"
       }
      }
     ],
@@ -968,22 +796,6 @@
       "schema": {
        "type": "string",
        "title": "Site"
-      }
-     },
-     {
-      "name": "authorization",
-      "in": "header",
-      "required": false,
-      "schema": {
-       "anyOf": [
-        {
-         "type": "string"
-        },
-        {
-         "type": "null"
-        }
-       ],
-       "title": "Authorization"
       }
      }
     ],
@@ -1036,22 +848,6 @@
        "type": "string",
        "title": "Site"
       }
-     },
-     {
-      "name": "authorization",
-      "in": "header",
-      "required": false,
-      "schema": {
-       "anyOf": [
-        {
-         "type": "string"
-        },
-        {
-         "type": "null"
-        }
-       ],
-       "title": "Authorization"
-      }
      }
     ],
     "responses": {
@@ -1096,22 +892,6 @@
        "format": "uuid",
        "title": "Run Id"
       }
-     },
-     {
-      "name": "authorization",
-      "in": "header",
-      "required": false,
-      "schema": {
-       "anyOf": [
-        {
-         "type": "string"
-        },
-        {
-         "type": "null"
-        }
-       ],
-       "title": "Authorization"
-      }
      }
     ],
     "responses": {
@@ -1155,22 +935,6 @@
       "schema": {
        "type": "string",
        "title": "Site"
-      }
-     },
-     {
-      "name": "authorization",
-      "in": "header",
-      "required": false,
-      "schema": {
-       "anyOf": [
-        {
-         "type": "string"
-        },
-        {
-         "type": "null"
-        }
-       ],
-       "title": "Authorization"
       }
      }
     ],
@@ -1220,22 +984,6 @@
        "type": "string",
        "title": "Site"
       }
-     },
-     {
-      "name": "authorization",
-      "in": "header",
-      "required": false,
-      "schema": {
-       "anyOf": [
-        {
-         "type": "string"
-        },
-        {
-         "type": "null"
-        }
-       ],
-       "title": "Authorization"
-      }
      }
     ],
     "responses": {
@@ -1281,22 +1029,6 @@
        "type": "string",
        "format": "uuid",
        "title": "Action Id"
-      }
-     },
-     {
-      "name": "authorization",
-      "in": "header",
-      "required": false,
-      "schema": {
-       "anyOf": [
-        {
-         "type": "string"
-        },
-        {
-         "type": "null"
-        }
-       ],
-       "title": "Authorization"
       }
      }
     ],
@@ -1349,22 +1081,6 @@
        "type": "string",
        "title": "Site"
       }
-     },
-     {
-      "name": "authorization",
-      "in": "header",
-      "required": false,
-      "schema": {
-       "anyOf": [
-        {
-         "type": "string"
-        },
-        {
-         "type": "null"
-        }
-       ],
-       "title": "Authorization"
-      }
      }
     ],
     "responses": {
@@ -1405,22 +1121,6 @@
       "schema": {
        "type": "string",
        "title": "Site"
-      }
-     },
-     {
-      "name": "authorization",
-      "in": "header",
-      "required": false,
-      "schema": {
-       "anyOf": [
-        {
-         "type": "string"
-        },
-        {
-         "type": "null"
-        }
-       ],
-       "title": "Authorization"
       }
      }
     ],
@@ -1465,22 +1165,6 @@
        "format": "uuid",
        "title": "Run Id"
       }
-     },
-     {
-      "name": "authorization",
-      "in": "header",
-      "required": false,
-      "schema": {
-       "anyOf": [
-        {
-         "type": "string"
-        },
-        {
-         "type": "null"
-        }
-       ],
-       "title": "Authorization"
-      }
      }
     ],
     "responses": {
@@ -1509,59 +1193,24 @@
     }
    }
   },
-  "/auth/personas": {
-   "get": {
-    "summary": "Personas",
-    "description": "Demo personas only (anyone with the link can act as them). Disabled unless GROUNDWORK_DEMO_LOGIN.",
-    "operationId": "personas_auth_personas_get",
-    "responses": {
-     "200": {
-      "description": "Successful Response",
-      "content": {
-       "application/json": {
-        "schema": {
-         "items": {
-          "additionalProperties": true,
-          "type": "object"
-         },
-         "type": "array",
-         "title": "Response Personas Auth Personas Get"
-        }
-       }
-      }
-     }
-    }
-   }
-  },
   "/auth/demo-login": {
    "post": {
     "summary": "Demo Login",
-    "description": "Log in as a demo persona. With sandboxes on, a visitor without a live sandbox gets a new one;\na visitor who has one (their current token) stays in it when switching persona; `fresh` starts\nover in a new sandbox and deletes the old one.",
+    "description": "A bearer token for the demo project's lead, for scripts. Browsers use POST /session.",
     "operationId": "demo_login_auth_demo_login_post",
-    "parameters": [
-     {
-      "name": "authorization",
-      "in": "header",
-      "required": false,
-      "schema": {
-       "anyOf": [
-        {
-         "type": "string"
-        },
-        {
-         "type": "null"
-        }
-       ],
-       "title": "Authorization"
-      }
-     }
-    ],
     "requestBody": {
-     "required": true,
      "content": {
       "application/json": {
        "schema": {
-        "$ref": "#/components/schemas/DemoLogin"
+        "anyOf": [
+         {
+          "$ref": "#/components/schemas/DemoSignIn"
+         },
+         {
+          "type": "null"
+         }
+        ],
+        "title": "Body"
        }
       }
      }
@@ -1572,8 +1221,8 @@
       "content": {
        "application/json": {
         "schema": {
-         "type": "object",
          "additionalProperties": true,
+         "type": "object",
          "title": "Response Demo Login Auth Demo Login Post"
         }
        }
@@ -1585,6 +1234,115 @@
        "application/json": {
         "schema": {
          "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/session": {
+   "get": {
+    "summary": "Get Session",
+    "description": "Who this browser is, if anyone, and how the server runs. Never an error.",
+    "operationId": "get_session_session_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Get Session Session Get"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "summary": "Start Session",
+    "description": "Sign this browser in to the demo (a cookie). Only where demo sign-in is on.",
+    "operationId": "start_session_session_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "anyOf": [
+         {
+          "$ref": "#/components/schemas/DemoSignIn"
+         },
+         {
+          "type": "null"
+         }
+        ],
+        "title": "Body"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Start Session Session Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/demo/reset": {
+   "post": {
+    "summary": "Demo Reset",
+    "description": "Start the demo over. Hosted with sandboxes: a fresh private copy. Otherwise the demo\nproject is reloaded from its fixture (the approver's own projects are never touched).",
+    "operationId": "demo_reset_demo_reset_post",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Demo Reset Demo Reset Post"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/demo/tamper": {
+   "post": {
+    "summary": "Demo Tamper",
+    "description": "Local and development only: edit one decision in the demo project's ledger the way someone\nholding owner credentials could (trigger disabled, row edited, trigger re-enabled).\nVerification then fails. Reset the demo to restore a clean chain. Refused when hosted.",
+    "operationId": "demo_tamper_demo_tamper_post",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Demo Tamper Demo Tamper Post"
         }
        }
       }
@@ -1613,22 +1371,6 @@
       "schema": {
        "type": "string",
        "title": "Key"
-      }
-     },
-     {
-      "name": "authorization",
-      "in": "header",
-      "required": false,
-      "schema": {
-       "anyOf": [
-        {
-         "type": "string"
-        },
-        {
-         "type": "null"
-        }
-       ],
-       "title": "Authorization"
       }
      }
     ],
@@ -1661,7 +1403,7 @@
   "/admin/tamper": {
    "post": {
     "summary": "Admin Tamper",
-    "description": "Local demo only: edit one decision in a ledger the way someone holding owner credentials\ncould (trigger disabled, row edited, trigger re-enabled). Verification then fails. It edits the\ncaller's org when a valid token comes with the admin token, else the demo org. Refused in the\nhosted profile. `POST /admin/reset` restores a clean chain.",
+    "description": "Scripts and tests: the same edit as /demo/tamper with the admin token. It edits the caller's\norg when a valid token comes along, else the demo org. Refused in the hosted profile.",
     "operationId": "admin_tamper_admin_tamper_post",
     "parameters": [
      {
@@ -1678,22 +1420,6 @@
         }
        ],
        "title": "X-Admin-Token"
-      }
-     },
-     {
-      "name": "authorization",
-      "in": "header",
-      "required": false,
-      "schema": {
-       "anyOf": [
-        {
-         "type": "string"
-        },
-        {
-         "type": "null"
-        }
-       ],
-       "title": "Authorization"
       }
      }
     ],
@@ -1948,12 +1674,8 @@
     ],
     "title": "ChainView"
    },
-   "DemoLogin": {
+   "DemoSignIn": {
     "properties": {
-     "person": {
-      "type": "string",
-      "title": "Person"
-     },
      "fresh": {
       "type": "boolean",
       "title": "Fresh",
@@ -1961,10 +1683,24 @@
      }
     },
     "type": "object",
+    "title": "DemoSignIn"
+   },
+   "DraftVerdict": {
+    "properties": {
+     "verdict": {
+      "type": "string",
+      "enum": [
+       "confirm",
+       "reject"
+      ],
+      "title": "Verdict"
+     }
+    },
+    "type": "object",
     "required": [
-     "person"
+     "verdict"
     ],
-    "title": "DemoLogin"
+    "title": "DraftVerdict"
    },
    "EventView": {
     "properties": {

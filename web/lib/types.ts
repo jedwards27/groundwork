@@ -127,6 +127,10 @@ export interface LedgerEntry {
   payload: Record<string, unknown>;
   hash: string;
   prev_hash: string;
+  // The action as it would have gone out, and whether it was only recorded (dry run).
+  subject: string;
+  text: string;
+  dry_run: boolean;
 }
 
 export interface Verify {
@@ -176,14 +180,6 @@ export interface Attestation {
 
 export type Me = components["schemas"]["MeView"];
 
-export interface Persona {
-  key: string;
-  name: string;
-  title: string;
-  party: string;
-  approver: boolean;
-}
-
 export interface Health {
   ok: boolean;
   version: string;
@@ -195,11 +191,74 @@ export interface Health {
   sandboxes?: boolean;
 }
 
+// The browser's session: who you are, if anyone, and how this server runs.
 export interface Session {
-  me: Me | null;
-  personas: Persona[];
-  health: Health | null;
-  error?: string;
+  signed_in: boolean;
+  local: boolean;
+  you: { name: string; person: string; approver: boolean; demo_lead: boolean; sandbox_expires_at: string | null } | null;
+  projects: number;
+  health: Health;
+}
+
+export interface AskItem {
+  id: string;
+  project: string;
+  project_name: string;
+  ref: string;
+  title: string;
+  kind: string | null;
+  clause: string;
+  mandate_version: number | null;
+  route: string[];
+  recipient: string | null;
+  subject: string;
+  text: string;
+  approvers: string[];
+  can_approve: boolean;
+  action_hash: string;
+  at: string;
+}
+
+export interface DraftItem {
+  id: string;
+  kind: "project" | "mandate" | "facts" | "links" | "people";
+  project: string;
+  title: string;
+  at: string;
+  lines: { text: string; change: "add" | "remove" | "assumed" | null }[];
+  note: string;
+}
+
+export interface ProjectRow {
+  project: string;
+  name: string;
+  location: string;
+  as_of: string;
+  finish: string;
+  target: string;
+  forecast: string;
+  days_late: number | null;
+  sets_the_date: string | null;
+  asks_waiting: number;
+  mandate: string;
+}
+
+export interface RunRow {
+  project: string;
+  project_name: string;
+  run: string;
+  message: string;
+  at: string;
+  status: string;
+  counts: { allow: number; ask: number; deny: number };
+  report_ok: boolean | null;
+}
+
+export interface HomeView {
+  asks: AskItem[];
+  drafts: DraftItem[];
+  projects: ProjectRow[];
+  runs: RunRow[];
 }
 
 export interface Step {

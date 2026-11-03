@@ -79,23 +79,51 @@ def test_admin_reset_needs_the_admin_token(seeded):
         assert c.post("/admin/reset").status_code == 403
 
 
-def test_demo_login_is_off_by_default_and_works_when_on(seeded, monkeypatch):
+def test_demo_sign_in_is_off_by_default_and_signs_in_the_one_demo_person(seeded, monkeypatch):
     from groundwork.config import get_settings as gs
 
     with TestClient(app) as c:
-        assert c.get("/auth/personas").status_code == 404
+        assert c.post("/auth/demo-login").status_code == 404
+        assert c.post("/session").status_code == 404
         monkeypatch.setenv("GROUNDWORK_DEMO_LOGIN", "true")
         gs.cache_clear()
         try:
-            people = c.get("/auth/personas").json()
-            assert {p["key"] for p in people} == {"dana", "priya", "sam"}  # the principal's people only
-            assert c.post("/auth/demo-login", json={"person": "morgan"}).status_code == 404
-            tok = c.post("/auth/demo-login", json={"person": "dana"}).json()["token"]
+            assert c.get("/auth/personas").status_code == 404  # no choosing who to be
+            tok = c.post("/auth/demo-login").json()["token"]
             assert c.get("/me", headers={"Authorization": f"Bearer {tok}"}).json()["person"] == "dana"
-            assert c.post("/auth/demo-login", json={"person": "nobody"}).status_code == 404
+            assert c.get("/session").json()["signed_in"] is False
+
+            # A browser signs in with a cookie its scripts cannot read.
+            r = c.post("/session")
+            assert r.status_code == 200 and "token" not in r.json()
+            assert "httponly" in r.headers["set-cookie"].lower()
+            s = c.get("/session").json()
+            assert s["signed_in"] and s["you"]["name"] == "Dana Ortiz" and s["you"]["demo_lead"] is True
+            assert c.get("/me").json()["person"] == "dana"
         finally:
             monkeypatch.delenv("GROUNDWORK_DEMO_LOGIN")
             gs.cache_clear()
+
+
+def test_a_cookie_cannot_carry_a_state_change_from_another_site(seeded, monkeypatch):
+    from groundwork.config import get_settings as gs
+
+    monkeypatch.setenv("GROUNDWORK_DEMO_LOGIN", "true")
+    gs.cache_clear()
+    try:
+        with TestClient(app) as c:
+            c.post("/session")
+            play = {"event": "event-a"}
+            assert c.post("/sites/lake-mariner/events", json=play).status_code == 403  # no Origin
+            evil = {"origin": "https://elsewhere.example"}
+            assert c.post("/sites/lake-mariner/events", json=play, headers=evil).status_code == 403
+            ours = {"origin": "http://testserver"}
+            assert c.post("/sites/lake-mariner/events", content="event=event-a", headers=ours | {"content-type": "application/x-www-form-urlencoded"}).status_code == 403
+            assert c.post("/sites/lake-mariner/events", json=play, headers=ours).status_code == 202
+            assert c.get("/sites/lake-mariner/events").status_code == 200  # reads need no proof
+    finally:
+        monkeypatch.delenv("GROUNDWORK_DEMO_LOGIN")
+        gs.cache_clear()
 
 
 def test_tamper_is_admin_only_and_detected(client, seeded, monkeypatch):

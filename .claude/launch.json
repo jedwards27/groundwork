@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "api-simulated",
+      "runtimeExecutable": "env",
+      "runtimeArgs": ["ANTHROPIC_API_KEY=", "uv", "run", "--directory", "backend", "groundwork", "serve", "--port", "8000"],
+      "port": 8000
+    },
+    {
+      "name": "web",
+      "runtimeExecutable": "env",
+      "runtimeArgs": ["npm", "--prefix", "web", "run", "dev"],
+      "port": 3000
+    }
+  ]
+}

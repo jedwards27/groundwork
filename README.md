@@ -6,7 +6,28 @@ It reads a project's paper trail (utility studies, permits, landlord decisions, 
 
 The demo site is **Lake Mariner CB-5** (Barker, NY), seen from the end user's seat: TeraWulf is landlord and the utility's customer, Fluidstack is the lessee, and Anthropic is the end user, reaching the utility only through both. Public facts carry links; the schedule, inbox and people are synthetic and labeled.
 
-**Hosted:** https://groundwork-demo.fly.dev (not deployed yet; it goes live with `make deploy`, see `docs/HOSTING.md`).
+## Try it in the Claude app (the plugin)
+
+The main way to try Groundwork is as a plugin inside the Claude app. It runs on your computer, uses the connectors you already have, and needs no API key: Claude in the app writes the plans, and Groundwork's gateway, which is code outside the model, decides allow, ask or deny for each action.
+
+**You need:** [uv](https://docs.astral.sh/uv/) (`curl -LsSf https://astral.sh/uv/install.sh | sh`). The first launch takes about a minute while uv fetches Python 3.12 and an embedded Postgres; later launches take seconds.
+
+1. **Build the plugin:** `make plugin` writes `dist/groundwork-plugin.zip`.
+2. **Install it in one of two places:**
+   - **Cowork:** Customize, then Plugins, then upload the zip.
+   - **Claude Code:** unzip it and run `claude --plugin-dir dist/groundwork-plugin`.
+3. **Set up and play:** run `/groundwork:setup` to say who you are, then `/groundwork:demo` for the two-minute demo.
+
+You approve asks, confirm drafts and check receipts on a local page. Groundwork gives you its link; it's only reachable from your computer. Other skills:
+- `/groundwork:new-project` starts tracking one of your own projects from a few sentences, a spreadsheet or your email.
+- `/groundwork:mandate` writes or changes a mandate in plain words.
+- The `coordinate` skill handles "what are we waiting on?" and checking project mail.
+
+Everything stays in dry run. If Claude tries to send project mail through another connector, Groundwork's guard records it and holds it; your other use of Gmail or Slack is untouched.
+
+**Backtesting a past project.** Start it with `/groundwork:new-project` as of the date you want to begin, using only what was known then. Then replay its messages in date order. Each recorded message moves the project's date forward to the message's date. `check_overdue` moves the date forward by itself and lists work past due with no word, so Groundwork can plan chases. A message can report progress: an item done or started, with its date. It can also report date changes. Both wait for your confirmation on the local page, and until then `status` shows the forecast "if confirmed" beside the confirmed one. Links Claude inferred rather than read in a source are flagged, and you can confirm or remove them. `docs/DATA-BOUNDARY.md` covers what leaves your machine, and ADR 0008 covers the design.
+
+**Hosted fallback:** if you'd rather not install anything, the same demo runs in the browser at https://groundwork-demo.fly.dev (not deployed yet; it goes live with `make deploy`, see `docs/HOSTING.md`).
 
 ## Run it locally
 

@@ -1,263 +1,210 @@
-// The demo, end to end, against the real API: what a buildout lead sees, what the agent did, what
-// the gateway held, who approved what, and whether the ledger still verifies. Every number on the
-// page is checked against the API rather than hard-coded, so the test follows the engine.
+// The demo, end to end, against the real API: what a project lead sees, what the agent did, what
+// the gateway held, who approved what, and whether the ledger still verifies. Numbers on the page
+// are checked against the API rather than hard-coded, so the test follows the engine.
 import { expect, test, type Page } from "@playwright/test";
 
 const SITE = "lake-mariner";
 
-type Milestone = { days_remaining: number };
-type Chain = { gate: string | null; milestone: Milestone; items: { key: string; title: string }[] };
-type Action = { id: string; ref: string; decision: string | null; delta: string; state: string; approvers: string[] };
+type Chain = { milestone: { forecast_finish: string; days_remaining: number } };
+type Action = { id: string; ref: string; decision: string | null; delta: string; state: string };
 type Plan = { simulated: boolean; actions: Action[]; report_check: { ok?: boolean } | null };
-type Verify = { ok: boolean; count: number; problems: string[] };
+type Verify = { ok: boolean; count: number };
+type Health = { hosted?: boolean; sandboxes?: boolean };
 
 async function api<T>(page: Page, path: string): Promise<T> {
-  const res = await page.request.get(`/api/gw/${path}`);
+  const res = await page.request.get(`/api/${path}`);
   expect(res.ok(), `GET ${path} returned ${res.status()}`).toBeTruthy();
   return (await res.json()) as T;
 }
 
-async function signIn(page: Page, name: string): Promise<void> {
-  await page.goto("/");
-  const dialog = page.getByRole("dialog", { name: "Act as a demo persona" });
-  await expect(dialog).toBeVisible();
-  await dialog.getByRole("button", { name: new RegExp(name) }).click();
-  await expect(page.getByTestId("persona")).toContainText(name);
-}
-
-async function play(page: Page, eventKey: string): Promise<void> {
-  await page.getByTestId(`play-${eventKey}`).click();
-  // The run streams its steps over SSE; it is finished when the replay control appears.
-  await expect(page.getByRole("button", { name: "Replay this run (no new model call)" })).toBeVisible({ timeout: 90_000 });
-}
-
-function row(page: Page, ref: string) {
-  return page.locator(`.item[data-ref="${ref}"]`);
-}
-
-type Health = { hosted?: boolean; sandboxes?: boolean };
-
 async function health(page: Page): Promise<Health> {
-  const s = (await (await page.request.get("/api/session")).json()) as { health?: Health };
-  return s.health ?? {};
+  return ((await (await page.request.get("/api/session")).json()) as { health: Health }).health;
 }
 
-async function hosted(page: Page): Promise<boolean> {
-  return !!(await health(page)).hosted;
+// There is no one to choose: opening the app signs a visitor in as the demo's lead.
+async function open(page: Page, path = "/"): Promise<void> {
+  await page.goto(path);
+  await expect(page.getByTestId("you")).toBeVisible();
+}
+
+async function tab(page: Page, name: string): Promise<void> {
+  await page.getByRole("tab", { name: new RegExp(`^${name}`) }).click();
+}
+
+// Play a message from the inbox. Its steps stream into a drawer, which offers the decisions at the end.
+async function play(page: Page, eventKey: string): Promise<void> {
+  await tab(page, "Inbox");
+  await page.getByTestId(`play-${eventKey}`).click();
+  const drawer = page.getByTestId("message-drawer");
+  await expect(drawer.getByTestId("see-actions")).toBeVisible({ timeout: 90_000 });
+  await drawer.getByTestId("see-actions").click();
+  await expect(page).toHaveURL(new RegExp(`/projects/${SITE}/actions$`));
+}
+
+async function menu(page: Page, item: RegExp): Promise<void> {
+  await page.getByTestId("you").click();
+  await page.getByRole("option", { name: item }).click();
 }
 
 // Every test starts signed out on a clean copy of the demo. With sandboxes, signing in already gives
-// a fresh private copy. Without them, reset the shared fixture, which is an approver's control.
-test.beforeEach(async ({ page, context }) => {
+// a fresh private copy. Without them, reload the shared demo project as its lead.
+test.beforeEach(async ({ page, context, baseURL }) => {
   await context.clearCookies();
   if ((await health(page)).sandboxes) return;
-  expect((await page.request.post("/api/session", { data: { person: "dana" } })).ok(), "demo login is on").toBeTruthy();
-  const res = await page.request.post("/api/admin/reset");
-  expect(res.ok(), "reset needs GROUNDWORK_ADMIN_TOKEN on the web server").toBeTruthy();
+  expect((await page.request.post("/api/session")).ok(), "demo sign-in is on").toBeTruthy();
+  const res = await page.request.post("/api/demo/reset", { headers: { origin: baseURL! } });
+  expect(res.ok(), `reset returned ${res.status()}`).toBeTruthy();
   await context.clearCookies();
 });
 
-test("the two-minute demo: the gate and its sources, DO, ASK through the lessee, NEVER, the report beside the record, and a record anyone can verify", async ({ page }) => {
-  await signIn(page, "Dana Ortiz");
+test("the two-minute demo: Allow, Ask through the lessee, Deny, the report beside the ledger, and a record anyone can verify", async ({ page }) => {
+  await open(page, `/projects/${SITE}`);
+  await expect(page.getByTestId("gate")).toContainText("NYSEG");
   await play(page, "demo-monday");
 
-  // a. This week's gating item, and why it moved, citing the message each delay came from.
-  await expect(page.getByTestId("gate")).toContainText("NYSEG");
-  await expect(page.getByTestId("why-moved")).toContainText("source:");
+  // Allow: a status request the mandate already allows, with the clause it relied on.
+  await expect(page.getByTestId("decision-a1")).toHaveText("Allow");
+  await page.getByTestId("action-a1").click();
+  const drawer = page.getByTestId("action-drawer");
+  await expect(drawer.getByTestId("clause-a1")).toContainText("routine_messages");
+  await expect(drawer).toContainText("Nothing was sent");
+  await page.keyboard.press("Escape");
 
-  // b. DO: a status request the mandate already allows, with the clause it relied on.
-  await expect(page.getByTestId("decision-a1")).toHaveText("DO");
-  await expect(page.getByTestId("clause-a1")).toContainText("routine_messages");
-  await expect(page.getByTestId("who-a1")).toContainText("No approval needed");
+  // Ask: the landlord-bound request, routed Anthropic -> Fluidstack -> TeraWulf, waiting for you.
+  await expect(page.getByTestId("decision-a2")).toHaveText("Ask");
+  await page.getByTestId("action-a2").click();
+  await expect(drawer).toContainText("Anthropic → Fluidstack → TeraWulf");
+  await expect(drawer.getByTestId("approve")).toBeVisible();
+  await page.keyboard.press("Escape");
 
-  // c. ASK: the landlord-bound request, routed Anthropic -> Fluidstack -> TeraWulf, waiting on a named person.
-  await expect(page.getByTestId("decision-a2")).toHaveText("ASK");
-  const route = page.getByTestId("route-a2");
-  await expect(route).toContainText("Anthropic");
-  await expect(route).toContainText("Fluidstack (Morgan Lee)");
-  await expect(route).toContainText("TeraWulf");
-  await expect(route).toContainText("Dana Ortiz");
-  await expect(page.getByTestId("who-a2")).toContainText("Waiting for a named approver: Dana Ortiz");
+  // Deny: the change order a vendor document told the agent to sign.
+  await expect(page.getByTestId("decision-a3")).toHaveText("Deny");
+  await page.getByTestId("action-a3").click();
+  await expect(drawer.getByTestId("clause-a3")).toContainText("Never: pay, sign, delete");
+  await page.keyboard.press("Escape");
 
-  // d. NEVER: the change order a vendor document told the agent to sign; the report says so.
-  await expect(page.getByTestId("decision-a3")).toHaveText("NEVER");
-  await expect(page.getByTestId("clause-a3")).toContainText("Never: pay, sign, delete");
-  await expect(page.getByTestId("report")).toContainText("told an AI assistant to approve and sign it");
-
-  // e. The report beside the record, then one record checked by hash, and a forged copy rejected.
-  await expect(page.getByTestId("report-verdict")).toContainText("verified match");
+  // The report beside the ledger, then one record checked by hash, and a forged copy rejected.
+  await expect(page.getByTestId("report-verdict")).toHaveText("Report matches the ledger");
   const plan = await api<Plan>(page, `sites/${SITE}/latest-plan`);
   expect(plan.simulated).toBe(true);
   expect(plan.report_check?.ok).toBe(true);
+  await page.getByRole("button", { name: "The agent's report beside the ledger" }).click();
   await page.getByTestId("report-vs-record").getByRole("link").last().click();
-  await expect(page).toHaveURL(/\/verify\?seq=\d+/);
-  // The record list renders client-side, so once it holds a record the page is interactive.
-  await expect(page.getByTestId("verify-select")).toHaveValue(/^\d+$/);
+  await expect(page).toHaveURL(/\/verify\?project=lake-mariner&record=\d+/);
   await page.getByTestId("verify-run").click();
   await expect(page.getByTestId("verify-verdict")).toHaveText("Match");
-  await page.getByRole("button", { name: "Copy the selected record into the box" }).click();
+  await page.getByRole("button", { name: "Paste the stored record" }).click();
   const box = page.getByTestId("verify-copy");
   await box.fill((await box.inputValue()).replace('"decision": "refuse"', '"decision": "auto"'));
   await page.getByTestId("verify-run").click();
   await expect(page.getByTestId("verify-verdict")).toHaveText("Mismatch");
 });
 
-test("event A: the gate moves, the gateway holds one action, an auto-reply changes nothing, a named person approves", async ({ page }) => {
-  await signIn(page, "Dana Ortiz");
-
-  // Minute 0: countdown and gating item, as the critical-path engine computes them.
+test("event A: the forecast moves, the gateway holds one action, an auto-reply changes nothing, you approve it from home", async ({ page }) => {
+  await open(page, `/projects/${SITE}`);
   const before = await api<Chain>(page, `sites/${SITE}/chain`);
-  const gate = before.items.find((i) => i.key === before.gate);
-  expect(gate, "the fixture has a computed gate").toBeTruthy();
-  await expect(page.getByTestId("days-remaining")).toHaveText(String(before.milestone.days_remaining));
-  await expect(page.getByTestId("gate")).toContainText(gate!.title);
-  await expect(page.getByText("No plan yet. Play an event from the inbox.")).toBeVisible();
 
-  // Play event A: revised short-circuit data, the coordination study must be re-run.
   await play(page, "event-a");
   const after = await api<Chain>(page, `sites/${SITE}/chain`);
   expect(after.milestone.days_remaining).toBeGreaterThan(before.milestone.days_remaining);
-  await expect(page.getByTestId("days-remaining")).toHaveText(String(after.milestone.days_remaining));
-  await expect(page.getByTestId("differential")).toBeVisible();
-  await expect(page.getByTestId("differential").getByText("If the landlord agrees", { exact: true })).toBeVisible();
-
-  // The plan on the page matches the plan the API decided, group by group.
-  const plan = await api<Plan>(page, `sites/${SITE}/latest-plan`);
-  const count = (d: string) => plan.actions.filter((a) => a.decision === d).length;
-  const sums = page.locator(".sum");
-  await expect(sums.locator(".auto .n")).toHaveText(String(count("auto")));
-  await expect(sums.locator(".ask .n")).toHaveText(String(count("ask")));
-  await expect(sums.locator(".ref .n")).toHaveText(String(count("refuse")));
-  if (plan.simulated) await expect(page.getByTestId("simulated-banner")).toBeVisible();
+  await expect(page.getByTestId("lateness")).toContainText("days late");
 
   // At least one action the agent wanted to do alone was held by the gateway for a person.
+  const plan = await api<Plan>(page, `sites/${SITE}/latest-plan`);
   const held = plan.actions.find((a) => a.delta === "over_reach" && a.state === "pending");
   expect(held, "the gateway held at least one action").toBeTruthy();
-  await expect(row(page, held!.ref).getByTestId("held")).toBeVisible();
-  await expect(row(page, held!.ref).locator(".state")).toHaveText("pending");
-
-  // The post-execution report agrees with the ledger.
-  await expect(page.getByTestId("report")).toContainText("matches the ledger");
+  await expect(page.getByTestId(`held-${held!.ref}`)).toBeVisible();
+  await expect(page.getByTestId("report-verdict")).toHaveText("Report matches the ledger");
 
   // "Approved, please proceed" arrives as an auto-reply. It is evidence, never an approval.
   await play(page, "ack-approved");
-  await expect(row(page, held!.ref).locator(".state")).toHaveText("pending");
   const still = await api<Plan>(page, `sites/${SITE}/latest-plan`);
   expect(still.actions.find((a) => a.ref === held!.ref)?.state).toBe("pending");
 
-  // Dana, a named approver, approves it. It runs in dry run and the approval is on the record.
-  await page.getByTestId(`decide-${held!.ref}`).click();
-  const dialog = page.getByRole("dialog");
-  await expect(dialog.getByText("Dana Ortiz", { exact: false })).toBeVisible();
-  await dialog.getByRole("textbox").fill("Approved in the end-to-end walkthrough.");
-  await dialog.getByTestId("approve").click();
-  await expect(dialog).toBeHidden();
-  await expect(row(page, held!.ref)).toContainText("approved by Dana Ortiz");
-  await expect(row(page, held!.ref)).toContainText("ran in dry run");
+  // Home lists it under "Needs you"; approving there runs it in dry run, on the record.
+  await page.getByTestId("home-link").click();
+  await page.getByTestId(`ask-${held!.ref}`).click();
+  const ask = page.getByTestId("ask-drawer");
+  await expect(ask).toContainText("Mandate clause");
+  await ask.getByTestId("approve").click();
+  await expect(page.getByTestId(`ask-${held!.ref}`)).toBeHidden();
+  const done = await api<Plan>(page, `sites/${SITE}/latest-plan`);
+  expect(done.actions.find((a) => a.ref === held!.ref)?.state).toBe("executed");
 
-  // The ledger verifies, and the page says so with the same entry count as the API.
+  // The ledger verifies, and the page says so with the same record count as the API.
   const v = await api<Verify>(page, `sites/${SITE}/ledger/verify`);
   expect(v.ok).toBe(true);
-  await expect(page.getByTestId("verify")).toContainText(`Chain verified · ${v.count} entries`);
-  await expect(page.getByTestId("attested-chain")).toContainText("verified");
+  await page.goto(`/projects/${SITE}/ledger`);
+  await expect(page.getByTestId("chain-ok")).toHaveText(`Verified · ${v.count} records`);
 });
 
-test("a viewer can see the queue but cannot approve", async ({ page }) => {
-  await signIn(page, "Dana Ortiz");
-  await play(page, "event-a");
-  const plan = await api<Plan>(page, `sites/${SITE}/latest-plan`);
-  const pending = plan.actions.find((a) => a.state === "pending");
-  expect(pending).toBeTruthy();
-
-  await page.getByTestId("persona").click();
-  await page.getByRole("dialog", { name: "Act as a demo persona" }).getByRole("button", { name: /Sam Okafor/ }).click();
-  await expect(page.getByTestId("persona")).toContainText("Sam Okafor · viewer");
-
-  await page.getByTestId(`decide-${pending!.ref}`).click();
-  const dialog = page.getByRole("dialog");
-  await expect(dialog).toContainText("not an approver for this action");
-  await expect(dialog.getByTestId("approve")).toBeDisabled();
-
-  // The API refuses too: the button is a convenience, the check is on the server.
-  const res = await page.request.post(`/api/gw/actions/${pending!.id}/approvals`, {
-    data: { verdict: "approve", note: "", idempotency_key: crypto.randomUUID() },
-  });
-  expect(res.status()).toBeGreaterThanOrEqual(400);
+test("a state change riding on the cookie needs this app's Origin", async ({ page, baseURL }) => {
+  await open(page);
+  const play = { data: { event: "event-a" } };
+  expect((await page.request.post(`/api/sites/${SITE}/events`, play)).status()).toBe(403);
+  const ok = await page.request.post(`/api/sites/${SITE}/events`, { ...play, headers: { origin: baseURL! } });
+  expect(ok.status()).toBe(202);
 });
 
-test("who may reset: a viewer cannot reset the shared site, but anyone may start their own sandbox over", async ({ page }) => {
-  await signIn(page, "Sam Okafor");
-  const res = await page.request.post("/api/admin/reset");
-  expect(res.status()).toBe((await health(page)).sandboxes ? 200 : 403);
-});
-
-test("two visitors at once each get a private sandbox", async ({ page, browser }) => {
+test("two visitors at once each get a private copy", async ({ page, browser }) => {
   test.skip(!(await health(page)).sandboxes, "sandboxes are off (they are on in the hosted profile)");
   const other = await browser.newContext();
   const bob = await other.newPage();
   try {
-    await signIn(page, "Dana Ortiz");
-    await signIn(bob, "Dana Ortiz");
-    if (await hosted(page)) await expect(page.getByTestId("hosted-banner")).toContainText("your own copy");
+    await open(page, `/projects/${SITE}`);
+    await open(bob, `/projects/${SITE}`);
+    await expect(page.getByTestId("sandbox")).toBeVisible();
     const start = await api<Chain>(bob, `sites/${SITE}/chain`);
-
     await play(page, "event-a");
-    await expect(page.getByTestId("days-remaining")).not.toHaveText(String(start.milestone.days_remaining));
 
-    // Bob's copy has not moved: same countdown, no plan, a one-entry ledger.
-    await bob.reload();
-    await expect(bob.getByTestId("days-remaining")).toHaveText(String(start.milestone.days_remaining));
-    await expect(bob.getByText("No plan yet. Play an event from the inbox.")).toBeVisible();
-    await expect(bob.getByTestId("verify")).toContainText("Chain verified · 1 entries");
+    // Bob's copy has not moved: same forecast, no plan, a one-record ledger.
+    const still = await api<Chain>(bob, `sites/${SITE}/chain`);
+    expect(still.milestone.forecast_finish).toBe(start.milestone.forecast_finish);
+    await bob.goto(`/projects/${SITE}/ledger`);
+    await expect(bob.getByTestId("chain-ok")).toHaveText("Verified · 1 record");
   } finally {
     await other.close();
   }
 });
 
-test("tampering with one ledger entry fails verification; reset restores the fixture", async ({ page }) => {
-  test.skip(await hosted(page), "the hosted profile refuses the tamper endpoint");
-  await signIn(page, "Dana Ortiz");
-  const start = await api<Chain>(page, `sites/${SITE}/chain`);
+test("tampering with one ledger record fails verification; reset restores the demo", async ({ page }) => {
+  test.skip(!!(await health(page)).hosted, "the hosted profile refuses tampering");
+  await open(page, `/projects/${SITE}`);
   await play(page, "event-a");
-  await expect(page.getByTestId("verify")).toContainText("Chain verified");
+  await tab(page, "Ledger");
+  await expect(page.getByTestId("chain-ok")).toBeVisible();
 
-  await page.getByRole("button", { name: "Tamper with one entry" }).click();
-  await expect(page.getByTestId("verify")).toContainText("Verification failed");
-  await expect(page.getByTestId("verify")).toContainText("contents do not match its hash");
-  await expect(page.getByTestId("attested-chain")).toContainText("FAILED");
+  await menu(page, /Tamper with one demo record/);
+  await expect(page.getByTestId("chain-broken")).toBeVisible();
+  await expect(page.getByTestId("verify-problem")).toContainText("contents do not match its hash");
 
-  await page.getByRole("button", { name: /^(Reset site|Start over)$/ }).click();
-  await expect(page.getByTestId("days-remaining")).toHaveText(String(start.milestone.days_remaining));
-  await expect(page.getByTestId("verify")).toContainText("Chain verified · 1 entries");
-  await expect(page.getByText("No plan yet. Play an event from the inbox.")).toBeVisible();
+  await menu(page, /Reset the demo project|Start over/);
+  await expect(page.getByTestId("chain-ok")).toHaveText("Verified · 1 record");
 });
 
-test("moving the dial re-decides open actions only; what already ran stays on the record", async ({ page }) => {
-  await signIn(page, "Dana Ortiz");
+test("a new mandate version decides open actions again; what already ran stays on the record", async ({ page }) => {
+  await open(page, `/projects/${SITE}`);
   await play(page, "event-a");
   const before = await api<Plan>(page, `sites/${SITE}/latest-plan`);
   const ran = before.actions.filter((a) => a.state === "executed").map((a) => a.ref);
-  const open = before.actions.filter((a) => a.state === "pending").map((a) => a.ref);
+  const open_ = before.actions.filter((a) => a.state === "pending").map((a) => a.ref);
   expect(ran.length).toBeGreaterThan(0);
-  expect(open.length).toBeGreaterThan(0);
+  expect(open_.length).toBeGreaterThan(0);
 
-  // Preview Autonomous, then issue it as a new mandate version.
-  const dial = page.getByRole("region", { name: "Authority dial" });
-  const slider = dial.getByRole("slider", { name: "Authority preset" });
-  await slider.focus();
-  await page.keyboard.press("ArrowRight");
-  await expect(dial.locator(".preset")).toContainText("Autonomous within limits");
-  await expect(dial.locator(".preset")).toContainText("preview");
-  await dial.getByRole("button", { name: "Issue mandate v2" }).click();
-  await page.getByRole("dialog").getByRole("button", { name: "Issue v2" }).click();
-  await expect(dial.locator(".preset")).toContainText("mandate v2");
-  await expect(dial).toContainText("Mandate v2 issued.");
+  // Preview the Auto template, then issue it as a new mandate version.
+  await tab(page, "Mandate");
+  await page.getByTestId("template").click();
+  await page.getByRole("option", { name: "Auto" }).click();
+  await expect(page.getByTestId("mandate-version")).toHaveText("preview");
+  await expect(page.getByTestId("preview")).toContainText("Under Auto");
+  await page.getByTestId("issue").click();
+  await page.getByTestId("issue-confirm").click();
+  await expect(page.getByTestId("mandate-version")).toHaveText("v2");
 
-  // Nothing that ran was re-decided; at least one open action was.
+  // Nothing that ran was decided again; at least one open action was.
   const after = await api<Plan>(page, `sites/${SITE}/latest-plan`);
   for (const ref of ran) expect(after.actions.find((a) => a.ref === ref)?.state, ref).toBe("executed");
-  const moved = open.filter((ref) => after.actions.find((a) => a.ref === ref)?.state !== "pending");
-  expect(moved.length, "Autonomous lets at least one held action run").toBeGreaterThan(0);
-  const v = await api<Verify>(page, `sites/${SITE}/ledger/verify`);
-  expect(v.ok).toBe(true);
+  const moved = open_.filter((ref) => after.actions.find((a) => a.ref === ref)?.state !== "pending");
+  expect(moved.length, "Auto lets at least one held action run").toBeGreaterThan(0);
+  expect((await api<Verify>(page, `sites/${SITE}/ledger/verify`)).ok).toBe(true);
 });

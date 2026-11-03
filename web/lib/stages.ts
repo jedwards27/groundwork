@@ -20,8 +20,9 @@ export interface StageState {
   note: string;
 }
 
+// Only the stages this project has items for: none, for a project outside the data-center vertical.
 export function stages(items: ItemView[]): StageState[] {
-  return STAGES.map((s) => {
+  return STAGES.filter((s) => items.some((i) => s.codes.includes(i.code))).map((s) => {
     const its = items.filter((i) => s.codes.includes(i.code));
     const done = its.length > 0 && its.every((i) => i.status === "done");
     const late = its.filter((i) => i.status !== "done" && i.finish_shift_days > 0);

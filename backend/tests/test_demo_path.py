@@ -37,9 +37,9 @@ def test_demo_is_scripted_even_with_a_live_key(dana, monkeypatch):
     assert a["a1"]["recipient"] == "morgan" and a["a1"]["state"] == "executed"
     assert a["a1"]["clause"].startswith("routine_messages:")
 
-    # ASK: the landlord-bound request routes Anthropic -> Fluidstack -> TeraWulf to named approvers.
+    # ASK: the landlord-bound request routes Anthropic -> Fluidstack -> TeraWulf to the named approver.
     assert a["a2"]["path"] == ["fluidstack", "terawulf"] and a["a2"]["state"] == "pending"
-    assert a["a2"]["approvers"] == ["dana", "priya"]
+    assert a["a2"]["approvers"] == ["dana"]
     assert "direct counterparties only" in a["a2"]["clause"]
 
     # NEVER: the change order a vendor document told the agent to sign.

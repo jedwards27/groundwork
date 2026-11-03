@@ -34,7 +34,7 @@ from groundwork.executors import ExecutorDisabled, execute
 from groundwork.ledger import append
 from groundwork.policy.gateway import SPEND_KINDS
 from groundwork.schemas.action import Autonomy
-from groundwork.schemas.plan import Arm, Plan
+from groundwork.schemas.plan import Arm, Plan, Report
 from groundwork.service import actions as actions_svc
 from groundwork.service import planctx
 from groundwork.service.decisions import decide_plan, intent_check
@@ -470,26 +470,47 @@ def report_phase(org_id: uuid.UUID, run_id: uuid.UUID, plan_id: uuid.UUID, tools
         except PlannerError as exc:
             report, usage = tools.sim_reporter.report(plan, entries)
             reporter_name = f"simulated (live reporter failed: {exc})"
-        append(
-            s,
-            "report",
-            {**report.model_dump(), "reporter": reporter_name, "usage": usage},
-            run_id=run_id,
-            arm=plan_row.arm,
-        )
-        check = check_report([a.ref for a in plan.actions], entries, report)
-        if not check.ok:
-            append(s, "report_mismatch", check.as_dict(), run_id=run_id, arm=plan_row.arm)
-        set_summary(s, run_id, report=report.model_dump(), report_check=check.as_dict())
-        step(
-            s,
-            run_id,
-            "report",
-            "Report matches the ledger"
-            if check.ok
-            else f"Report disagrees with the ledger: {check.as_dict()}",
-            report_ok=check.ok,
-        )
+        _record_report(s, run_id, plan_row, plan, entries, report, reporter_name, usage)
+
+
+def report_entries(s: Session, state: SiteState, plan_row: m.Plan) -> dict[str, list[str]]:
+    """Each action's ledger entry types, as the reporter and the honesty check see them."""
+    pv = actions_svc.plan_view(s, state, plan_row)
+    return {
+        a["ref"]: [t["type"] if t["type"] != "decided" else f"decided:{a['decision']}" for t in a["ledger"]]
+        for a in pv["actions"]
+    }
+
+
+def _record_report(
+    s: Session,
+    run_id: uuid.UUID,
+    plan_row: m.Plan,
+    plan: Plan,
+    entries: dict[str, list[str]],
+    report: Report,
+    reporter_name: str,
+    usage: dict[str, Any],
+) -> Any:
+    append(
+        s,
+        "report",
+        {**report.model_dump(), "reporter": reporter_name, "usage": usage},
+        run_id=run_id,
+        arm=plan_row.arm,
+    )
+    check = check_report([a.ref for a in plan.actions], entries, report)
+    if not check.ok:
+        append(s, "report_mismatch", check.as_dict(), run_id=run_id, arm=plan_row.arm)
+    set_summary(s, run_id, report=report.model_dump(), report_check=check.as_dict())
+    step(
+        s,
+        run_id,
+        "report",
+        "Report matches the ledger" if check.ok else f"Report disagrees with the ledger: {check.as_dict()}",
+        report_ok=check.ok,
+    )
+    return check
 
 
 def acknowledgment_phase(org_id: uuid.UUID, run_id: uuid.UUID) -> None:
@@ -538,33 +559,39 @@ def acknowledgment_phase(org_id: uuid.UUID, run_id: uuid.UUID) -> None:
 
 
 # --- entry point -------------------------------------------------------------------------------
+def _apply_message(org_id: uuid.UUID, run_id: uuid.UUID) -> tuple[str, str, bool]:
+    """Mark the run running and apply its message. Returns (site key, message kind, scripted)."""
+    with org_session(org_id) as s:
+        run = s.get(m.Run, run_id)
+        assert run is not None
+        run.status, run.started_at = "running", datetime.now(UTC)
+        site, event = _site(s, run)
+        site_key, event_key, event_kind, scripted = site.key, event.key, event.kind, event.scripted
+        step(s, run_id, "running", f"Reading '{event.title}'")
+    with org_session(org_id) as s:
+        state = repo.load_state(s, site_key)
+        before = _milestone(state)
+        # Every played event is "applied" (received); only schedule changes carry delays.
+        repo.set_event_status(s, state.site_id, event_key, "applied")  # type: ignore[arg-type]
+        after = _milestone(repo.load_state(s, site_key))
+        set_summary(s, run_id, milestone_before=before, milestone_after=after)
+        step(
+            s,
+            run_id,
+            "forecast",
+            f"{after['label']}: {before['forecast_finish']} -> {after['forecast_finish']} "
+            f"(range {after['forecast_low']} to {after['forecast_high']}); gating item: {after['gate_title']}",
+            before=before,
+            after=after,
+        )
+    return site_key, event_kind, scripted
+
+
 def execute_run(org_id: uuid.UUID, run_id: uuid.UUID, *, force_simulated: bool = False) -> None:
     try:
-        with org_session(org_id) as s:
-            run = s.get(m.Run, run_id)
-            assert run is not None
-            run.status, run.started_at = "running", datetime.now(UTC)
-            site, event = _site(s, run)
-            site_key, event_key, event_kind = site.key, event.key, event.kind
-            # The demo path is scripted: it always plays the hand-written plan, model or no model.
-            force_simulated = force_simulated or event.scripted
-            step(s, run_id, "running", f"Reading '{event.title}'")
-        with org_session(org_id) as s:
-            state = repo.load_state(s, site_key)
-            before = _milestone(state)
-            # Every played event is "applied" (received); only schedule changes carry delays.
-            repo.set_event_status(s, state.site_id, event_key, "applied")  # type: ignore[arg-type]
-            after = _milestone(repo.load_state(s, site_key))
-            set_summary(s, run_id, milestone_before=before, milestone_after=after)
-            step(
-                s,
-                run_id,
-                "forecast",
-                f"{after['label']}: {before['forecast_finish']} -> {after['forecast_finish']} "
-                f"(range {after['forecast_low']} to {after['forecast_high']}); gating item: {after['gate_title']}",
-                before=before,
-                after=after,
-            )
+        site_key, event_kind, scripted = _apply_message(org_id, run_id)
+        # The demo path is scripted: it always plays the hand-written plan, model or no model.
+        force_simulated = force_simulated or scripted
         if event_kind == "acknowledgment":
             acknowledgment_phase(org_id, run_id)
             _finish(org_id, run_id)
@@ -620,3 +647,62 @@ def _finish(org_id: uuid.UUID, run_id: uuid.UUID) -> None:
         assert run is not None
         run.status, run.finished_at = "done", datetime.now(UTC)
         step(s, run_id, "done", "Run complete")
+
+
+# --- plans written outside Groundwork (Claude in the app, through the plugin) -------------------
+def play_external_plan(
+    org_id: uuid.UUID, run_id: uuid.UUID, plan: Plan, *, planner: str, model_id: str
+) -> uuid.UUID | None:
+    """Apply the message, record a plan Claude wrote in the app, and run the gateway and the dry-run
+    executors on it. The run then waits for the report from the same writer
+    (``submit_external_report``). Returns the plan id, or None for an acknowledgment."""
+    site_key, event_kind, _ = _apply_message(org_id, run_id)
+    if event_kind == "acknowledgment":
+        acknowledgment_phase(org_id, run_id)
+        _finish(org_id, run_id)
+        return None
+    with org_session(org_id) as s:
+        # The deterministic content rules classify outbound text; no model key is needed.
+        tools = choose_tools(s, site_key, force_simulated=True)
+        run = s.get(m.Run, run_id)
+        assert run is not None
+        result = PlannerResult(plan=plan, planner=planner, model_id=model_id, prompt_hash="external")
+        row = _record_plan(s, run, Arm.informed, result)
+        step(
+            s,
+            run_id,
+            "plan",
+            f"Informed arm: {model_id} in {planner} proposed {len(plan.actions)} actions",
+            arm="informed",
+            planner=planner,
+            model_id=model_id,
+        )
+        set_summary(s, run_id, planner=planner, model_id=model_id, simulated_note="")
+        plan_id = row.id
+    decide_phase(org_id, run_id, plan_id, tools)
+    execute_phase(org_id, run_id, plan_id)
+    with org_session(org_id) as s:
+        run = s.get(m.Run, run_id)
+        assert run is not None
+        run.status = "waiting_model"
+        step(s, run_id, "waiting", "Waiting for the agent's report")
+    return plan_id
+
+
+def submit_external_report(org_id: uuid.UUID, run_id: uuid.UUID, report: Report, *, reporter: str) -> Any:
+    """Record the agent's own report for a run it planned, check it against the ledger, finish."""
+    with org_session(org_id) as s:
+        run = s.get(m.Run, run_id)
+        if run is None:
+            raise KeyError(str(run_id))
+        if run.status != "waiting_model":
+            raise ValueError(f"this run is {run.status}, not waiting for a report")
+        plan_row = actions_svc.primary_plan(s, run_id)
+        assert plan_row is not None
+        site, _ = _site(s, run)
+        state = repo.load_state(s, site.key)
+        plan = Plan.model_validate(plan_row.content)
+        entries = report_entries(s, state, plan_row)
+        check = _record_report(s, run_id, plan_row, plan, entries, report, reporter, {})
+    _finish(org_id, run_id)
+    return check

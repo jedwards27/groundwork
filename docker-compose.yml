@@ -1,8 +1,8 @@
 # Two ways to use this file:
 #   docker compose up -d db                  Postgres only, for `make dev` without a local Postgres
 #   sh scripts/new-env.sh && docker compose --profile full up --build
-#                                            Postgres, API and Mission Control: Docker is the only
-#                                            prerequisite. Open http://localhost:3000
+#                                            Postgres and Groundwork: Docker is the only
+#                                            prerequisite. Open http://localhost:8000
 # Every port binds to 127.0.0.1, so nothing is reachable from the network.
 x-secrets: &secrets
   GROUNDWORK_ADMIN_TOKEN: ${GROUNDWORK_ADMIN_TOKEN:?no .env with secrets; run sh scripts/new-env.sh first}
@@ -49,21 +49,7 @@ services:
       start_period: 30s
       retries: 30
     ports:
-      - "127.0.0.1:8000:8000"
-
-  web:
-    profiles: ["full"]
-    build:
-      context: ./web
-    depends_on:
-      api:
-        condition: service_healthy
-    environment:
-      <<: *secrets
-      GROUNDWORK_API_URL: http://api:8000
-      NEXT_TELEMETRY_DISABLED: "1"
-    ports:
-      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:8000:8000"  # the web app and its API: http://localhost:8000
 
 volumes:
   pgdata:

@@ -77,6 +77,10 @@ PROFILE = DomainProfile(
         "epc": "counterparty_routine",
         "operator": "counterparty_routine",
         "end_user": "internal",
+        "owner": "internal",
+        "contractor": "counterparty_routine",
+        "designer": "counterparty_routine",
+        "consultant": "counterparty_routine",
     },
     # Assumptions to verify (practitioner question 18): business days to get a response.
     response_lag_bd={"lessee": 5, "landlord": 5, "developer": 5, "epc": 5, "vendor": 5, "ie": 3},

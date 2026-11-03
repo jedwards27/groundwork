@@ -1,0 +1,16 @@
+{
+  "name": "groundwork",
+  "displayName": "Groundwork",
+  "version": "0.3.0",
+  "description": "Groundwork: an agent with delegated judgment that chases down what a building, energy or infrastructure project is waiting on, within the limits its team sets. Runs on this computer, in dry run.",
+  "author": {
+    "name": "Jude Edwards"
+  },
+  "keywords": [
+    "projects",
+    "coordination",
+    "approvals",
+    "mandate",
+    "ledger"
+  ]
+}

@@ -39,6 +39,11 @@ export const PROVENANCE_LABEL: Record<string, string> = {
   assumption_to_verify: "assumption to verify",
 };
 
+// The API keeps its own values (auto / ask / refuse, autonomous); the page shows the product's words.
+export const DECISION_LABEL: Record<string, string> = { auto: "allow", ask: "ask", refuse: "deny" };
+
+export const TEMPLATE_LABEL: Record<string, string> = { supervised: "Supervised", standard: "Standard", autonomous: "Auto" };
+
 // Gateway reasons are written over keys (the gateway is generic); show names instead.
 export function humanize(text: string, names: Record<string, string>): string {
   const keys = Object.keys(names).sort((a, b) => b.length - a.length);
@@ -46,3 +51,23 @@ export function humanize(text: string, names: Record<string, string>): string {
   const re = new RegExp(`\\b(${keys.map((k) => k.replace(/[-]/g, "\\-")).join("|")})\\b`, "g");
   return text.replace(re, (k) => names[k] ?? k);
 }
+
+// "3 min ago", "2 h ago", "Nov 2" for timestamps.
+export function ago(iso: string): string {
+  const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60_000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins} min ago`;
+  if (mins < 24 * 60) return `${Math.round(mins / 60)} h ago`;
+  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+export function lateness(days: number | null | undefined): { text: string; late: boolean } {
+  const d = days ?? 0;
+  if (d > 0) return { text: `${d} days late`, late: true };
+  if (d < 0) return { text: `${-d} days early`, late: false };
+  return { text: "on time", late: false };
+}
+
+// The demo project. Its messages have hand-written plans, so the app can play them without Claude;
+// a project of your own is planned by Claude through the plugin.
+export const DEMO_PROJECT = "lake-mariner";

@@ -60,12 +60,8 @@ def latest_primary_plan(s: Session, site_id: uuid.UUID) -> m.Plan | None:
 def set_preset(
     s: Session, state: SiteState, preset: str, person_id: uuid.UUID | None, person_key: str | None
 ) -> dict[str, Any]:
-    """Issue a new mandate version and re-decide open actions of the latest plan. Never re-plans;
-    executed, approved, declined and refused actions keep their record."""
-    from groundwork.service.pipeline import execute_actions, spent_today
-
-    site_id = state.require_site_id()
-    current = repo.active_mandate(s, site_id)
+    """Issue a new mandate version from a template and re-decide open actions of the latest plan."""
+    current = repo.active_mandate(s, state.require_site_id())
     new = build_preset(
         preset,
         issuer=current.issuer,
@@ -78,6 +74,27 @@ def set_preset(
         version=current.version + 1,
         dry_run=current.dry_run,
     )
+    return issue(s, state, new, person_id, person_key)
+
+
+def issue(
+    s: Session,
+    state: SiteState,
+    new: Mandate,
+    person_id: uuid.UUID | None,
+    person_key: str | None,
+    *,
+    words: str | None = None,
+) -> dict[str, Any]:
+    """Record a new mandate version and re-decide open actions of the latest plan. Never re-plans;
+    executed, approved, declined and refused actions keep their record. ``words`` is the person's
+    own description when the version came from plain-language terms."""
+    from groundwork.service.pipeline import execute_actions, spent_today
+
+    site_id = state.require_site_id()
+    current = repo.active_mandate(s, site_id)
+    if new.version != current.version + 1:
+        raise ValueError(f"expected version {current.version + 1}, got {new.version}")
     s.add(
         m.MandateVersion(
             org_id=state.org_id,
@@ -100,6 +117,7 @@ def set_preset(
             "previous_preset": current.preset,
             "by": person_key,
             "summary": new.plain_lines(),
+            **({"words": words} if words else {}),
         },
     )
     plan_row = latest_primary_plan(s, site_id)

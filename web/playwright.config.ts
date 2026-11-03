@@ -1,9 +1,10 @@
 import { defineConfig } from "@playwright/test";
 
 // The walkthrough drives the real stack: the API on :8000 (dev database, Lake Mariner fixture) and
-// Mission Control on :3000. It resets the site before each test. Without E2E_BASE_URL, Playwright
-// starts both servers if they are not already running (`make e2e`). With E2E_BASE_URL (for example
-// the compose stack), it tests whatever is there and starts nothing.
+// the web app on :3000, which forwards /api to it. It resets the demo before each test. Without
+// E2E_BASE_URL, Playwright starts both servers if they are not already running (`make e2e`). With
+// E2E_BASE_URL (the compose stack, the hosted rehearsal, or the plugin's own server), it tests
+// whatever is there and starts nothing.
 //
 // Browser: the installed Google Chrome by default, so nothing is downloaded. Set PW_CHANNEL= (empty)
 // to use Playwright's own Chromium after `npx playwright install chromium`.

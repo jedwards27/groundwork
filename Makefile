@@ -1,7 +1,7 @@
 # Groundwork. `make help` lists targets. Two ways to run:
 #   make dev                         development (needs Postgres, uv and Node 20+)
 #   sh scripts/new-env.sh && docker compose --profile full up --build
-#                                     Docker only: Postgres, API and Mission Control in containers
+#                                     Docker only: Postgres and Groundwork (app and API) in containers
 SHELL := /bin/bash
 UV ?= uv
 BACKEND := backend
@@ -37,17 +37,17 @@ migrate: ## Apply migrations to the dev and test databases
 seed: ## Load the Lake Mariner fixture (replaces the demo org's data)
 	cd $(BACKEND) && $(UV) run groundwork seed
 
-api: ## Run the API on :8000
+api: ## Run the API on :8000 (under /api; it also serves the built web app, see web-build)
 	cd $(BACKEND) && $(UV) run groundwork serve --reload
 
 web-install: ## Install the web app's dependencies (Node 20+)
 	cd web && $(NPM) ci --no-fund --no-audit
 
-web: ## Run Mission Control on :3000 (needs the API on :8000)
-	cd web && NEXT_TELEMETRY_DISABLED=1 $(NPM) run dev
+web: ## Run the web app on :3000 with live reload (forwards /api to the API on :8000)
+	cd web && $(NPM) run dev
 
-web-build: ## Production build of Mission Control (also type-checks it)
-	cd web && NEXT_TELEMETRY_DISABLED=1 $(NPM) run typecheck && NEXT_TELEMETRY_DISABLED=1 $(NPM) run build
+web-build: ## Build the web app into web/dist (type-checks it first); the API serves it on :8000
+	cd web && $(NPM) run build
 
 e2e: ## Browser walkthrough of the demo against the real API (starts servers if needed; uses installed Chrome)
 	cd web && $(NPM) run e2e
@@ -58,8 +58,14 @@ preflight: ## Check whether the current settings may serve the public hosted dem
 hosted-bootstrap: ## Create the hosted database roles and write .env.hosted (prompts for the admin URL)
 	cd $(BACKEND) && $(UV) run groundwork hosted-bootstrap
 
-rehearse-hosted: web-build ## Run the hosted profile locally against a throwaway Postgres (API :8100, web :3200)
+rehearse-hosted: web-build ## Run the hosted profile locally against a throwaway Postgres (app and API on :8100)
 	sh scripts/rehearse-hosted.sh
+
+plugin: ## Build dist/groundwork-plugin.zip for Cowork upload or `claude --plugin-dir`
+	sh scripts/build-plugin.sh
+
+plugin-local: web-build ## Run the plugin's local runtime and its web app without Claude (embedded Postgres)
+	cd $(BACKEND) && UV_PROJECT_ENVIRONMENT=.venv-local $(UV) run --python 3.12 --extra local groundwork local
 
 deploy: ## Deploy the hosted demo to Fly.io (needs fly auth login and .env.hosted; docs/HOSTING.md)
 	sh scripts/deploy-fly.sh
@@ -68,9 +74,9 @@ types: ## Regenerate web/openapi.json and the web client's types from the API
 	cd $(BACKEND) && $(UV) run python -c "import json; from groundwork.api.app import app; print(json.dumps(app.openapi(), indent=1))" > ../web/openapi.json
 	cd web && $(NPM) run types
 
-dev: setup db-setup migrate seed web-install ## Everything: API on :8000 and Mission Control on :3000
-	@echo "API http://localhost:8000/docs · Mission Control http://localhost:3000"
-	@trap 'kill 0' EXIT; (cd $(BACKEND) && $(UV) run groundwork serve) & (cd web && NEXT_TELEMETRY_DISABLED=1 $(NPM) run dev) & wait
+dev: setup db-setup migrate seed web-install ## Everything: Groundwork on :3000 (live reload), its API on :8000
+	@echo "Groundwork http://localhost:3000 · API docs http://localhost:8000/api/docs"
+	@trap 'kill 0' EXIT; (cd $(BACKEND) && $(UV) run groundwork serve) & (cd web && $(NPM) run dev) & wait
 
 demo: ## Slice-1 demo: chain, gate, critical path, then event A as a run
 	cd $(BACKEND) && $(UV) run groundwork demo
@@ -84,4 +90,4 @@ inspect: ## Validate a site folder: make inspect SITE=path/to/your-site
 test: ## Lint, types, import boundaries and the test suite
 	cd $(BACKEND) && $(UV) run ruff check groundwork tests evals migrations && $(UV) run pyright && $(UV) run lint-imports && $(UV) run pytest
 
-.PHONY: help doctor setup db-setup migrate seed api web web-install web-build e2e types dev demo demo-offline inspect test preflight hosted-bootstrap rehearse-hosted deploy
+.PHONY: plugin plugin-local help doctor setup db-setup migrate seed api web web-install web-build e2e types dev demo demo-offline inspect test preflight hosted-bootstrap rehearse-hosted deploy

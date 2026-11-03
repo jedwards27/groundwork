@@ -9,6 +9,7 @@ never-list first, then everything that forces a person, then the auto rules, the
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import date
 
 from groundwork.policy.mandate import AutoRule, Mandate
 from groundwork.schemas.action import (
@@ -53,6 +54,7 @@ class RequestContext:
     spent_today_cents: int = 0
     missing_params: tuple[str, ...] = ()
     notes: tuple[str, ...] = field(default_factory=tuple)
+    as_of: date | None = None  # the project's current date, for the mandate's validity
 
 
 @dataclass(frozen=True)
@@ -134,7 +136,15 @@ def decide(action: ProposedAction, ctx: RequestContext, mandate: Mandate) -> Dec
     if ex in NEVER_EXECUTORS or kind in mandate.never:
         return out(Autonomy.refuse, f"Never within authority: {kind.value}", "never", never_clause)
 
-    # 2. Anything that forces a person.
+    # 2. Anything that forces a person, starting with a mandate that has run out.
+    if mandate.valid_until is not None and ctx.as_of is not None and ctx.as_of > mandate.valid_until:
+        return out(
+            Autonomy.ask,
+            f"Mandate expired on {mandate.valid_until}",
+            "expired",
+            f"Expired: this mandate ran until {mandate.valid_until}. Until a person issues a new version, "
+            "everything asks a named approver.",
+        )
     if ctx.missing_params:
         return out(
             Autonomy.ask,

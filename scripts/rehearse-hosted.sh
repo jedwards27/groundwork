@@ -3,12 +3,12 @@
 #
 # Starts a throwaway Postgres whose admin role is neither superuser nor BYPASSRLS, like Neon's,
 # then runs the same commands a deploy runs: `groundwork hosted-bootstrap`, `groundwork preflight`
-# and `groundwork release`. It serves the API in the hosted profile on :8100 and the production web
-# build on :3200. Test it from another terminal:
+# and `groundwork release`. It serves the hosted profile on :8100: the production web build and its
+# API from one process, as on Fly. Test it from another terminal:
 #
-#   E2E_BASE_URL=http://localhost:3200 make e2e
+#   E2E_BASE_URL=http://localhost:8100 make e2e
 #
-# Needs initdb and pg_ctl (Homebrew postgresql), uv, Node 20+, and `make web-build` first.
+# Needs initdb and pg_ctl (Homebrew postgresql), uv, and `make web-build` first.
 # Ctrl-C stops everything and deletes the cluster and its secrets.
 set -eu
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
@@ -19,14 +19,13 @@ rand() { LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 32; }
 cleanup() {
   trap - EXIT INT TERM
   [ -n "${API_PID:-}" ] && kill "$API_PID" 2>/dev/null || true
-  [ -n "${WEB_PID:-}" ] && kill "$WEB_PID" 2>/dev/null || true
   pg_ctl -D "$WORK/pg" -m fast stop >/dev/null 2>&1 || true
   rm -rf "$WORK"
   echo "rehearsal stopped; cluster and secrets deleted"
 }
 trap cleanup EXIT INT TERM
 
-[ -f "$ROOT/web/.next/standalone/server.js" ] || { echo "Build the web app first: make web-build"; exit 1; }
+[ -f "$ROOT/web/dist/index.html" ] || { echo "Build the web app first: make web-build"; exit 1; }
 
 echo "1/5 throwaway Postgres on :$PGPORT"
 SUPER_PW=$(rand); ADMIN_PW=$(rand)
@@ -59,14 +58,8 @@ uv run groundwork preflight
 echo "4/5 release: migrate and seed"
 uv run groundwork release
 
-echo "5/5 hosted API on :8100 (IPv6, as on Fly) and Mission Control on :3200"
+echo "5/5 the hosted profile on :8100 (IPv6, as on Fly)"
 uv run groundwork serve --host :: --port 8100 &
 API_PID=$!
-rm -rf "$ROOT/web/.next/standalone/.next/static"
-cp -R "$ROOT/web/.next/static" "$ROOT/web/.next/standalone/.next/static"
-(cd "$ROOT/web/.next/standalone" && exec env -i PATH="$PATH" HOME="$HOME" NODE_ENV=production \
-  NEXT_TELEMETRY_DISABLED=1 PORT=3200 HOSTNAME=0.0.0.0 GROUNDWORK_API_URL="http://[::1]:8100" \
-  GROUNDWORK_ADMIN_TOKEN="$GROUNDWORK_ADMIN_TOKEN" node server.js) &
-WEB_PID=$!
-echo "Mission Control (hosted profile): http://localhost:3200   Ctrl-C to stop"
+echo "Groundwork (hosted profile): http://localhost:8100   Ctrl-C to stop"
 wait

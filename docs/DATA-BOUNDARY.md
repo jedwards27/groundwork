@@ -29,7 +29,17 @@ Without an API key nothing is sent; the hand-written simulated planner runs inst
 
 ## Run-time network other than Anthropic
 
-- **None.** The browser loads everything from the web app's own address: scripts, styles and fonts are bundled, so there is no font or analytics request to a third party. The web app's server talks only to the API. Next.js anonymous telemetry is turned off with `NEXT_TELEMETRY_DISABLED=1` in `.env.example`, `next.config.ts`, both run profiles and the web container, and a test checks it. Executors run in dry run, so no email, calendar or filing leaves the system.
+- **None.** The browser loads everything from the app's own address, which also serves the API: scripts and styles are bundled and the fonts are the system's, so there is no font or analytics request to a third party. The content security policy limits the page's requests to its own origin (`connect-src 'self'`), and a test checks it. The web app has no framework telemetry. Executors run in dry run, so no email, calendar or filing leaves the system.
+
+## The Claude plugin (local)
+
+When Groundwork runs as a Claude plugin, project data reaches Anthropic only through the person's own Claude session, under their account's terms:
+- what Claude reads with their connectors;
+- what Groundwork's tools return to Claude.
+
+The Groundwork server runs on the machine and keeps everything under `~/.groundwork`: the embedded database, drafts, the person's name and email, and the local page's token. It makes no network calls at run time; it clears `ANTHROPIC_API_KEY`, so the server itself never calls a model. The local page listens on 127.0.0.1 only. The outbound guard holds connector sends addressed to a party on a tracked project and records them; it sends nothing.
+
+On first launch, uv downloads Python 3.12 and the locked packages from PyPI, including `pgserver`, which bundles the Postgres binaries. No project data is involved.
 
 ## Hosted demo (separate profile)
 

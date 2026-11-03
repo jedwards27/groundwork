@@ -30,6 +30,24 @@ def api(seeded):
         yield c
 
 
+@pytest.fixture()
+def counsel(seeded):
+    """The demo with legal drafts routed to counsel (Priya), as a real project would have it. The
+    demo itself has one person who signs in, so there Dana approves legal drafts too."""
+    import dataclasses
+
+    from groundwork.db import repo
+
+    b = seeded["bundle"]
+    people = type(b.people)(dataclasses.replace(p, approver=True) if p.key == "priya" else p for p in b.people)
+    mandate = dataclasses.replace(b.mandate, approvers=("dana", "priya"), legal_approvers=("priya",))
+    with owner_session() as s:
+        repo.seed_bundle(s, dataclasses.replace(b, people=people, mandate=mandate))
+    with TestClient(app) as c:
+        c.headers.update(token(seeded["org_a"], "dana"))
+        yield c
+
+
 def play(api, event):
     r = api.post("/sites/lake-mariner/events", json={"event": event})
     assert r.status_code == 202, r.text
@@ -66,7 +84,7 @@ def test_event_a_decisions_states_and_differential(api):
     assert a["a2"]["path"] == ["fluidstack", "terawulf"]
     assert a["a3"]["amount_cents"] == 1850000 and a["a3"]["state"] == "executed"
     assert a["a3"]["external_ref"].startswith("dry-run:commit_spend:")
-    assert a["a7"]["kind"] == "legal" and a["a7"]["approvers"] == ["priya"]
+    assert a["a7"]["kind"] == "legal" and a["a7"]["approvers"] == ["dana"]  # the demo's one approver
     assert a["a1"]["kind"] == "chase"
     d = p["differential"]
     assert d["recovered_now"] == 0 and d["recovered_if_they_agree"] == 14
@@ -85,7 +103,8 @@ def test_event_b_refuses_the_payment(api):
     assert len(att["signature"]["value"]) == 64
 
 
-def test_approvals_are_typed_and_bound(api, seeded):
+def test_approvals_are_typed_and_bound(counsel, seeded):
+    api = counsel
     run = play(api, "event-a")
     a = by_ref(plan(api, run))
     a2, a7, a3 = a["a2"]["id"], a["a7"]["id"], a["a3"]["id"]

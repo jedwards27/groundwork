@@ -6,8 +6,9 @@ are allowed. The generic packages consume a profile; they never import a vertica
 
 from groundwork.core.profile import DomainProfile
 from groundwork.domain.datacenter import PROFILE as DATACENTER
+from groundwork.domain.general import PROFILE as GENERAL
 
-PROFILES: dict[str, DomainProfile] = {DATACENTER.name: DATACENTER}
+PROFILES: dict[str, DomainProfile] = {DATACENTER.name: DATACENTER, GENERAL.name: GENERAL}
 
 
 def get_profile(name: str) -> DomainProfile:

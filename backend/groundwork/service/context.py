@@ -174,6 +174,7 @@ def resolve(
         effect_reason=effect_reason,
         spent_today_cents=spent_today_cents,
         missing_params=tuple(missing),
+        as_of=state.as_of,
     )
     lag = (
         response_lag_bd(state, profile, a, list(path))

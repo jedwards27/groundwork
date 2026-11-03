@@ -10,16 +10,19 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 import structlog
-from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Query, Request, status
+from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Query, Request, Response, status
 from fastapi.concurrency import run_in_threadpool
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from sse_starlette.sse import EventSourceResponse
 
 from groundwork import __version__
-from groundwork.api.auth import Identity, TokenError, verify
+from groundwork.api.auth import Identity
 from groundwork.api.deps import db, identity
+from groundwork.api.home import router as home_router
+from groundwork.api.viewer import Viewer, csrf_problem, lead, set_cookie, viewer, viewer_or_none
 from groundwork.config import get_settings, hosted_problems
 from groundwork.db import models as m
 from groundwork.db import repo
@@ -35,7 +38,7 @@ from groundwork.schemas.views import (
     SiteView,
 )
 from groundwork.service import actions as actions_svc
-from groundwork.service import mandates, reset, runs, sandboxes, views
+from groundwork.service import mandates, overview, reset, runs, sandboxes, views
 from groundwork.service.attestation import attestation
 from groundwork.service.scorecard import scorecard
 
@@ -67,6 +70,17 @@ app = FastAPI(
     summary="Paper critical path, slip forecasts, and bounded action under an explicit mandate.",
     lifespan=lifespan,
 )
+app.include_router(home_router)
+
+
+@app.middleware("http")
+async def refuse_cross_site(request: Request, call_next):  # type: ignore[no-untyped-def]
+    """A browser sends the session cookie on its own; a state change riding on it must come from
+    this app's own pages (``api/viewer.py``)."""
+    problem = csrf_problem(request)
+    if problem:
+        return JSONResponse({"detail": problem}, status_code=status.HTTP_403_FORBIDDEN)
+    return await call_next(request)
 
 
 class MeView(BaseModel):
@@ -121,6 +135,7 @@ def health() -> dict[str, Any]:
 
 
 @app.get("/me", response_model=MeView)
+@app.get("/sites/{site}/me", response_model=MeView)
 def me(who: Identity = Depends(identity), s: Session = Depends(db)) -> MeView:
     person = s.get(m.Person, who.person_id)
     org = s.get(m.Org, who.org_id)
@@ -275,20 +290,29 @@ def _ledger_rows(
     if run_id is not None:
         q = q.where(m.LedgerEntry.run_id == run_id)
     rows = list(s.execute(q).scalars())
-    return [
-        {
-            "seq": e.seq,
-            "type": e.entry_type,
-            "arm": e.arm,
-            "run_id": str(e.run_id) if e.run_id else None,
-            "action_id": str(e.action_id) if e.action_id else None,
-            "recorded_at": e.recorded_at,
-            "payload": e.payload,
-            "hash": e.hash,
-            "prev_hash": e.prev_hash,
-        }
-        for e in reversed(rows)
-    ]
+    ids = {e.action_id for e in rows if e.action_id is not None and e.entry_type in ("proposed", "executed")}
+    params = {a.id: a.params for a in s.execute(select(m.Action).where(m.Action.id.in_(ids))).scalars()} if ids else {}
+    out = []
+    for e in reversed(rows):
+        subject, body = overview.text_of(params[e.action_id]) if e.action_id is not None and e.action_id in params else ("", "")
+        out.append(
+            {
+                "seq": e.seq,
+                "type": e.entry_type,
+                "arm": e.arm,
+                "run_id": str(e.run_id) if e.run_id else None,
+                "action_id": str(e.action_id) if e.action_id else None,
+                "recorded_at": e.recorded_at,
+                "payload": e.payload,
+                "hash": e.hash,
+                "prev_hash": e.prev_hash,
+                # The action as it would have gone out, and whether it went (dry run: it did not).
+                "subject": subject,
+                "text": body,
+                "dry_run": bool(e.entry_type == "executed" and e.payload.get("dry_run")),
+            }
+        )
+    return out
 
 
 @app.get("/sites/{site}/mandate")
@@ -481,8 +505,7 @@ def replay_run(run_id: uuid.UUID, s: Session = Depends(db)) -> dict[str, Any]:
     }
 
 
-class DemoLogin(BaseModel):
-    person: str
+class DemoSignIn(BaseModel):
     # With sandboxes: start over in a new sandbox (the current one is deleted).
     fresh: bool = False
 
@@ -490,7 +513,7 @@ class DemoLogin(BaseModel):
 def _demo_org_id() -> uuid.UUID:
     cfg = get_settings()
     if not cfg.groundwork_demo_login:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "demo login is disabled")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "demo sign-in is disabled")
     with owner_session() as s:
         org = s.execute(select(m.Org).where(m.Org.name == cfg.groundwork_demo_org)).scalar_one_or_none()
         if org is None:
@@ -498,69 +521,22 @@ def _demo_org_id() -> uuid.UUID:
         return org.id
 
 
-def _principal_people(org_id: uuid.UUID) -> list[m.Person]:
-    """Only the principal's own people are users; counterparties' contacts never sign in."""
-    with owner_session() as s:
-        principals = {
-            x for (x,) in s.execute(select(m.Site.principal_party_id).where(m.Site.org_id == org_id))
-        }
-        return list(
-            s.execute(
-                select(m.Person)
-                .where(m.Person.org_id == org_id, m.Person.party_id.in_(principals))
-                .order_by(m.Person.key)
-            ).scalars()
-        )
-
-
-def _demo_people() -> list[m.Person]:
-    return _principal_people(_demo_org_id())
-
-
-def _bearer(authorization: str | None) -> Identity | None:
-    """The caller's identity if they sent a valid token, else None (never an error)."""
-    if not authorization or not authorization.lower().startswith("bearer "):
-        return None
-    try:
-        return verify(
-            authorization.split(" ", 1)[1].strip(), secret=get_settings().groundwork_dev_hmac_secret
-        )
-    except TokenError:
-        return None
-
-
-@app.get("/auth/personas")
-def personas() -> list[dict[str, Any]]:
-    """Demo personas only (anyone with the link can act as them). Disabled unless GROUNDWORK_DEMO_LOGIN."""
-    with owner_session() as s:
-        parties = {p.id: p for p in s.execute(select(m.Party)).scalars()}
-    return [
-        {
-            "key": p.key,
-            "name": p.name,
-            "title": p.title,
-            "party": parties[p.party_id].key,
-            "approver": p.approver,
-        }
-        for p in _demo_people()
-    ]
-
-
-@app.post("/auth/demo-login")
-def demo_login(body: DemoLogin, authorization: str | None = Header(default=None)) -> dict[str, Any]:
-    """Log in as a demo persona. With sandboxes on, a visitor without a live sandbox gets a new one;
-    a visitor who has one (their current token) stays in it when switching persona; `fresh` starts
-    over in a new sandbox and deletes the old one."""
+def _demo_sign_in(request: Request, fresh: bool) -> dict[str, Any]:
+    """A token for the demo project's lead: the one person a visitor is in the demo. With sandboxes
+    on, a visitor without a live sandbox gets a new one; a visitor who has one stays in it; `fresh`
+    starts over in a new one and deletes the old one."""
     from groundwork.api.auth import mint
 
     cfg = get_settings()
-    if body.person not in {p.key for p in _demo_people()}:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "no such persona")
     org_id = _demo_org_id()
     if cfg.groundwork_sandboxes:
-        who = _bearer(authorization)
-        current = who.org_id if who and sandboxes.live(who.org_id) else None
-        if current is None or body.fresh:
+        current_viewer = viewer_or_none(request)
+        current = (
+            current_viewer.identities[0].org_id
+            if current_viewer and len(current_viewer.identities) == 1 and sandboxes.live(current_viewer.identities[0].org_id)
+            else None
+        )
+        if current is None or fresh:
             try:
                 org_id = sandboxes.create()
             except sandboxes.SandboxLimit as exc:
@@ -569,16 +545,129 @@ def demo_login(body: DemoLogin, authorization: str | None = Header(default=None)
                 sandboxes.discard(current)
         else:
             org_id = current
-    person = next(p for p in _principal_people(org_id) if p.key == body.person)
+    with owner_session() as s:
+        person = lead(s, org_id)
+        if person is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "the demo project has no lead approver")
+        pid, key, name = person.id, person.key, person.name
     return {
-        "token": mint(
-            person.id, person.org_id, secret=cfg.groundwork_dev_hmac_secret, ttl_hours=cfg.token_ttl_hours
-        ),
-        "person": person.key,
-        "name": person.name,
+        "token": mint(pid, org_id, secret=cfg.groundwork_dev_hmac_secret, ttl_hours=cfg.token_ttl_hours),
+        "person": key,
+        "name": name,
         "ttl_hours": cfg.token_ttl_hours,
         "sandbox": cfg.groundwork_sandboxes,
     }
+
+
+@app.post("/auth/demo-login")
+def demo_login(request: Request, body: DemoSignIn | None = None) -> dict[str, Any]:
+    """A bearer token for the demo project's lead, for scripts. Browsers use POST /session."""
+    return _demo_sign_in(request, bool(body and body.fresh))
+
+
+@app.get("/session")
+def get_session(request: Request) -> dict[str, Any]:
+    """Who this browser is, if anyone, and how the server runs. Never an error."""
+    v = viewer_or_none(request)
+    you = None
+    if v is not None and v.identities:
+        with owner_session() as s:
+            people = [(i, s.get(m.Person, i.person_id)) for i in v.identities]
+            ident, person = next(((i, p) for i, p in people if p is not None and p.key == "me"), people[0])
+            org = s.get(m.Org, ident.org_id)
+            if person is not None and org is not None:
+                you = {
+                    "name": person.name,
+                    "person": person.key,
+                    "approver": person.approver,
+                    # In the demo you act as its fictional lead; the app says so.
+                    "demo_lead": person.key != "me",
+                    "sandbox_expires_at": org.expires_at.isoformat() if org.expires_at else None,
+                }
+    return {
+        "signed_in": v is not None,
+        "local": bool(v and v.local),
+        "you": you,
+        "projects": len(v.orgs) if v else 0,
+        "health": health(),
+    }
+
+
+@app.post("/session")
+def start_session(request: Request, response: Response, body: DemoSignIn | None = None) -> dict[str, Any]:
+    """Sign this browser in to the demo (a cookie). Only where demo sign-in is on."""
+    out = _demo_sign_in(request, bool(body and body.fresh))
+    set_cookie(request, response, out.pop("token"), out["ttl_hours"])
+    return out
+
+
+def _demo_identity(v: Viewer) -> Identity:
+    """The viewer's identity in the demo project (their sandbox, or the shared demo org)."""
+    with owner_session() as s:
+        demo = s.execute(select(m.Org.id).where(m.Org.name == get_settings().groundwork_demo_org)).scalars().all()
+    if len(v.identities) == 1:
+        return v.identities[0]
+    found = next((i for i in v.identities if i.org_id in demo), None)
+    if found is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "the demo project is not on this computer")
+    return found
+
+
+def _require_approver(who: Identity) -> None:
+    with owner_session() as s:
+        person = s.get(m.Person, who.person_id)
+    if person is None or not person.approver:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "only an approver can reset the demo or edit its ledger")
+
+
+@app.post("/demo/reset")
+def demo_reset(request: Request, response: Response, v: Viewer = Depends(viewer)) -> dict[str, Any]:
+    """Start the demo over. Hosted with sandboxes: a fresh private copy. Otherwise the demo
+    project is reloaded from its fixture (the approver's own projects are never touched)."""
+    cfg = get_settings()
+    if cfg.groundwork_sandboxes and not v.local:
+        return start_session(request, response, DemoSignIn(fresh=True))
+    _require_approver(_demo_identity(v))
+    result = reset.reset_fixtures()
+    if not v.local:
+        # Reloading gives every person a new id, so this browser's token needs replacing.
+        out = _demo_sign_in(request, False)
+        set_cookie(request, response, out.pop("token"), out["ttl_hours"])
+    return result
+
+
+def _tamper(org_id: uuid.UUID) -> int:
+    from sqlalchemy import text
+
+    with owner_session() as s:
+        seq = s.execute(
+            text("SELECT min(seq) FROM ledger_entry WHERE org_id = :o AND entry_type = 'decided'"),
+            {"o": org_id},
+        ).scalar()
+        if seq is None:
+            raise HTTPException(status.HTTP_409_CONFLICT, "play a message first: there is no decision to edit")
+        s.execute(text("ALTER TABLE ledger_entry DISABLE TRIGGER ledger_no_update_delete"))
+        s.execute(
+            text(
+                "UPDATE ledger_entry SET payload = jsonb_set(payload, '{reason}', '\"edited after the fact\"') "
+                "WHERE org_id = :o AND seq = :q"
+            ),
+            {"o": org_id, "q": seq},
+        )
+        s.execute(text("ALTER TABLE ledger_entry ENABLE TRIGGER ledger_no_update_delete"))
+    return int(seq)
+
+
+@app.post("/demo/tamper")
+def demo_tamper(v: Viewer = Depends(viewer)) -> dict[str, Any]:
+    """Local and development only: edit one decision in the demo project's ledger the way someone
+    holding owner credentials could (trigger disabled, row edited, trigger re-enabled).
+    Verification then fails. Reset the demo to restore a clean chain. Refused when hosted."""
+    if get_settings().groundwork_hosted:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "never available in the hosted demo")
+    who = _demo_identity(v)
+    _require_approver(who)
+    return {"edited_seq": _tamper(who.org_id)}
 
 
 @app.get("/sites/{site}/evidence/{key}")
@@ -599,42 +688,21 @@ def get_evidence(site: str, key: str, s: Session = Depends(db)) -> dict[str, Any
 
 
 @app.post("/admin/tamper")
-def admin_tamper(
-    x_admin_token: str | None = Header(default=None), authorization: str | None = Header(default=None)
-) -> dict[str, Any]:
-    """Local demo only: edit one decision in a ledger the way someone holding owner credentials
-    could (trigger disabled, row edited, trigger re-enabled). Verification then fails. It edits the
-    caller's org when a valid token comes with the admin token, else the demo org. Refused in the
-    hosted profile. `POST /admin/reset` restores a clean chain."""
+def admin_tamper(request: Request, x_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
+    """Scripts and tests: the same edit as /demo/tamper with the admin token. It edits the caller's
+    org when a valid token comes along, else the demo org. Refused in the hosted profile."""
     cfg = get_settings()
     if cfg.groundwork_hosted or not cfg.groundwork_admin_token or x_admin_token != cfg.groundwork_admin_token:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "admin token required; never available when hosted")
-    from sqlalchemy import text
-
-    who = _bearer(authorization)
+    v = viewer_or_none(request)
+    if v is not None and len(v.identities) == 1:
+        return {"edited_seq": _tamper(v.identities[0].org_id)}
     with owner_session() as s:
-        if who is not None:
-            org = s.get(m.Org, who.org_id)
-        else:
-            org = s.execute(select(m.Org).where(m.Org.name == cfg.groundwork_demo_org)).scalar_one_or_none()
+        org = s.execute(select(m.Org).where(m.Org.name == cfg.groundwork_demo_org)).scalar_one_or_none()
         if org is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "demo org not seeded")
-        seq = s.execute(
-            text("SELECT min(seq) FROM ledger_entry WHERE org_id = :o AND entry_type = 'decided'"),
-            {"o": org.id},
-        ).scalar()
-        if seq is None:
-            raise HTTPException(status.HTTP_409_CONFLICT, "play an event first: there is no decision to edit")
-        s.execute(text("ALTER TABLE ledger_entry DISABLE TRIGGER ledger_no_update_delete"))
-        s.execute(
-            text(
-                "UPDATE ledger_entry SET payload = jsonb_set(payload, '{reason}', '\"edited after the fact\"') "
-                "WHERE org_id = :o AND seq = :q"
-            ),
-            {"o": org.id, "q": seq},
-        )
-        s.execute(text("ALTER TABLE ledger_entry ENABLE TRIGGER ledger_no_update_delete"))
-    return {"edited_seq": seq}
+        org_id = org.id
+    return {"edited_seq": _tamper(org_id)}
 
 
 @app.post("/admin/reset")

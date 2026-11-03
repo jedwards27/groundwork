@@ -461,11 +461,45 @@ def cost(site: str = typer.Option("lake-mariner")) -> None:
 
 
 @app.command()
+def mcp(
+    database: str = typer.Option("embedded", help="embedded (the plugin) or existing (the configured Postgres)"),
+    port: int = typer.Option(0, help="Port for the Groundwork app; 0 picks a free one"),
+) -> None:
+    """The Claude plugin's tool server over stdio, plus the Groundwork app. Started by the plugin."""
+    from groundwork.local.mcp_server import serve as serve_mcp
+
+    serve_mcp(database, port or None)  # type: ignore[arg-type]
+
+
+@app.command()
+def local(
+    database: str = typer.Option("embedded", help="embedded (the plugin) or existing (the configured Postgres)"),
+    port: int = typer.Option(0, help="Port for the Groundwork app; 0 picks a free one"),
+) -> None:
+    """Start Groundwork's local runtime and page without Claude (for a look, or for development)."""
+    import time
+
+    from groundwork.local.home import page_url
+    from groundwork.local.mcp_server import start_page
+    from groundwork.local.runtime import boot
+
+    info = boot(database)  # type: ignore[arg-type]
+    start_page(port or None)
+    console.print(f"Groundwork local: home {info['home']}; page [bold]{page_url()}[/]")
+    console.print("Ctrl-C stops it.")
+    try:
+        while True:
+            time.sleep(3600)
+    except KeyboardInterrupt:
+        pass
+
+
+@app.command()
 def serve(host: str = "127.0.0.1", port: int = 8000, reload: bool = False) -> None:
-    """Run the API."""
+    """Run the web app and its API (under /api)."""
     import uvicorn
 
-    uvicorn.run("groundwork.api.app:app", host=host, port=port, reload=reload)
+    uvicorn.run("groundwork.api.server:app", host=host, port=port, reload=reload)
 
 
 # --- printing ----------------------------------------------------------------------------------

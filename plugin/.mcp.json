@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "groundwork": {
+      "command": "${CLAUDE_PLUGIN_ROOT}/server/start.sh",
+      "args": []
+    }
+  }
+}
