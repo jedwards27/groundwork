@@ -14,7 +14,29 @@ export const project = {
     waitingOn: "Waiting on",
   },
 
-  tabs: { overview: "Overview", inbox: "Inbox", actions: "Actions", mandate: "Mandate", ledger: "Ledger" },
+  tabs: { overview: "Overview", steps: "Steps", inbox: "Inbox", actions: "Actions", mandate: "Mandate", ledger: "Ledger" },
+
+  // Archived projects, and the project menu (only on your own computer).
+  archived: {
+    banner: (when: string) => `Archived ${when}. It's off your home page and mail doesn't go to it.`,
+    restore: "Restore",
+    delete: "Delete…",
+  },
+  menu: {
+    label: "Project",
+    archive: "Archive project",
+    archiveTip: "Takes it off your home page and out of mail routing. Nothing is deleted; restore it any time.",
+    archiveWhy: "Archived from the app",
+  },
+  deleting: {
+    title: (name: string) => `Delete ${name}?`,
+    body: "This deletes the project, its messages, runs and ledger from this computer. It can't be undone. A line in deleted.jsonl keeps the ledger's last hash, so a receipt from it can still be checked.",
+    type: (key: string) => `Type ${key} to confirm`,
+    confirm: "Delete for good",
+    cancel: "Cancel",
+    demo: "The demo project can't be deleted. Archive it to hide it.",
+  },
+  follows: (name: string) => `Follows on from ${name}`,
 
   why: {
     title: "What the date waits on",
@@ -25,7 +47,8 @@ export const project = {
     done: "done",
     due: (date: string) => `due ${date}`,
     later: (days: number) => `, ${days} days later than planned`,
-    slack: "Everything else in the project has slack: it can slip a little without moving the date. The Overview tab shows it all.",
+    slack: "Everything else in the project has slack: it can slip a little without moving the date. The Steps tab lists every step, done ones included.",
+    stale: (n: number) => `${n} ${n === 1 ? "step is" : "steps are"} past plan with no word. The late end of the range assumes ${n === 1 ? "it slips" : "each slips"} as much again.`,
     movedLabel: "Why it moved",
     moved: (leg: string, low: number, high: number) => `${leg} (+${low} to ${high} days)`,
     from: (party: string, forwarding: string | null, date: string) => `From ${party}${forwarding ? `, forwarding ${forwarding}` : ""}, ${date}`,
@@ -36,7 +59,14 @@ export const project = {
       title: "What depends on what",
       hint: "Every step in the project and what it waits on, laid out on the calendar.",
       legend:
-        "Each box is a step, placed by when it's due, in the row of whoever owes it. Blue boxes and arrows are the steps that decide the date; amber is the one it waits on now. Grey ones are done. Hover a box for its dates.",
+        "Each box is a step, placed by when it's due, in the row of whoever owes it. Blue boxes and arrows are the steps that decide the date; amber is the one it waits on now. Grey ones are done; dashed ones are cancelled. ~ marks an estimated date. Hover a box for its dates.",
+      near: "Around today",
+      all: "Whole project",
+      hidden: (n: number, date: string) => `${n} ${n === 1 ? "step" : "steps"} finished before ${date} ${n === 1 ? "is" : "are"} hidden.`,
+      showAll: "Show the whole project",
+      cancelled: "cancelled",
+      noWord: " · no word",
+      estimated: "~",
       aria: (n: number) => `What depends on what, ${n} steps`,
       today: "today",
       target: (date: string) => `target ${date}`,
@@ -70,6 +100,28 @@ export const project = {
       source: (provenance: string, source: string | null) => `${provenance}${source ? `. Source: ${source}` : ""}`,
       workingFor: (party: string) => `Working for ${party}. Every number carries its source.`,
     },
+  },
+
+  steps: {
+    title: "Every step",
+    hint: "All the steps in the project, done and cancelled ones included. Click a column to sort.",
+    filters: { all: "All", open: "Open", pastDue: "Past due", done: "Done", cancelled: "Cancelled" },
+    filterCount: (label: string, n: number) => `${label} ${n}`,
+    search: "Find a step, owner or source",
+    cols: { title: "Step", owner: "Owner", kind: "Kind", status: "Status", date: "Date", waits: "Waits on", source: "Source" },
+    status: { done: "Done", in_progress: "In progress", not_started: "Not started", cancelled: "Cancelled" } as Record<string, string>,
+    kinds: {
+      study: "Study", approval: "Approval", permit: "Permit", inspection: "Inspection", test: "Test", delivery: "Delivery",
+      install: "Install", milestone: "Milestone", notice: "Notice", agreement: "Agreement", consent: "Consent",
+      financing: "Financing", land: "Land", decision: "Decision", meeting: "Meeting", payment: "Payment",
+    } as Record<string, string>,
+    date: { finished: "finished", due: "due", planned: "planned" },
+    estimatedTip: "An estimate, or a done step whose finish date isn't known.",
+    pastDue: (days: number) => `${days} d past plan, no word`,
+    sets: "sets the date",
+    empty: "No steps match.",
+    count: (shown: number, total: number) => (shown === total ? `${total} steps` : `${shown} of ${total} steps`),
+    change: "To add, change, cancel or remove steps, ask Claude. It drafts the change; you confirm it on your home page.",
   },
 
   inbox: {

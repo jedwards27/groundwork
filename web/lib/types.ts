@@ -222,12 +222,20 @@ export interface AskItem {
 
 export interface DraftItem {
   id: string;
-  kind: "project" | "mandate" | "facts" | "links" | "people";
+  kind: "project" | "mandate" | "facts" | "links" | "people" | "steps" | "project_edit" | "archive" | "delete";
   project: string;
   title: string;
   at: string;
-  lines: { text: string; change: "add" | "remove" | "assumed" | null }[];
+  lines: { text: string; change: "add" | "remove" | "assumed" | "cancel" | null }[];
   note: string;
+  // Set on a delete: the person types this (the project's key) to confirm.
+  type_to_confirm?: string | null;
+}
+
+export interface ArchivedRow {
+  project: string;
+  name: string;
+  archived_at: string | null;
 }
 
 export interface ProjectRow {
@@ -260,6 +268,7 @@ export interface HomeView {
   drafts: DraftItem[];
   projects: ProjectRow[];
   runs: RunRow[];
+  archived?: ArchivedRow[];
 }
 
 export interface Step {

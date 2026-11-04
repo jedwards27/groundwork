@@ -14,7 +14,7 @@ from typing import Any, Literal
 
 from groundwork.local.home import _read, _write, home
 
-Kind = Literal["project", "mandate", "facts", "links", "people"]
+Kind = Literal["project", "mandate", "facts", "links", "people", "steps", "project_edit", "archive", "delete"]
 
 
 def _dir():  # type: ignore[no-untyped-def]

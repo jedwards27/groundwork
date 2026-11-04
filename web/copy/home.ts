@@ -10,10 +10,22 @@ export const home = {
     empty: "Nothing needs you right now.",
     ask: "Ask",
     row: (project: string, when: string) => `${project} · ${when}`,
+    demo: "Demo",
+    demoTip: "From the Lake Mariner demo, not one of your projects.",
   },
 
   // What a draft from Claude is about, on its tag.
-  draftKinds: { project: "New project", mandate: "Mandate", facts: "Dates", links: "Links", people: "People" } as Record<string, string>,
+  draftKinds: {
+    project: "New project",
+    mandate: "Mandate",
+    facts: "Dates",
+    links: "Links",
+    people: "People",
+    steps: "Steps",
+    project_edit: "Project details",
+    archive: "Archive",
+    delete: "Delete",
+  } as Record<string, string>,
 
   projects: {
     title: "Projects",
@@ -21,6 +33,12 @@ export const home = {
     empty: "No projects yet. Ask Claude to start one from your email or a few sentences.",
     waitingOn: (what: string) => ` · waiting on ${what}`,
     tutorial: "Tutorial",
+  },
+
+  archived: {
+    title: (n: number) => `Archived · ${n}`,
+    hint: "Archived projects are out of the way: they're not on this list, and mail doesn't go to them. Nothing in them is deleted.",
+    row: (when: string) => `Archived ${when}`,
   },
 
   activity: {
@@ -48,7 +66,10 @@ export const home = {
   draft: {
     prepared: (kind: string, project: string, when: string) => `${kind} · ${project} · prepared by Claude ${when}`,
     confirm: "Confirm",
+    deleteForGood: "Delete for good",
     reject: "Reject",
+    typeToConfirm: (key: string) => `Type ${key} to delete it`,
     footer: "Nothing changes until you confirm. Your confirmation is a record on the project's ledger.",
+    footerDelete: "Nothing changes until you confirm.",
   },
 };

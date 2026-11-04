@@ -2,6 +2,9 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useStyletron } from "baseui";
 import { Accordion, Panel } from "baseui/accordion";
 import { Button, KIND, SIZE } from "baseui/button";
+import { Banner, KIND as BANNER } from "baseui/banner";
+import { Input } from "baseui/input";
+import { Modal, ModalBody, ModalButton, ModalFooter, ModalHeader } from "baseui/modal";
 import { Skeleton } from "baseui/skeleton";
 import { Tab, Tabs } from "baseui/tabs-motion";
 import { toaster } from "baseui/toast";
@@ -17,12 +20,13 @@ import { InboxTab, type RunState } from "./InboxTab";
 import { LedgerTab } from "./LedgerTab";
 import { MandateTab } from "./MandateTab";
 import { Overview } from "./Overview";
+import { StepsTab } from "./StepsTab";
 import { useTutorial } from "./Tutorial";
 import { Chip, Drawer, Field, Muted, Page, Quote } from "./ui";
 import { project as say } from "@/copy/project";
 import { tutorial as t } from "@/copy/tutorial";
 
-const TABS = ["overview", "inbox", "actions", "mandate", "ledger"] as const;
+const TABS = ["overview", "steps", "inbox", "actions", "mandate", "ledger"] as const;
 const PANEL = { TabPanel: { style: { paddingLeft: 0, paddingRight: 0, minWidth: 0 } } };
 
 export function Project({ session }: { session: Session }) {
@@ -40,6 +44,9 @@ export function Project({ session }: { session: Session }) {
   const me = useQuery({ queryKey: ["me", key], queryFn: () => get<Me>(`sites/${key}/me`) });
   const [run, setRun] = useState<RunState | null>(null);
   const [why, setWhy] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [typed, setTyped] = useState("");
+  const [busy, setBusy] = useState(false);
   const tutorial = useTutorial();
   const source = useRef<EventSource | null>(null);
   useEffect(() => () => source.current?.close(), []);
@@ -49,6 +56,26 @@ export function Project({ session }: { session: Session }) {
   }, [key]);
 
   const refresh = useCallback(() => qc.invalidateQueries(), [qc]);
+
+  // Archive, restore and delete: the person acting in the app, on their own computer. Each is a
+  // ledger record (a delete, a line in deleted.jsonl, since the ledger goes with the project).
+  const lifecycle = async (what: "archive" | "restore" | "delete") => {
+    setBusy(true);
+    try {
+      const body = what === "archive" ? { why: say.menu.archiveWhy } : what === "delete" ? { typed } : undefined;
+      const r = await send<{ message: string }>("POST", `projects/${key}/${what}`, body);
+      toaster.info(r.message, {});
+      if (what === "delete") {
+        setDeleting(false);
+        navigate("/");
+      }
+      await qc.invalidateQueries();
+    } catch (e) {
+      toaster.negative((e as Error).message, {});
+    } finally {
+      setBusy(false);
+    }
+  };
 
   // Play a message: the run streams its steps; the views refresh as the forecast and decisions land.
   const play = async (eventKey: string) => {
@@ -102,6 +129,9 @@ export function Project({ session }: { session: Session }) {
   const asks = p ? p.actions.filter((a) => a.state === "pending").length : 0;
   const fresh = (events.data ?? []).filter((e) => e.status !== "applied").length;
   const claudePlans = session.local && key !== DEMO_PROJECT;
+  const mine = session.local && !session.health.hosted;
+  const stale = Object.keys(c.stale ?? {}).length;
+  const follows = s.attrs.follows;
   const legs = gate
     ? (events.data ?? []).filter((e) => e.status === "applied").flatMap((e) => e.impacts.filter((i) => i.item === gate.key).map((i) => ({ i, e })))
     : [];
@@ -114,16 +144,44 @@ export function Project({ session }: { session: Session }) {
 
   return (
     <Page>
+      {s.archived_at && (
+        <Banner
+          kind={BANNER.info}
+          overrides={{ Root: { style: { marginLeft: 0, marginRight: 0, marginTop: 0 } } }}
+          action={
+            mine
+              ? { label: say.archived.restore, onClick: () => void lifecycle("restore") }
+              : undefined
+          }
+        >
+          <span data-testid="archived-banner">{say.archived.banner(fmtLong(s.archived_at.slice(0, 10)))}</span>{" "}
+          {mine && key !== DEMO_PROJECT && (
+            <Button kind={KIND.tertiary} size={SIZE.mini} onClick={() => setDeleting(true)} data-testid="delete-project">
+              {say.archived.delete}
+            </Button>
+          )}
+        </Banner>
+      )}
       <section data-testid="summary">
         <div className={css({ display: "flex", alignItems: "center", gap: theme.sizing.scale300 })}>
           <LabelSmall color={theme.colors.contentTertiary}>{ms.label}</LabelSmall>
-          {key === DEMO_PROJECT && !tutorial.open && (
-            <span className={css({ marginLeft: "auto" })}>
+          {follows && (
+            <LabelSmall color={theme.colors.contentTertiary}>
+              · <a href={`/projects/${follows}`} onClick={(e) => { e.preventDefault(); navigate(`/projects/${follows}`); }}>{say.follows(follows)}</a>
+            </LabelSmall>
+          )}
+          <span className={css({ marginLeft: "auto", display: "inline-flex", gap: theme.sizing.scale200 })}>
+            {key === DEMO_PROJECT && !tutorial.open && (
               <Button kind={KIND.secondary} size={SIZE.mini} onClick={tutorial.start} data-testid="tutorial-start">
                 {t.projectButton}
               </Button>
-            </span>
-          )}
+            )}
+            {mine && !s.archived_at && (
+              <Button kind={KIND.tertiary} size={SIZE.mini} onClick={() => void lifecycle("archive")} isLoading={busy} title={say.menu.archiveTip} data-testid="archive-project">
+                {say.menu.archive}
+              </Button>
+            )}
+          </span>
         </div>
         <div className={css({ display: "flex", alignItems: "center", gap: theme.sizing.scale400, flexWrap: "wrap" })}>
           <HeadingLarge margin={0} data-testid="forecast">
@@ -174,6 +232,9 @@ export function Project({ session }: { session: Session }) {
           <Tab key="overview" title={say.tabs.overview} overrides={PANEL}>
             <Overview chain={c} site={s} plan={p} />
           </Tab>
+          <Tab key="steps" overrides={PANEL} title={title(say.tabs.steps, 0, "tab-steps")}>
+            <StepsTab chain={c} site={s} />
+          </Tab>
           <Tab key="inbox" overrides={PANEL} title={title(say.tabs.inbox, fresh, "tab-inbox")}>
             <InboxTab events={events.data ?? []} site={s} run={run} onPlay={play} claudePlans={claudePlans} onSeeActions={() => navigate(`/projects/${key}/actions`)} />
           </Tab>
@@ -188,6 +249,22 @@ export function Project({ session }: { session: Session }) {
           </Tab>
         </Tabs>
       </div>
+
+      <Modal isOpen={deleting} onClose={() => setDeleting(false)} closeable autoFocus>
+        <ModalHeader>{say.deleting.title(s.name)}</ModalHeader>
+        <ModalBody>
+          <ParagraphSmall>{say.deleting.body}</ParagraphSmall>
+          <Input value={typed} onChange={(e) => setTyped((e.target as HTMLInputElement).value)} placeholder={say.deleting.type(key)} overrides={{ Input: { props: { "data-testid": "delete-typed" } } }} />
+        </ModalBody>
+        <ModalFooter>
+          <ModalButton kind={KIND.tertiary} onClick={() => setDeleting(false)}>
+            {say.deleting.cancel}
+          </ModalButton>
+          <ModalButton onClick={() => void lifecycle("delete")} disabled={typed.trim() !== key} isLoading={busy} data-testid="delete-confirm">
+            {say.deleting.confirm}
+          </ModalButton>
+        </ModalFooter>
+      </Modal>
 
       <Drawer open={why} onClose={() => setWhy(false)} title={say.why.title} testId="why-drawer">
         <Muted>
@@ -214,6 +291,7 @@ export function Project({ session }: { session: Session }) {
           </ol>
         </Field>
         <Muted>{say.why.slack}</Muted>
+        {stale > 0 && <Muted testId="why-stale">{say.why.stale(stale)}</Muted>}
         {legs.length > 0 && (
           <Field label={say.why.movedLabel}>
             <Accordion>

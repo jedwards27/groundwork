@@ -42,6 +42,63 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/{key}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Archive
+         * @description Archive a project: it leaves home and mail routing. A ledger record says who and why.
+         */
+        post: operations["archive_projects__key__archive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{key}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restore */
+        post: operations["restore_projects__key__restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{key}/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Delete
+         * @description Delete a project for good. The person types its key; the demo project can't be deleted.
+         */
+        post: operations["delete_projects__key__delete_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/projects/preview": {
         parameters: {
             query?: never;
@@ -671,6 +728,14 @@ export interface components {
              */
             note: string;
         };
+        /** Archive */
+        Archive: {
+            /**
+             * Why
+             * @default
+             */
+            why: string;
+        };
         /** CalendarLossView */
         CalendarLossView: {
             /** Pred */
@@ -712,6 +777,26 @@ export interface components {
             applied_events: string[];
             /** Scenario Events */
             scenario_events: string[];
+            /**
+             * Stale
+             * @default {}
+             */
+            stale: {
+                [key: string]: number;
+            };
+        };
+        /** Delete */
+        Delete: {
+            /**
+             * Typed
+             * @description The project's key, typed by the person.
+             */
+            typed: string;
+            /**
+             * Why
+             * @default
+             */
+            why: string;
         };
         /** DemoSignIn */
         DemoSignIn: {
@@ -728,6 +813,8 @@ export interface components {
              * @enum {string}
              */
             verdict: "confirm" | "reject";
+            /** Typed */
+            typed?: string | null;
         };
         /** EventView */
         EventView: {
@@ -866,9 +953,10 @@ export interface components {
             title: string;
             /**
              * Kind
+             * @description install is fitting or installing work; decision is a selection or sign-off; meeting is a meeting or presentation; payment is an invoice, deposit or payment.
              * @enum {string}
              */
-            kind: "study" | "approval" | "permit" | "inspection" | "test" | "delivery" | "milestone" | "notice" | "agreement" | "consent" | "financing" | "land";
+            kind: "study" | "approval" | "permit" | "inspection" | "test" | "delivery" | "install" | "milestone" | "notice" | "agreement" | "consent" | "financing" | "land" | "decision" | "meeting" | "payment";
             /**
              * Owner
              * @description Party key responsible, or 'you' for the person's own side.
@@ -876,17 +964,23 @@ export interface components {
             owner: string;
             /**
              * Status
+             * @description cancelled means descoped: it stays on record, but nothing waits on it and the forecast ignores it.
              * @enum {string}
              */
-            status: "done" | "in_progress" | "not_started";
+            status: "done" | "in_progress" | "not_started" | "cancelled";
             /** Start */
             start?: string | null;
             /**
              * Finish
-             * Format: date
-             * @description Planned finish (or the actual finish when done).
+             * @description Planned finish, or the actual finish when done. Leave empty only for a done step whose finish date isn't known; it is then marked as an estimate.
              */
-            finish: string;
+            finish?: string | null;
+            /**
+             * Approximate
+             * @description True when the date is an estimate, for example 'early December' or 'about two weeks'.
+             * @default false
+             */
+            approximate: boolean;
             /**
              * Depends On
              * @description Item keys that must finish first, as a source states.
@@ -903,6 +997,11 @@ export interface components {
              * @default
              */
             source: string;
+            /**
+             * Notes
+             * @default
+             */
+            notes: string;
         };
         /** ItemView */
         ItemView: {
@@ -939,6 +1038,11 @@ export interface components {
             source: string;
             /** Notes */
             notes: string;
+            /**
+             * Estimated
+             * @default false
+             */
+            estimated: boolean;
             /**
              * Early Start
              * Format: date
@@ -1325,6 +1429,8 @@ export interface components {
             glossary: {
                 [key: string]: string;
             };
+            /** Archived At */
+            archived_at?: string | null;
         };
         /** ValidationError */
         ValidationError: {
@@ -1391,6 +1497,113 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["DraftVerdict"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_projects__key__archive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Archive"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_projects__key__restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_projects__key__delete_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Delete"];
             };
         };
         responses: {

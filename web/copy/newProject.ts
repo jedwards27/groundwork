@@ -62,7 +62,14 @@ export const newProject = {
     finishing: "Which step means it's finished?",
     finishingLabel: "Finishing step",
     numbered: (n: number) => `Step ${n}`,
-    statuses: { not_started: "Not started", in_progress: "Under way", done: "Done" },
+    statuses: { not_started: "Not started", in_progress: "Under way", done: "Done", cancelled: "Cancelled" },
+    paste: {
+      title: "Paste steps from a spreadsheet",
+      hint: "Copy rows from a spreadsheet or type one step per line. Columns, in order: step, who owes it, status, due date, and the steps it waits on (separated by ;). A header row is skipped. New names in the owner column become parties you can set a role for.",
+      placeholder: "Building permit issued\tCity permits\tunder way\t2026-12-01\nCabinets installed\tBayside Builders\tnot started\t2027-01-20\tBuilding permit issued",
+      add: "Add these steps",
+      added: (n: number, skipped: number) => `Added ${n} ${n === 1 ? "step" : "steps"}${skipped ? `; skipped ${skipped} ${skipped === 1 ? "row" : "rows"} missing a step name or a readable date` : ""}.`,
+    },
   },
 
   more: {

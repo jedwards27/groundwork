@@ -14,7 +14,7 @@ Groundwork keeps each project's picture of who owes what, and acts only inside t
    - **If it reports work finished or started,** use kind `progress` and list each item in `progress` with its date.
    - **Use `acknowledgment` only for** "approved, please proceed" replies, which change nothing.
    - **For a permit-portal result, a call or a note,** set `source` and pass `project`.
-   - **If routing is unclear,** ask the person which project it belongs to, or whether to ignore it.
+   - **If routing is unclear,** ask the person which project it belongs to, or whether to ignore it. This happens when the sender is on more than one project and neither the thread nor the subject says which.
 
    The project's date moves forward to each message's date. Date changes and progress take effect only after the person confirms them in the Groundwork app; until then, `status` shows the forecast "if confirmed".
 3. Call `play_message` for a message that needs follow-up. If it returns `needs_plan`, read its instructions and write a plan of a few concrete actions. Address recipients by the person or party keys in `site_state`. Give each action the level you think it deserves: auto, ask or refuse.
@@ -23,6 +23,10 @@ Groundwork keeps each project's picture of who owes what, and acts only inside t
 6. Call `submit_report` with what was done, asked and denied, using only what `propose_plan` returned. Groundwork checks your report against the ledger.
 7. **The clock.** Call `check_overdue` to find work past its date with no word. For a backtest, pass the date you're replaying to. It records a message you can play to plan chases.
 8. **Keep the picture honest:**
+   - `status` lists the first open steps; call `steps` for every step, done and cancelled ones included.
+   - When a step changes (new work, a new date, done, descoped), draft it with `edit_steps`. Use status `cancelled` for descoped work, so it stays on record; remove a step only if it was entered by mistake. Use `edit_project` for the name, the finish or a new party.
+   - If `status` lists steps past plan with no word, offer to chase them, or ask whether they're done or descoped.
+   - Offer `archive_project` for a duplicate or a finished project, and `delete_project` only if the person asks to remove it for good.
    - If `status` lists an assumed link on the critical path, ask the person whether it's real, then call `change_links` to confirm or remove it.
    - If mail from someone on the person's own side (a partner, a colleague) isn't routed, offer `add_people` with party `you`.
 

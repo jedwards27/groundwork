@@ -100,9 +100,50 @@ def draft_view(d: dict[str, Any]) -> dict[str, Any]:
     elif d["kind"] == "links":
         lines = _links(p["add"], "Add", "add") + _links(p["remove"], "Remove", "remove") + _links(p["confirm"], "Confirm", None)
         note = p["why"]
+    elif d["kind"] == "steps":
+        titles = p.get("titles", {})
+        lines = [{"text": f"Add: {x['title']} ({x['status'].replace('_', ' ')}, {x.get('finish') or 'date not known'})", "change": "add"} for x in p["add"]]
+        for c in p["change"]:
+            fields = ", ".join(f"{STEP_FIELD.get(k, k)} {_val(v)}" for k, v in c.items() if k != "key")
+            lines.append({"text": f"Change {titles.get(c['key'], c['key'])}: {fields}", "change": "cancel" if c.get("status") == "cancelled" else None})
+        lines += [{"text": f"Remove: {titles.get(k, k)}", "change": "remove"} for k in p["remove"]]
+        lines += _forecast_lines(p)
+        note = p["why"]
+    elif d["kind"] == "project_edit":
+        cur = p.get("current", {})
+        c = p["change"]
+        labels = {"name": "Name", "location": "Location", "finish_label": "Finish", "finish_target": "Target date", "finish_step": "Finish step", "follows": "Follows on from"}
+        lines = [
+            {"text": f"{labels[k]}: {cur.get(k, '') + ' → ' if cur.get(k) else ''}{v or '(none)'}", "change": None}
+            for k, v in c.items()
+            if k in labels
+        ]
+        lines += [{"text": f"Add party: {x['name']} ({x['role']})", "change": "add"} for x in c.get("add_parties", [])]
+        lines += [{"text": f"Rename party {x['key']} to {x['name']}", "change": None} for x in c.get("rename_parties", [])]
+        lines += _forecast_lines(p)
+        note = p["why"]
+    elif d["kind"] == "archive":
+        restore = p.get("restore")
+        lines = [
+            {
+                "text": "Back on home and in mail routing." if restore else "Leaves home and mail routing. Nothing is deleted; restore it any time.",
+                "change": None,
+            }
+        ]
+        note = p["why"]
+    elif d["kind"] == "delete":
+        lines = [
+            {"text": "Deletes the project, its messages, runs and ledger from this computer.", "change": None},
+            {"text": "This can't be undone. A line in deleted.jsonl keeps the ledger's last hash.", "change": None},
+        ]
+        note = p["why"]
     else:
         lines = [{"text": f"{x['name']} {('<' + x['email'] + '>') if x.get('email') else ''}".strip(), "change": "add"} for x in p["people"]]
         note = p["why"]
+    if d["kind"] == "project" and p.get("overlaps"):
+        lines += [
+            {"text": f"Also on {o['name']}: {', '.join(o['people'] + o['parties'])}", "change": "assumed"} for o in p["overlaps"]
+        ]
     return {
         "id": d["id"],
         "kind": d["kind"],
@@ -111,7 +152,26 @@ def draft_view(d: dict[str, Any]) -> dict[str, Any]:
         "at": d["created_at"],
         "lines": lines,
         "note": note,
+        "type_to_confirm": d["project"] if d["kind"] == "delete" else None,
     }
+
+
+STEP_FIELD = {"depends_on": "waits on", "approximate": "estimated", "start": "start", "finish": "finish", "status": "status"}
+
+
+def _val(v: Any) -> str:
+    if isinstance(v, list):
+        return ", ".join(v) or "nothing"
+    if isinstance(v, bool):
+        return "yes" if v else "no"
+    return str(v).replace("_", " ")
+
+
+def _forecast_lines(p: dict[str, Any]) -> list[dict[str, Any]]:
+    b, a = p.get("before"), p.get("after")
+    if not b or not a or (b["forecast"], b["sets_the_date"]) == (a["forecast"], a["sets_the_date"]):
+        return []
+    return [{"text": f"Forecast: {b['forecast']} → {a['forecast']}; sets the date: {a['sets_the_date'] or '—'}", "change": None}]
 
 
 @router.get("/home")
@@ -121,18 +181,21 @@ def home(v: Viewer = Depends(viewer)) -> dict[str, Any]:
         from groundwork.local import drafts
 
         pending = [draft_view(d) for d in drafts.pending()]
+        archived = [{"project": r.key, "name": r.name, "archived_at": r.archived_at} for r in overview.index(v.orgs, archived=True).values()]
     else:
-        pending = []
+        pending, archived = [], []
     return {
         "asks": _asks(v, refs),
         "drafts": pending,
         "projects": [overview.project_row(r) for r in refs],
         "runs": overview.recent_runs(refs, 8),
+        "archived": archived,
     }
 
 
 class DraftVerdict(BaseModel):
     verdict: Literal["confirm", "reject"]
+    typed: str | None = None
 
 
 @router.post("/drafts/{draft_id}")
@@ -144,6 +207,6 @@ def decide_draft(draft_id: str, body: DraftVerdict, v: Viewer = Depends(viewer))
     from groundwork.local.confirm import ConfirmError, decide
 
     try:
-        return {"message": decide(draft_id, body.verdict)}
+        return {"message": decide(draft_id, body.verdict, body.typed)}
     except ConfirmError as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc

@@ -23,15 +23,15 @@ from groundwork.agent.wire import WirePlan, to_plan
 from groundwork.db import models as m
 from groundwork.db import repo
 from groundwork.db.session import org_session, owner_session
-from groundwork.ingest.site_loader import ImpactRow
+from groundwork.ingest.site_loader import CLOSED, ImpactRow
 from groundwork.ledger import append, verify_entry
 from groundwork.local import drafts
 from groundwork.local.home import me, page_url, set_me, slug
 from groundwork.policy.terms import TEMPLATE_LABEL, MandateTerms, build_from_terms, diff_lines
 from groundwork.schemas.plan import Arm, Report
 from groundwork.service import actions as actions_svc
+from groundwork.service import edits, overview, pipeline, planctx, runs, views
 from groundwork.service import mandates as mandates_svc
-from groundwork.service import overview, pipeline, planctx, runs, views
 from groundwork.service import projects as projects_svc
 
 DECISION_WORD = overview.DECISION_WORD
@@ -51,7 +51,7 @@ _pending_asks = overview.pending_asks
 
 
 def _ref(project: str) -> ProjectRef:
-    idx = _index()
+    idx = _index(archived=None)
     if project not in idx:
         known = ", ".join(sorted(idx)) or "none yet"
         raise ToolError(f"no project {project!r}; known projects: {known}")
@@ -71,6 +71,7 @@ def projects() -> dict[str, Any]:
     return {
         "you": asdict(who) if who else None,
         "projects": out,
+        "archived": [{"project": r.key, "name": r.name, "archived_at": r.archived_at} for r in _index(archived=True).values()],
         "drafts_waiting": len(drafts.pending()),
         "page": page_url(),
     }
@@ -127,7 +128,7 @@ def status(project: str) -> dict[str, Any]:
     titles = {i.key: i.title for i in chain.items}
     gate = next((i for i in chain.items if i.key == chain.gate), None)
     open_items = sorted(
-        (i for i in chain.items if i.status != "done"),
+        (i for i in chain.items if i.status not in CLOSED),
         key=lambda i: (i.total_float if i.total_float is not None else 10_000, i.early_finish),
     )
     played = {k for k, v in state.event_status.items() if v != "available"}
@@ -177,6 +178,14 @@ def status(project: str) -> dict[str, Any]:
             }
             for i in open_items[:12]
         ],
+        "more_open_steps": max(0, len(open_items) - 12),
+        "steps_total": len(chain.items),
+        "every_step": "Call steps() for every step, including done and cancelled ones.",
+        "past_plan_no_word": [
+            {"item": k, "title": titles.get(k, k), "days_past": d, "on_the_finish_path": k in critical or next((i.on_target_path for i in chain.items if i.key == k), False)}
+            for k, d in sorted(chain.stale.items(), key=lambda kv: -kv[1])
+        ],
+        "archived": ref.archived_at,
         "assumed_links": [
             {
                 "before": titles.get(a, a),
@@ -205,9 +214,52 @@ def status(project: str) -> dict[str, Any]:
             "dry_run": mandate.dry_run,
         },
         "asks_waiting": len(asks),
-        "page": page_url(),
+        "page": page_url(f"projects/{project}"),
         "clock_note": "The project's date (as_of) moves forward to each recorded message's date, and with check_overdue.",
     }
+
+
+def steps(project: str, status: Literal["all", "open", "done", "cancelled", "past_due"] = "all") -> dict[str, Any]:
+    """Every step in a project, done and cancelled ones included, with its owner, kind, status,
+    dates, source and the steps it waits on. Use this, not status(), to list or check all steps."""
+    ref = _ref(project)
+    with org_session(ref.org_id) as s:
+        state = repo.load_state(s, project)
+    chain = views.chain_view(state)
+    preds: dict[str, list[str]] = {}
+    for ln in state.links:
+        preds.setdefault(ln.succ, []).append(ln.pred)
+    rows = []
+    for i in sorted(chain.items, key=lambda i: (i.actual_finish or i.early_finish, i.key)):
+        past_due = i.status not in CLOSED and i.planned_finish < state.as_of
+        if status == "open" and i.status in CLOSED:
+            continue
+        if status in ("done", "cancelled") and i.status != status:
+            continue
+        if status == "past_due" and not past_due:
+            continue
+        rows.append(
+            {
+                "item": i.key,
+                "title": i.title,
+                "kind": i.kind,
+                "owner": _party_name(state, i.owner),
+                "status": i.status,
+                "start": str(i.planned_start) if i.planned_start else None,
+                "planned": str(i.planned_finish),
+                "finished": str(i.actual_finish) if i.actual_finish else None,
+                "forecast": None if i.status in CLOSED else str(i.early_finish),
+                "estimated": i.estimated,
+                "past_due_no_word": chain.stale.get(i.key),
+                "waits_on": preds.get(i.key, []),
+                "source": i.source,
+                "notes": i.notes,
+            }
+        )
+    counts: dict[str, int] = {}
+    for i in chain.items:
+        counts[i.status] = counts.get(i.status, 0) + 1
+    return {"project": project, "total": len(chain.items), "by_status": counts, "shown": len(rows), "steps": rows, "page": page_url(f"projects/{project}/steps")}
 
 
 # --- playing a message ---------------------------------------------------------------------------
@@ -356,10 +408,16 @@ class Progress(BaseModel):
     why: str = Field(description="The sentence in the message that says so.")
 
 
-def _route(emails: set[str], thread: str | None) -> tuple[set[str], str]:
-    """Projects a message belongs to, and how that was decided."""
+def _route(emails: set[str], thread: str | None, text: str = "") -> tuple[set[str], str]:
+    """Projects a message belongs to, and how that was decided. Archived projects never match.
+
+    1. Same email thread as a message already on a project.
+    2. The sender or a recipient is a person on the project.
+    3. If people match more than one project, the one whose name the subject or body mentions.
+    Otherwise every match comes back, and the person is asked."""
     who = me()
     mine = {who.email} if who else set()
+    active = _index()
     with owner_session() as s:
         if thread:
             hits = {
@@ -367,6 +425,7 @@ def _route(emails: set[str], thread: str | None) -> tuple[set[str], str]:
                 for site, _ev in s.execute(
                     select(m.Site, m.Event).join(m.Event, m.Event.site_id == m.Site.id).where(m.Event.message_ref == f"thread:{thread}")
                 ).all()
+                if site.key in active
             }
             if hits:
                 return hits, "same email thread as an earlier message"
@@ -379,7 +438,13 @@ def _route(emails: set[str], thread: str | None) -> tuple[set[str], str]:
                 .join(m.SiteParty, m.SiteParty.site_id == m.Site.id)
                 .where(m.SiteParty.party_id == p.party_id)
             ).scalars()
+            if site.key in active
         }
+    if len(sites) > 1 and text:
+        low = text.lower()
+        named = {k for k in sites if active[k].name.lower() in low}
+        if len(named) == 1:
+            return named, "people are on more than one project; the message names this one"
     return sites, "the sender or a recipient is a person on the project"
 
 
@@ -426,12 +491,14 @@ def record_message(
     elif source != "email":
         raise ToolError(f"a {source} has no email addresses to route by; pass project=...")
     else:
-        targets, how = _route(emails, thread_id)
+        targets, how = _route(emails, thread_id, f"{subject}\n{body}")
     if len(targets) != 1:
         return {
             "recorded": False,
             "candidates": sorted(targets),
-            "reason": "more than one project matches" if targets else "no tracked project knows these addresses",
+            "reason": "the people on it are on more than one project, and the thread and subject don't say which"
+            if targets
+            else "no active project knows these addresses",
             "next": "Ask the person which project this belongs to (or whether to ignore it), then call "
             "record_message again with project=...",
         }
@@ -519,7 +586,7 @@ def check_overdue(project: str, as_of: date | None = None) -> dict[str, Any]:
             state = repo.load_state(s, project)
     names = {p.key: p.name for p in state.parties}
     overdue = sorted(
-        (i for i in state.items if i.status != "done" and i.planned_finish < state.as_of),
+        (i for i in state.items if i.status not in CLOSED and i.planned_finish < state.as_of),
         key=lambda i: i.planned_finish,
     )
     if not overdue:
@@ -720,8 +787,12 @@ def start_project(draft: ProjectDraft) -> dict[str, Any]:
     from groundwork.ingest.site_loader import LoadError
 
     key = slug(draft.name)
-    if key in _index():
-        raise ToolError(f"a project called {key!r} already exists; pick another name or change it with the other tools")
+    if key in _index(archived=None):
+        raise ToolError(
+            f"a project called {key!r} already exists. To change it, use edit_steps (add, change, cancel or remove "
+            "steps), edit_project (name, finish, parties) or add_people; to start over, archive_project or "
+            "delete_project it first, or pick another name."
+        )
     folder = _project_folder(draft, key)
     try:
         bundle = load_site(folder)
@@ -733,6 +804,10 @@ def start_project(draft: ProjectDraft) -> dict[str, Any]:
         drafts.resolve(old, "superseded", "groundwork")
     titles = {i.key: i.title for i in state.items}
     assumed = [f"{titles[b]} before {titles[it.key]}" for it in draft.items for b in it.assumed_depends_on]
+    shared = projects_svc.overlaps(
+        {x.email for p in draft.parties for x in p.people} | {x.email for x in draft.your_side},
+        {p.name for p in draft.parties},
+    )
     d = drafts.create(
         "project",
         key,
@@ -748,11 +823,18 @@ def start_project(draft: ProjectDraft) -> dict[str, Any]:
             "sets_the_date": titles.get(state.gate or ""),
             "assumed_links": assumed,
             "template": draft.template,
+            "overlaps": shared,
         },
     )
     return {
         "draft": d["id"],
         "replaced_drafts": replaced,
+        "overlaps": shared,
+        "overlap_note": "These people or parties are also on other projects. Mail from them goes to the project "
+        "whose email thread it continues, or whose name it mentions; otherwise you'll be asked. If this is the "
+        "same project as one of these, change that one instead."
+        if shared
+        else None,
         "project": key,
         "forecast": str(state.milestone.forecast_finish),
         "sets_the_date": d["payload"]["sets_the_date"],
@@ -766,6 +848,98 @@ def _state_from_bundle(bundle: Any) -> Any:
     from groundwork.service.state import SiteState
 
     return SiteState.from_bundle(bundle)
+
+
+# --- changing a project after it exists --------------------------------------------------------
+StepChange = edits.StepChange
+ProjectChange = edits.ProjectChange
+
+
+def _forecast_line(state: Any) -> dict[str, Any]:
+    chain = views.chain_view(state)
+    ms = chain.milestone
+    gate = next((i.title for i in chain.items if i.key == chain.gate), None)
+    return {"forecast": str(ms.forecast_finish), "range": [str(ms.forecast_low), str(ms.forecast_high)], "sets_the_date": gate}
+
+
+def edit_steps(
+    project: str,
+    why: str,
+    add: list[ItemIn] | None = None,
+    change: list[StepChange] | None = None,
+    remove: list[str] | None = None,
+) -> dict[str, Any]:
+    """Draft changes to a project's steps: add new ones, change any field (title, kind, owner,
+    status, dates, estimated, what it waits on, notes), mark one cancelled (descoped: kept on record,
+    ignored by the forecast) or remove one entered by mistake. Nothing changes until the person
+    confirms in the Groundwork app. Prefer cancelled over remove for anything that really happened."""
+    ref = _ref(project)
+    with org_session(ref.org_id) as s:
+        state = repo.load_state(s, project)
+    payload = {
+        "why": why,
+        "add": [x.model_dump(mode="json") for x in add or []],
+        "change": [x.model_dump(mode="json", exclude_none=True) for x in change or []],
+        "remove": list(remove or []),
+    }
+    if not (payload["add"] or payload["change"] or payload["remove"]):
+        raise ToolError("nothing to change: pass add, change or remove")
+    try:
+        after = edits.apply_steps_to_state(state, payload)
+    except edits.EditProblem as exc:
+        raise ToolError(str(exc)) from exc
+    payload["before"], payload["after"] = _forecast_line(state), _forecast_line(after)
+    titles = {i.key: i.title for i in state.items}
+    payload["titles"] = {k: titles.get(k, k) for k in [*payload["remove"], *(c["key"] for c in payload["change"])]}
+    n = len(payload["add"]) + len(payload["change"]) + len(payload["remove"])
+    d = drafts.create("steps", project, f"Change {n} {'step' if n == 1 else 'steps'} in {state.name}", payload)
+    return {
+        "draft": d["id"],
+        "forecast_now": payload["before"],
+        "forecast_if_confirmed": payload["after"],
+        "confirm_on": page_url(),
+        "next": "Ask the person to confirm in the Groundwork app.",
+    }
+
+
+def edit_project(project: str, why: str, change: ProjectChange) -> dict[str, Any]:
+    """Draft changes to a project's details: its name, location, finish (label, target date or the
+    step that marks it), parties (add or rename) or the earlier project it follows on from. The
+    project's key stays the same. Confirmed in the Groundwork app."""
+    ref = _ref(project)
+    with org_session(ref.org_id) as s:
+        state = repo.load_state(s, project)
+    payload = {"why": why, "change": change.model_dump(mode="json", exclude_defaults=True)}
+    if not payload["change"]:
+        raise ToolError("nothing to change")
+    try:
+        after = edits.apply_project_to_state(state, payload, set(_index(archived=None)))
+    except edits.EditProblem as exc:
+        raise ToolError(str(exc)) from exc
+    payload["before"], payload["after"] = _forecast_line(state), _forecast_line(after)
+    payload["current"] = {"name": state.name, "finish_label": state.milestones[0].label, "finish_target": str(state.milestones[0].target_date)}
+    d = drafts.create("project_edit", project, f"Change {state.name}", payload)
+    return {"draft": d["id"], "forecast_if_confirmed": payload["after"], "confirm_on": page_url(), "next": "Ask the person to confirm in the Groundwork app."}
+
+
+def archive_project(project: str, why: str, restore: bool = False) -> dict[str, Any]:
+    """Draft archiving a project (or restoring an archived one). Archiving hides it from home and
+    from mail routing; nothing is deleted. Use it for a duplicate, a finished project or one to park.
+    Confirmed in the Groundwork app."""
+    ref = _ref(project)
+    if restore != bool(ref.archived_at):
+        raise ToolError(f"{project} is {'already active' if restore else 'already archived'}")
+    verb = "Restore" if restore else "Archive"
+    d = drafts.create("archive", project, f"{verb} {ref.name}", {"why": why, "restore": restore})
+    return {"draft": d["id"], "confirm_on": page_url(), "next": "Ask the person to confirm in the Groundwork app."}
+
+
+def delete_project(project: str, why: str) -> dict[str, Any]:
+    """Draft deleting a project for good, with its messages and ledger. The person confirms in the
+    Groundwork app by typing the project's key. Suggest archive_project first unless they're sure."""
+    ref = _ref(project)
+    d = drafts.create("delete", project, f"Delete {ref.name} for good", {"why": why})
+    return {"draft": d["id"], "confirm_on": page_url(), "next": "Ask the person to confirm in the Groundwork app; they type the project's key to delete it."}
 
 
 # --- pending work, activity, the ledger and receipts ---------------------------------------------

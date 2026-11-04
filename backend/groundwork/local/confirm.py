@@ -18,16 +18,17 @@ from groundwork.ledger import append
 from groundwork.local import drafts, tools
 from groundwork.local.home import me
 from groundwork.policy import Mandate
+from groundwork.service import edits, projects
 from groundwork.service import mandates as mandates_svc
-from groundwork.service import projects
 
 
 class ConfirmError(ValueError):
     """The person can't confirm this right now; the message says why."""
 
 
-def decide(draft_id: str, verdict: Literal["confirm", "reject"]) -> str:
-    """Confirm or reject a pending draft as the person set up on this computer. Returns what happened."""
+def decide(draft_id: str, verdict: Literal["confirm", "reject"], typed: str | None = None) -> str:
+    """Confirm or reject a pending draft as the person set up on this computer. Returns what happened.
+    Deleting a project also needs the person to type its key."""
     who = me()
     if who is None:
         raise ConfirmError("Run setup in Claude first, so drafts are confirmed by a named person.")
@@ -40,14 +41,24 @@ def decide(draft_id: str, verdict: Literal["confirm", "reject"]) -> str:
     if verdict == "reject":
         drafts.resolve(draft_id, "rejected", who.name)
         return "Rejected; nothing changed."
+    if d["kind"] == "delete" and (typed or "").strip() != d["project"]:
+        raise ConfirmError(f"Type {d['project']} to delete it.")
     confirm = {
         "project": _confirm_project,
         "mandate": _confirm_mandate,
         "facts": _confirm_facts,
         "links": _confirm_links,
         "people": _confirm_people,
+        "steps": _confirm_steps,
+        "project_edit": _confirm_project_edit,
+        "archive": _confirm_archive,
+        "delete": _confirm_delete,
     }[d["kind"]]
-    return confirm(d, who.name)
+    try:
+        return confirm(d, who.name)
+    except edits.EditProblem as exc:
+        drafts.resolve(d["id"], "rejected", who.name, why=str(exc))
+        return f"Not changed: {exc}. The project changed since this draft; ask Claude to draft it again."
 
 
 def _confirm_project(d: dict[str, Any], by: str) -> str:
@@ -171,3 +182,60 @@ def _confirm_people(d: dict[str, Any], by: str) -> str:
         append(s, "people_added", {"party": p["party"], "people": [x["name"] for x in p["people"]], "why": p["why"], "by": by}, org_id=ref.org_id)
     drafts.resolve(d["id"], "confirmed", by)
     return f"Added {len(p['people'])} person(s)."
+
+
+def _confirm_steps(d: dict[str, Any], by: str) -> str:
+    ref = tools._ref(d["project"])
+    with org_session(ref.org_id) as s:
+        state = repo.load_state(s, ref.key)
+    out = edits.apply_steps(ref.org_id, ref.site_id, state, d["payload"], by)
+    drafts.resolve(d["id"], "confirmed", by)
+    return out
+
+
+def _confirm_project_edit(d: dict[str, Any], by: str) -> str:
+    ref = tools._ref(d["project"])
+    with org_session(ref.org_id) as s:
+        state = repo.load_state(s, ref.key)
+    out = edits.apply_project(ref.org_id, ref.site_id, state, d["payload"], by, set(tools._index(archived=None)))
+    drafts.resolve(d["id"], "confirmed", by)
+    return out
+
+
+def _confirm_archive(d: dict[str, Any], by: str) -> str:
+    ref = tools._ref(d["project"])
+    if d["payload"].get("restore"):
+        projects.restore(ref.org_id, ref.site_id, by=by)
+        out = f"Restored {ref.name}."
+    else:
+        projects.archive(ref.org_id, ref.site_id, by=by, why=d["payload"].get("why", ""))
+        out = f"Archived {ref.name}. Restore it any time from Archived on the home page."
+    drafts.resolve(d["id"], "confirmed", by)
+    return out
+
+
+def _confirm_delete(d: dict[str, Any], by: str) -> str:
+    ref = tools._ref(d["project"])
+    if ref.key == "lake-mariner":
+        drafts.resolve(d["id"], "rejected", by, why="the demo project can't be deleted")
+        return "Not deleted: the demo project stays. Archive it to hide it."
+    delete_project(ref, by, d["payload"].get("why", ""), keep=d["id"])
+    drafts.resolve(d["id"], "confirmed", by)
+    return f"Deleted {ref.name} and its ledger. A line in deleted.jsonl keeps its last hash."
+
+
+def delete_project(ref: Any, by: str, why: str, keep: str | None = None) -> dict[str, Any]:
+    """Delete a project, its ledger and its working folder; log the deletion and drop its drafts."""
+    import shutil
+
+    from groundwork.local.home import home
+
+    entry = projects.delete(ref.org_id, by=by, why=why, log=home() / "deleted.jsonl")
+    folder = home() / "projects" / ref.key
+    if folder.is_dir():
+        shutil.rmtree(folder)
+    for other in drafts.pending(ref.key):
+        if other["id"] == keep:
+            continue
+        drafts.resolve(other["id"], "superseded", by, why="the project was deleted")
+    return entry

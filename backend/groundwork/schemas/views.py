@@ -75,6 +75,7 @@ class ItemView(BaseModel):
     provenance: str
     source: str
     notes: str
+    estimated: bool = False
     # computed
     early_start: date
     early_finish: date
@@ -148,6 +149,7 @@ class ChainView(BaseModel):
     calendar_losses: list[CalendarLossView]
     applied_events: list[str]
     scenario_events: list[str]
+    stale: dict[str, int] = {}  # open steps past plan with no word since: key -> days past
 
 
 class ReferenceRowView(BaseModel):
@@ -212,6 +214,7 @@ class SiteView(BaseModel):
     people: list[PersonView]
     milestones: list[MilestoneView]
     glossary: dict[str, str]
+    archived_at: datetime | None = None
 
 
 class SiteSummary(BaseModel):

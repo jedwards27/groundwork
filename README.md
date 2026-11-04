@@ -27,6 +27,10 @@ You approve asks, confirm drafts and check receipts in the Groundwork app: the s
 - `/groundwork:mandate` writes or changes a mandate in plain words.
 - The `coordinate` skill handles "what are we waiting on?" and checking project mail.
 
+**Changing a project.** Open its **Steps** tab to see every step, done and cancelled ones included. To change one, ask Claude: it drafts the change with `edit_steps` (add, change, mark cancelled or remove steps) or `edit_project` (name, finish, parties), and you confirm it on your home page. To get a project out of the way, archive it: it leaves your home page and mail routing, and nothing is deleted. Delete removes it for good, after you type its key; a line in `~/.groundwork/deleted.jsonl` keeps its ledger's last hash. The project page has Archive, and an archived project has Restore and Delete. ADR 0011 covers the design.
+
+**When people are on two projects.** Mail goes to the project whose email thread it continues, then to the project whose people sent or received it. If those people are on more than one project, it goes to the one whose name the message mentions; otherwise Claude asks you. Starting a project warns when its people or parties are already on another one.
+
 Everything stays in dry run. If Claude tries to send project mail through another connector, Groundwork's guard records it and holds it; your other use of Gmail or Slack is untouched.
 
 **Updating.** Install the new zip the same way. If the update changes the Lake Mariner demo, the next launch loads the new demo from the start, with a fresh ledger, so the demo matches the skills that narrate it. Your own projects are never touched.

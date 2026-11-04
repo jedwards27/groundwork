@@ -6,6 +6,7 @@ import { Skeleton } from "baseui/skeleton";
 import { toaster } from "baseui/toast";
 import { KIND as TAG, Tag } from "baseui/tag";
 import { HeadingXSmall, LabelMedium, ParagraphSmall } from "baseui/typography";
+import { Input } from "baseui/input";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { get, send } from "@/lib/client";
@@ -43,6 +44,16 @@ export function Home({ session }: { session: Session }) {
       </Page>
     );
   const waiting = h.asks.length + h.drafts.length;
+  // Your own projects' asks and drafts first; the demo's carry a Demo tag.
+  const asks = [...h.asks].sort((a, b) => Number(a.project === DEMO_PROJECT) - Number(b.project === DEMO_PROJECT));
+  const draftsMine = [...h.drafts].sort((a, b) => Number(a.project === DEMO_PROJECT) - Number(b.project === DEMO_PROJECT));
+  const demoTag = (project: string) =>
+    project === DEMO_PROJECT && h.projects.length > 1 ? (
+      <Chip kind="gray" tip={say.needsYou.demoTip} testId="demo-tag">
+        {say.needsYou.demo}
+      </Chip>
+    ) : null;
+  const archived = h.archived ?? [];
   const runs = allRuns ? h.runs : h.runs.slice(0, 3);
   const demo = h.projects.some((p) => p.project === DEMO_PROJECT);
   return (
@@ -77,9 +88,10 @@ export function Home({ session }: { session: Session }) {
         testId="needs-you"
       >
         {waiting === 0 && <Empty>{say.needsYou.empty}</Empty>}
-        {h.asks.map((a) => (
+        {asks.map((a) => (
           <Row key={a.id} onClick={() => setAsk(a)} testId={`ask-${a.ref}`}>
             <Chip kind="yellow">{say.needsYou.ask}</Chip>
+            {demoTag(a.project)}
             <Grow>
               <Line>{a.title}</Line>
               <Muted>{say.needsYou.row(a.project_name, ago(a.at))}</Muted>
@@ -87,9 +99,10 @@ export function Home({ session }: { session: Session }) {
             <ChevronRight size={20} color={theme.colors.contentTertiary} />
           </Row>
         ))}
-        {h.drafts.map((d) => (
+        {draftsMine.map((d) => (
           <Row key={d.id} onClick={() => setDraft(d)} testId={`draft-${d.id}`}>
-            <Chip kind="blue">{say.draftKinds[d.kind]}</Chip>
+            <Chip kind={d.kind === "delete" ? "red" : "blue"}>{say.draftKinds[d.kind]}</Chip>
+            {demoTag(d.project)}
             <Grow>
               <Line>{d.title}</Line>
               <Muted>{say.needsYou.row(d.project, ago(d.at))}</Muted>
@@ -147,6 +160,23 @@ export function Home({ session }: { session: Session }) {
           );
         })}
       </Section>
+
+      {archived.length > 0 && (
+        <Accordion overrides={{ Content: { style: { paddingLeft: 0, paddingRight: 0 } }, Header: { style: { paddingLeft: 0, paddingRight: 0 } } }}>
+          <Panel title={say.archived.title(archived.length)}>
+            <Muted>{say.archived.hint}</Muted>
+            {archived.map((p) => (
+              <Row key={p.project} onClick={() => navigate(`/projects/${p.project}`)} testId={`archived-${p.project}`}>
+                <Grow>
+                  <Line>{p.name}</Line>
+                  <Muted>{say.archived.row(p.archived_at ? ago(p.archived_at) : "")}</Muted>
+                </Grow>
+                <ChevronRight size={20} color={theme.colors.contentTertiary} />
+              </Row>
+            ))}
+          </Panel>
+        </Accordion>
+      )}
 
       <Section
         title={say.activity.title}
@@ -217,11 +247,14 @@ function DraftDrawer({ draft, local, onClose }: { draft: DraftItem | null; local
   const [css, theme] = useStyletron();
   const qc = useQueryClient();
   const [busy, setBusy] = useState(false);
+  const [typed, setTyped] = useState("");
+  const needs = draft?.type_to_confirm ?? null;
   const decide = async (verdict: "confirm" | "reject") => {
     if (!draft) return;
     setBusy(true);
     try {
-      const r = await send<{ message: string }>("POST", `drafts/${draft.id}`, { verdict });
+      const r = await send<{ message: string }>("POST", `drafts/${draft.id}`, { verdict, ...(needs ? { typed } : {}) });
+      setTyped("");
       await qc.invalidateQueries();
       toaster.info(r.message, {});
       onClose();
@@ -231,7 +264,7 @@ function DraftDrawer({ draft, local, onClose }: { draft: DraftItem | null; local
       setBusy(false);
     }
   };
-  const color = { add: theme.colors.contentPositive, remove: theme.colors.contentNegative, assumed: theme.colors.contentWarning };
+  const color = { add: theme.colors.contentPositive, remove: theme.colors.contentNegative, assumed: theme.colors.contentWarning, cancel: theme.colors.contentTertiary };
   return (
     <Drawer
       open={!!draft}
@@ -242,8 +275,8 @@ function DraftDrawer({ draft, local, onClose }: { draft: DraftItem | null; local
         draft &&
         local && (
           <>
-            <Button onClick={() => decide("confirm")} isLoading={busy} data-testid="confirm">
-              {say.draft.confirm}
+            <Button onClick={() => decide("confirm")} isLoading={busy} disabled={!!needs && typed.trim() !== needs} data-testid="confirm">
+              {needs ? say.draft.deleteForGood : say.draft.confirm}
             </Button>
             <Button kind={KIND.secondary} onClick={() => decide("reject")} disabled={busy} data-testid="reject">
               {say.draft.reject}
@@ -264,7 +297,7 @@ function DraftDrawer({ draft, local, onClose }: { draft: DraftItem | null; local
                 className={css({
                   ...theme.typography.ParagraphSmall,
                   color: l.change ? color[l.change] : theme.colors.contentPrimary,
-                  textDecoration: l.change === "remove" ? "line-through" : "none",
+                  textDecoration: l.change === "remove" || l.change === "cancel" ? "line-through" : "none",
                 })}
               >
                 {l.text}
@@ -272,7 +305,10 @@ function DraftDrawer({ draft, local, onClose }: { draft: DraftItem | null; local
             ))}
           </ul>
           {draft.note && <Muted>{draft.note}</Muted>}
-          <Muted>{say.draft.footer}</Muted>
+          {needs && local && (
+            <Input value={typed} onChange={(e) => setTyped((e.target as HTMLInputElement).value)} placeholder={say.draft.typeToConfirm(needs)} overrides={{ Input: { props: { "data-testid": "draft-typed" } } }} />
+          )}
+          <Muted>{needs ? say.draft.footerDelete : say.draft.footer}</Muted>
         </>
       )}
     </Drawer>

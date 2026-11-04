@@ -53,7 +53,7 @@ def _owner(v: Viewer, body: NewProject) -> tuple[svc.Owner, str]:
 
 def _bundle(v: Viewer, body: NewProject, *, keep: bool = False) -> svc.SiteBundle:
     key = svc.slug(body.draft.name)
-    if key in overview.index(v.orgs):
+    if key in overview.index(v.orgs, archived=None):
         raise HTTPException(status.HTTP_409_CONFLICT, f"You already have a project called {body.draft.name!r}; pick another name.")
     owner, org_name = _owner(v, body)
     folder = None
@@ -65,6 +65,68 @@ def _bundle(v: Viewer, body: NewProject, *, keep: bool = False) -> svc.SiteBundl
         return svc.load(body.draft, key, owner, org_name, folder)
     except svc.ProjectProblem as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, exc.problems) from exc
+
+
+class Archive(BaseModel):
+    why: str = Field(default="", max_length=500)
+
+
+class Delete(BaseModel):
+    typed: str = Field(description="The project's key, typed by the person.")
+    why: str = Field(default="", max_length=500)
+
+
+def _mine(v: Viewer, key: str) -> overview.ProjectRef:
+    """A project on this computer. Archiving and deleting are local only: in the hosted demo a
+    visitor's copy is deleted when it expires."""
+    if not _local(v):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "not available in the demo")
+    ref = overview.index(v.orgs, archived=None).get(key)
+    if ref is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "no such project")
+    return ref
+
+
+def _by() -> str:
+    from groundwork.local.home import me
+
+    who = me()
+    if who is None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Run setup in Claude first, so changes are made by a named person.")
+    return who.name
+
+
+@router.post("/projects/{key}/archive")
+def archive(key: str, body: Archive, v: Viewer = Depends(viewer)) -> dict[str, str]:
+    """Archive a project: it leaves home and mail routing. A ledger record says who and why."""
+    ref = _mine(v, key)
+    if ref.archived_at:
+        return {"message": f"{ref.name} is already archived."}
+    svc.archive(ref.org_id, ref.site_id, by=_by(), why=body.why)
+    return {"message": f"Archived {ref.name}."}
+
+
+@router.post("/projects/{key}/restore")
+def restore(key: str, v: Viewer = Depends(viewer)) -> dict[str, str]:
+    ref = _mine(v, key)
+    if not ref.archived_at:
+        return {"message": f"{ref.name} is already active."}
+    svc.restore(ref.org_id, ref.site_id, by=_by())
+    return {"message": f"Restored {ref.name}."}
+
+
+@router.post("/projects/{key}/delete")
+def delete(key: str, body: Delete, v: Viewer = Depends(viewer)) -> dict[str, str]:
+    """Delete a project for good. The person types its key; the demo project can't be deleted."""
+    ref = _mine(v, key)
+    if key == "lake-mariner":
+        raise HTTPException(status.HTTP_409_CONFLICT, "The demo project can't be deleted. Archive it to hide it.")
+    if body.typed.strip() != key:
+        raise HTTPException(status.HTTP_409_CONFLICT, f"Type {key} to delete it.")
+    from groundwork.local.confirm import delete_project
+
+    delete_project(ref, _by(), body.why)
+    return {"message": f"Deleted {ref.name}."}
 
 
 @router.post("/projects/preview")

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime
 from typing import Any
 
 from groundwork.ingest.site_loader import (
@@ -60,6 +60,7 @@ class SiteState:
     mandate_spec: MandateSpec = field(default_factory=MandateSpec)
     org_id: uuid.UUID | None = None
     site_id: uuid.UUID | None = None
+    archived_at: datetime | None = None
     ids: dict[str, uuid.UUID] = field(default_factory=dict)  # "party:key" / "item:key" / "person:key" -> id
 
     @classmethod

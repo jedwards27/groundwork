@@ -96,6 +96,8 @@ class Site(Base):
     # Set only on the plugin's demo: the fingerprint of the fixture folder it was seeded from, so
     # an update that changes the demo reloads it (local/runtime.seed_demo).
     fixture_fingerprint: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Set when the person archives the project: it leaves home and mail routing until restored.
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = _created()
 
 
@@ -160,6 +162,8 @@ class Item(Base):
     provenance: Mapped[str] = mapped_column(Text, nullable=False)
     source: Mapped[str] = mapped_column(Text, nullable=False)
     notes: Mapped[str] = mapped_column(Text, nullable=False)
+    # The date is someone's estimate ("early December"), or a done step's finish isn't known.
+    date_estimated: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false", default=False)
 
 
 class Milestone(Base):

@@ -13,7 +13,8 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+from sqlalchemy import delete as sa_delete
 from sqlalchemy import select
 
 from groundwork.db import models as m
@@ -56,21 +57,47 @@ class PartyIn(BaseModel):
     people: list[PersonIn] = Field(default_factory=list)
 
 
+Kind = Literal[
+    "study", "approval", "permit", "inspection", "test", "delivery", "install", "milestone", "notice",
+    "agreement", "consent", "financing", "land", "decision", "meeting", "payment",
+]
+KIND_HELP = (
+    "install is fitting or installing work; decision is a selection or sign-off; meeting is a meeting or "
+    "presentation; payment is an invoice, deposit or payment."
+)
+Status = Literal["done", "in_progress", "not_started", "cancelled"]
+STATUS_HELP = "cancelled means descoped: it stays on record, but nothing waits on it and the forecast ignores it."
+
+
 class ItemIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     key: str = Field(description="Short lowercase key, unique in the project.")
     title: str
-    kind: Literal["study", "approval", "permit", "inspection", "test", "delivery", "milestone", "notice", "agreement", "consent", "financing", "land"]
+    kind: Kind = Field(description=KIND_HELP)
     owner: str = Field(description="Party key responsible, or 'you' for the person's own side.")
-    status: Literal["done", "in_progress", "not_started"]
+    status: Status = Field(description=STATUS_HELP)
     start: date | None = None
-    finish: date = Field(description="Planned finish (or the actual finish when done).")
+    finish: date | None = Field(
+        default=None,
+        description="Planned finish, or the actual finish when done. Leave empty only for a done step whose "
+        "finish date isn't known; it is then marked as an estimate.",
+    )
+    approximate: bool = Field(
+        default=False, description="True when the date is an estimate, for example 'early December' or 'about two weeks'."
+    )
     depends_on: list[str] = Field(default_factory=list, description="Item keys that must finish first, as a source states.")
     assumed_depends_on: list[str] = Field(
         default_factory=list,
         description="Item keys you believe must finish first but no source states. Flagged for the person to confirm.",
     )
     source: str = Field(default="", description="Where this came from: an email subject, a file, the person.")
+    notes: str = ""
+
+    @model_validator(mode="after")
+    def _finish_needed(self) -> ItemIn:
+        if self.finish is None and self.status not in ("done", "cancelled"):
+            raise ValueError(f"{self.key}: finish is required unless the step is done or cancelled")
+        return self
 
 
 class ProjectDraft(BaseModel):
@@ -154,10 +181,12 @@ def write_folder(d: ProjectDraft, key: str, folder: Path, owner: Owner, org_name
     }
     (folder / "site.yaml").write_text(yaml.safe_dump(doc, sort_keys=False))
     out = io.StringIO()
-    cols = ["key", "title", "kind", "owner", "performer", "status", "planned_start", "planned_finish", "actual_finish", "calendar", "predecessors", "provenance", "source", "notes"]
+    cols = ["key", "title", "kind", "owner", "performer", "status", "planned_start", "planned_finish", "actual_finish", "estimated", "calendar", "predecessors", "provenance", "source", "notes"]
     w = csv.DictWriter(out, fieldnames=cols)
     w.writeheader()
+    as_of = d.as_of or date.today()
     for it in d.items:
+        finish = it.finish or min(as_of, it.start or as_of)
         w.writerow(
             {
                 "key": it.key,
@@ -167,13 +196,14 @@ def write_folder(d: ProjectDraft, key: str, folder: Path, owner: Owner, org_name
                 "performer": it.owner,
                 "status": it.status,
                 "planned_start": it.start.isoformat() if it.start else "",
-                "planned_finish": it.finish.isoformat(),
-                "actual_finish": it.finish.isoformat() if it.status == "done" else "",
+                "planned_finish": finish.isoformat(),
+                "actual_finish": finish.isoformat() if it.status == "done" else "",
+                "estimated": "true" if (it.approximate or it.finish is None) else "",
                 "calendar": "calendar",
                 "predecessors": ";".join([*it.depends_on, *it.assumed_depends_on]),
                 "provenance": "synthetic",
                 "source": it.source,
-                "notes": "",
+                "notes": it.notes or ("Finished; the date isn't known." if it.finish is None and it.status == "done" else ""),
             }
         )
     (folder / "schedule.csv").write_text(out.getvalue())
@@ -231,6 +261,30 @@ def taken(bundle: SiteBundle) -> bool:
         return s.execute(select(m.Org).where(m.Org.name == bundle.org_name)).first() is not None
 
 
+def snapshot(bundle: SiteBundle) -> dict[str, Any]:
+    """What the project held when it was created, for its first ledger record: enough to see later
+    what changed, and a hash of the whole folder."""
+    import hashlib
+    import json
+
+    ms = bundle.milestones[0] if bundle.milestones else None
+    steps = [
+        {"key": i.key, "title": i.title, "status": i.status, "finish": str(i.actual_finish or i.planned_finish), **({"estimated": True} if i.estimated else {})}
+        for i in bundle.items
+    ]
+    body = {
+        "name": bundle.site_name,
+        "as_of": str(bundle.as_of),
+        "finish": {"label": ms.label, "step": ms.item, "target": str(ms.target_date)} if ms else None,
+        "parties": [p.name for p in bundle.parties],
+        "people": len(bundle.people),
+        "links": len(bundle.links),
+        "steps": steps,
+    }
+    digest = hashlib.sha256(json.dumps(body, sort_keys=True, default=str).encode()).hexdigest()
+    return {**body, "snapshot_sha256": digest}
+
+
 def create(bundle: SiteBundle, *, by: str, expires_at: datetime | None = None) -> uuid.UUID:
     """Create the project as a new org, with its ledger's first records. Owner role."""
     with owner_session() as s:
@@ -239,8 +293,86 @@ def create(bundle: SiteBundle, *, by: str, expires_at: datetime | None = None) -
             org = s.get(m.Org, org_id)
             assert org is not None
             org.expires_at = expires_at
-        append(s, "project_created", {"project": bundle.site_key, "by": by, "items": len(bundle.items)}, org_id=org_id)
+        append(
+            s,
+            "project_created",
+            {"project": bundle.site_key, "by": by, "items": len(bundle.items), "snapshot": snapshot(bundle)},
+            org_id=org_id,
+        )
     return org_id
+
+
+def overlaps(emails: set[str], party_names: set[str], *, skip: str | None = None) -> list[dict[str, Any]]:
+    """Other active projects that share people (by email) or a party (by name) with these. Mail from
+    a shared person can belong to either project, so routing asks unless the thread or subject says."""
+    emails = {e.lower() for e in emails if e}
+    names = {n.strip().lower() for n in party_names if n.strip()}
+    out: list[dict[str, Any]] = []
+    with owner_session() as s:
+        for site in s.execute(select(m.Site).where(m.Site.archived_at.is_(None))).scalars():
+            if site.key == skip:
+                continue
+            org = s.get(m.Org, site.org_id)
+            if org is None or org.expires_at is not None:
+                continue
+            party_ids = {sp.party_id for sp in s.execute(select(m.SiteParty).where(m.SiteParty.site_id == site.id)).scalars()}
+            parties = [p for p in s.execute(select(m.Party).where(m.Party.id.in_(party_ids))).scalars() if p.key != "you"]
+            people = s.execute(select(m.Person).where(m.Person.party_id.in_(party_ids), m.Person.key != "me")).scalars()
+            shared_people = sorted({p.email.lower() for p in people if p.email and p.email.lower() in emails})
+            shared_parties = sorted({p.name for p in parties if p.name.strip().lower() in names})
+            if shared_people or shared_parties:
+                out.append({"project": site.key, "name": site.name, "people": shared_people, "parties": shared_parties})
+    return out
+
+
+# --- archive, restore, delete -------------------------------------------------------------------
+def archive(org_id: uuid.UUID, site_id: uuid.UUID, *, by: str, why: str) -> None:
+    """Hide the project from home and from mail routing. Nothing is deleted; restore undoes it."""
+    from datetime import UTC
+
+    with owner_session() as s:
+        site = s.get(m.Site, site_id)
+        assert site is not None
+        site.archived_at = datetime.now(UTC)
+        append(s, "project_archived", {"project": site.key, "by": by, "why": why}, org_id=org_id)
+
+
+def restore(org_id: uuid.UUID, site_id: uuid.UUID, *, by: str) -> None:
+    with owner_session() as s:
+        site = s.get(m.Site, site_id)
+        assert site is not None
+        site.archived_at = None
+        append(s, "project_restored", {"project": site.key, "by": by}, org_id=org_id)
+
+
+def delete(org_id: uuid.UUID, *, by: str, why: str, log: Path | None = None) -> dict[str, Any]:
+    """Delete the project and its ledger for good. The ledger can't record its own deletion, so a
+    line goes to a local log instead: what was deleted, by whom, and the ledger's last hash, which
+    still checks any receipt someone kept."""
+    import json
+    from datetime import UTC
+
+    with owner_session() as s:
+        site = s.execute(select(m.Site).where(m.Site.org_id == org_id)).scalar_one()
+        head = s.execute(
+            select(m.LedgerEntry).where(m.LedgerEntry.org_id == org_id).order_by(m.LedgerEntry.seq.desc()).limit(1)
+        ).scalar_one_or_none()
+        entry = {
+            "deleted_at": datetime.now(UTC).isoformat(),
+            "project": site.key,
+            "name": site.name,
+            "by": by,
+            "why": why,
+            "records": head.seq if head else 0,
+            "last_hash": head.hash if head else None,
+        }
+        repo.delete_org_data(s, org_id)
+        s.execute(sa_delete(m.Org).where(m.Org.id == org_id))
+    if log is not None:
+        log.parent.mkdir(parents=True, exist_ok=True)
+        with log.open("a") as fh:
+            fh.write(json.dumps(entry) + "\n")
+    return entry
 
 
 def me_in(org_id: uuid.UUID) -> uuid.UUID:

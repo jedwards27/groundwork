@@ -42,8 +42,14 @@ ITEM_KINDS = (
     "consent",
     "financing",
     "land",
+    "install",
+    "decision",
+    "meeting",
+    "payment",
 )
-STATUSES = ("done", "in_progress", "not_started")
+# A cancelled step is out of scope: it stays on record but nothing waits on it.
+STATUSES = ("done", "in_progress", "not_started", "cancelled")
+CLOSED = ("done", "cancelled")
 ROLES = (
     "landlord",
     "lessee",
@@ -117,6 +123,7 @@ class ItemRow:
     provenance: str
     source: str
     notes: str
+    estimated: bool = False  # the date is an estimate, or a done step's finish isn't known
 
 
 @dataclass(frozen=True)
@@ -399,8 +406,10 @@ def load_site(root: Path | str) -> SiteBundle:
                 continue
             if start and start > finish:
                 problems.append(f"{where}: planned_start {start} is after planned_finish {finish}")
+            estimated = (row.get("estimated") or "").strip().lower() in ("true", "yes", "1", "~")
             if status == "done" and actual is None:
-                problems.append(f"{where}: done items need an actual_finish")
+                # Finished, date not known: keep the planned date and mark it as an estimate.
+                actual, estimated = finish, True
             cal = (row.get("calendar") or "business").strip()
             if cal not in ("business", "calendar"):
                 problems.append(f"{where}: calendar must be business or calendar")
@@ -420,6 +429,7 @@ def load_site(root: Path | str) -> SiteBundle:
                     _prov(row.get("provenance"), where, problems),
                     (row.get("source") or "").strip(),
                     (row.get("notes") or "").strip(),
+                    estimated,
                 )
             )
             links.extend(parse_predecessors(row.get("predecessors", ""), key, problems))

@@ -10,7 +10,7 @@ from groundwork.core import Adjustment, Link, Schedule, Target, Task, WorkCalend
 from groundwork.core.forecast import Forecast, Measure, RangedDelay, ReferenceRow, forecast
 from groundwork.core.profile import DomainProfile
 from groundwork.domain import get_profile
-from groundwork.ingest.site_loader import EventRow, MilestoneRow, PartyRow
+from groundwork.ingest.site_loader import CLOSED, EventRow, ItemRow, MilestoneRow, PartyRow
 from groundwork.schemas.views import (
     CalendarLossView,
     ChainView,
@@ -102,11 +102,16 @@ def party_views(state: SiteState, profile: DomainProfile) -> list[PartyView]:
 
 
 # --- engine inputs -----------------------------------------------------------------------------
+def _task(i: ItemRow, as_of: date) -> Task:
+    if i.status == "cancelled":
+        # Out of scope: nothing waits on it, so the engine sees it as finished by today at the latest.
+        start = i.planned_start or i.planned_finish
+        return Task(i.key, "done", i.planned_finish, i.planned_start, i.calendar, min(start, as_of))  # type: ignore[arg-type]
+    return Task(i.key, i.status, i.planned_finish, i.planned_start, i.calendar, i.actual_finish)  # type: ignore[arg-type]
+
+
 def engine_inputs(state: SiteState) -> tuple[list[Task], list[Link], WorkCalendar, dict[str, str]]:
-    tasks = [
-        Task(i.key, i.status, i.planned_finish, i.planned_start, i.calendar, i.actual_finish)  # type: ignore[arg-type]
-        for i in state.items
-    ]
+    tasks = [_task(i, state.as_of) for i in state.items]
     links = [Link(ln.pred, ln.succ, ln.kind, ln.lag, ln.lag_calendar) for ln in state.links]  # type: ignore[arg-type]
     return tasks, links, WorkCalendar.of(state.holidays), {i.key: i.code for i in state.items}
 
@@ -117,6 +122,27 @@ def event_delays(events: Sequence[EventRow]) -> list[RangedDelay]:
         for e in events
         for imp in e.impacts
     ]
+
+
+def stale(state: SiteState) -> dict[str, int]:
+    """Open steps past their planned finish with no message about them since: key -> days past."""
+    heard: dict[str, date] = {}
+    for e in state.events:
+        if state.event_status.get(e.key) == "moved":
+            continue
+        for k in {*e.links, *(imp.item for imp in e.impacts)}:
+            heard[k] = max(heard.get(k, date.min), e.received_at.date())
+    return {
+        i.key: (state.as_of - i.planned_finish).days
+        for i in state.items
+        if i.status not in CLOSED and i.planned_finish < state.as_of and heard.get(i.key, date.min) < i.planned_finish
+    }
+
+
+def stale_delays(state: SiteState) -> list[RangedDelay]:
+    """The late case for a step past plan with no word: it slips as much again. The middle case
+    leaves it starting today, which the engine already does."""
+    return [RangedDelay(k, 0, days, "calendar", "past plan with no word", mid=0) for k, days in stale(state).items()]
 
 
 def reference_rows(state: SiteState) -> list[ReferenceRow]:
@@ -161,7 +187,7 @@ def run_forecast(
         as_of=state.as_of,
         calendar=cal,
         target=Target(ms.item, ms.target_date),
-        delays=event_delays(events),
+        delays=event_delays(events) + stale_delays(state),
         adjustments=adjustments,
         reference_rows=reference_rows(state),
         codes=codes,
@@ -259,6 +285,7 @@ def chain_view(
                 provenance=i.provenance,
                 source=i.source,
                 notes=i.notes,
+                estimated=i.estimated,
                 early_start=r.early_start,
                 early_finish=r.early_finish,
                 late_finish=r.late_finish,
@@ -296,6 +323,7 @@ def chain_view(
         ],
         applied_events=[e.key for e in state.applied_events()],
         scenario_events=list(scenario),
+        stale=stale(state),
     )
 
 
@@ -402,6 +430,7 @@ def site_view(state: SiteState) -> SiteView:
         ],
         milestones=milestones,
         glossary=dict(profile.glossary),
+        archived_at=state.archived_at,
     )
 
 

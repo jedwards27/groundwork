@@ -368,3 +368,26 @@ test("a new project from the website: check its forecast, then create it", async
   await page.getByTestId("home-link").click();
   await expect(ui(page, "project-kitchen-remodel")).toBeVisible();
 });
+
+test("every step: the Steps tab lists them all, and the chart can show the whole project", async ({ page }) => {
+  await open(page, `/projects/${SITE}`);
+  const chain = await api<{ items: { key: string; status: string }[] }>(page, `sites/${SITE}/chain`);
+  await ui(page, "range-all").click();
+  await expect(page.locator('[data-testid="graph"] g[data-key]')).toHaveCount(chain.items.length);
+  await tab(page, "Steps");
+  await expect(page).toHaveURL(new RegExp(`/projects/${SITE}/steps$`));
+  await expect(ui(page, "steps")).toContainText(`${chain.items.length} steps`);
+  for (const i of chain.items) await expect(ui(page, `step-${i.key}`)).toHaveCount(1);
+  const done = chain.items.filter((i) => i.status === "done").length;
+  await page.getByRole("radio", { name: new RegExp(`^Done ${done}$`) }).click();
+  await expect(ui(page, "steps")).toContainText(`${done} of ${chain.items.length} steps`);
+});
+
+test("a new project's steps can be pasted from a spreadsheet", async ({ page }) => {
+  await open(page, "/projects/new");
+  await page.getByRole("button", { name: "Paste steps from a spreadsheet" }).click();
+  await ui(page, "paste-steps").fill("Step\tOwner\tStatus\tDue\tWaits on\nPermit issued\tCity permits\tunder way\t2027-01-15\t\nCabinets installed\tBayside Builders\tnot started\t2/1/2027\tPermit issued\nno date\tBayside Builders\t\t\t");
+  await ui(page, "paste-add").click();
+  await expect(ui(page, "paste-note")).toHaveText("Added 2 steps; skipped 1 row missing a step name or a readable date.");
+  await expect(page.locator('input[placeholder="Organization"]').nth(1)).toHaveValue("Bayside Builders");
+});

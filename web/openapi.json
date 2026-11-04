@@ -80,6 +80,157 @@
     }
    }
   },
+  "/projects/{key}/archive": {
+   "post": {
+    "summary": "Archive",
+    "description": "Archive a project: it leaves home and mail routing. A ledger record says who and why.",
+    "operationId": "archive_projects__key__archive_post",
+    "parameters": [
+     {
+      "name": "key",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Key"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/Archive"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": {
+          "type": "string"
+         },
+         "title": "Response Archive Projects  Key  Archive Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/projects/{key}/restore": {
+   "post": {
+    "summary": "Restore",
+    "operationId": "restore_projects__key__restore_post",
+    "parameters": [
+     {
+      "name": "key",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Key"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": {
+          "type": "string"
+         },
+         "title": "Response Restore Projects  Key  Restore Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/projects/{key}/delete": {
+   "post": {
+    "summary": "Delete",
+    "description": "Delete a project for good. The person types its key; the demo project can't be deleted.",
+    "operationId": "delete_projects__key__delete_post",
+    "parameters": [
+     {
+      "name": "key",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Key"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/Delete"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": {
+          "type": "string"
+         },
+         "title": "Response Delete Projects  Key  Delete Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/projects/preview": {
    "post": {
     "summary": "Preview",
@@ -1606,6 +1757,18 @@
     ],
     "title": "ApprovalIn"
    },
+   "Archive": {
+    "properties": {
+     "why": {
+      "type": "string",
+      "maxLength": 500,
+      "title": "Why",
+      "default": ""
+     }
+    },
+    "type": "object",
+    "title": "Archive"
+   },
    "CalendarLossView": {
     "properties": {
      "pred": {
@@ -1736,6 +1899,14 @@
       },
       "type": "array",
       "title": "Scenario Events"
+     },
+     "stale": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "type": "object",
+      "title": "Stale",
+      "default": {}
      }
     },
     "type": "object",
@@ -1755,6 +1926,26 @@
      "scenario_events"
     ],
     "title": "ChainView"
+   },
+   "Delete": {
+    "properties": {
+     "typed": {
+      "type": "string",
+      "title": "Typed",
+      "description": "The project's key, typed by the person."
+     },
+     "why": {
+      "type": "string",
+      "maxLength": 500,
+      "title": "Why",
+      "default": ""
+     }
+    },
+    "type": "object",
+    "required": [
+     "typed"
+    ],
+    "title": "Delete"
    },
    "DemoSignIn": {
     "properties": {
@@ -1776,6 +1967,17 @@
        "reject"
       ],
       "title": "Verdict"
+     },
+     "typed": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Typed"
      }
     },
     "type": "object",
@@ -2085,14 +2287,19 @@
        "inspection",
        "test",
        "delivery",
+       "install",
        "milestone",
        "notice",
        "agreement",
        "consent",
        "financing",
-       "land"
+       "land",
+       "decision",
+       "meeting",
+       "payment"
       ],
-      "title": "Kind"
+      "title": "Kind",
+      "description": "install is fitting or installing work; decision is a selection or sign-off; meeting is a meeting or presentation; payment is an invoice, deposit or payment."
      },
      "owner": {
       "type": "string",
@@ -2104,9 +2311,11 @@
       "enum": [
        "done",
        "in_progress",
-       "not_started"
+       "not_started",
+       "cancelled"
       ],
-      "title": "Status"
+      "title": "Status",
+      "description": "cancelled means descoped: it stays on record, but nothing waits on it and the forecast ignores it."
      },
      "start": {
       "anyOf": [
@@ -2121,10 +2330,23 @@
       "title": "Start"
      },
      "finish": {
-      "type": "string",
-      "format": "date",
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date"
+       },
+       {
+        "type": "null"
+       }
+      ],
       "title": "Finish",
-      "description": "Planned finish (or the actual finish when done)."
+      "description": "Planned finish, or the actual finish when done. Leave empty only for a done step whose finish date isn't known; it is then marked as an estimate."
+     },
+     "approximate": {
+      "type": "boolean",
+      "title": "Approximate",
+      "description": "True when the date is an estimate, for example 'early December' or 'about two weeks'.",
+      "default": false
      },
      "depends_on": {
       "items": {
@@ -2147,6 +2369,11 @@
       "title": "Source",
       "description": "Where this came from: an email subject, a file, the person.",
       "default": ""
+     },
+     "notes": {
+      "type": "string",
+      "title": "Notes",
+      "default": ""
      }
     },
     "additionalProperties": false,
@@ -2156,8 +2383,7 @@
      "title",
      "kind",
      "owner",
-     "status",
-     "finish"
+     "status"
     ],
     "title": "ItemIn"
    },
@@ -2239,6 +2465,11 @@
      "notes": {
       "type": "string",
       "title": "Notes"
+     },
+     "estimated": {
+      "type": "boolean",
+      "title": "Estimated",
+      "default": false
      },
      "early_start": {
       "type": "string",
@@ -3262,6 +3493,18 @@
       },
       "type": "object",
       "title": "Glossary"
+     },
+     "archived_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Archived At"
      }
     },
     "type": "object",

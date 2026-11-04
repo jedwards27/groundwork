@@ -209,7 +209,8 @@ def test_tools_cannot_approve_confirm_or_issue(local):
     assert names == {
         "setup", "projects", "status", "play_message", "propose_plan", "submit_report", "record_message",
         "check_overdue", "change_links", "add_people", "move_message", "draft_mandate", "start_project",
-        "pending", "ledger", "verify_record",
+        "pending", "ledger", "verify_record", "steps", "edit_steps", "edit_project", "archive_project",
+        "delete_project",
     }
     assert not any(w in n for n in names for w in ("approve", "confirm", "issue", "grant"))
 

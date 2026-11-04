@@ -30,14 +30,21 @@ class ProjectRef:
     name: str
     org_id: uuid.UUID
     site_id: uuid.UUID
+    archived_at: str | None = None
 
 
-def index(orgs: set[uuid.UUID] | None = None) -> dict[str, ProjectRef]:
-    """Projects by key. Sandboxes (hosted visitors' copies) are left out unless asked for by org."""
+def index(orgs: set[uuid.UUID] | None = None, *, archived: bool | None = False) -> dict[str, ProjectRef]:
+    """Projects by key. Sandboxes (hosted visitors' copies) are left out unless asked for by org.
+    Archived projects are left out unless `archived` is True (only them) or None (all)."""
     with owner_session() as s:
         q = select(m.Site).join(m.Org, m.Org.id == m.Site.org_id)
         q = q.where(m.Site.org_id.in_(orgs)) if orgs is not None else q.where(m.Org.expires_at.is_(None))
-        return {r.key: ProjectRef(r.key, r.name, r.org_id, r.id) for r in s.execute(q.order_by(m.Site.name)).scalars()}
+        if archived is not None:
+            q = q.where(m.Site.archived_at.is_not(None) if archived else m.Site.archived_at.is_(None))
+        return {
+            r.key: ProjectRef(r.key, r.name, r.org_id, r.id, r.archived_at.isoformat() if r.archived_at else None)
+            for r in s.execute(q.order_by(m.Site.name)).scalars()
+        }
 
 
 def ref_for_action(action_id: uuid.UUID) -> ProjectRef | None:

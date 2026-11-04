@@ -28,7 +28,7 @@ export function Overview({ chain, site, plan }: { chain: ChainView; site: SiteVi
   return (
     <div className={css({ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: theme.sizing.scale600 })}>
       <Section title={say.graph.title} hint={say.graph.hint} testId="graph">
-        <Chain chain={chain} />
+        <Chain key={chain.site} chain={chain} />
       </Section>
       <Accordion>
         <Panel

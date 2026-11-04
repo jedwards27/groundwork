@@ -8,6 +8,7 @@ import { Button, KIND, SIZE } from "baseui/button";
 import { FormControl } from "baseui/form-control";
 import { Delete } from "baseui/icon";
 import { Input } from "baseui/input";
+import { Textarea } from "baseui/textarea";
 import { Select, type Value } from "baseui/select";
 import { HeadingSmall, LabelMedium, ParagraphSmall } from "baseui/typography";
 import { useState } from "react";
@@ -19,7 +20,7 @@ import { newProject as say } from "@/copy/newProject";
 import { Chip, Muted, Page, Section } from "./ui";
 
 type Role = "contractor" | "designer" | "consultant" | "vendor" | "landlord" | "lender" | "ahj" | "agency" | "regulator" | "developer" | "operator" | "community";
-type Status = "not_started" | "in_progress" | "done";
+type Status = "not_started" | "in_progress" | "done" | "cancelled";
 
 const ROLES = (Object.keys(say.parties.roles) as Role[]).map((id) => ({ id, label: say.parties.roles[id] }));
 const STATUSES = (Object.keys(say.steps.statuses) as Status[]).map((id) => ({ id, label: say.steps.statuses[id] }));
@@ -95,6 +96,47 @@ const example = (): Form => {
   };
 };
 
+// A date as a spreadsheet writes it: 2026-12-01, 12/1/2026 or "Dec 1, 2026".
+function isoDate(text: string): string | null {
+  const t = text.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return t;
+  const us = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  if (us) {
+    const y = us[3].length === 2 ? 2000 + Number(us[3]) : Number(us[3]);
+    return `${y}-${pad(Number(us[1]))}-${pad(Number(us[2]))}`;
+  }
+  const d = new Date(t);
+  return t && !Number.isNaN(d.getTime()) ? `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` : null;
+}
+
+function statusOf(text: string): Status {
+  const t = text.trim().toLowerCase();
+  if (/^(done|complete|completed|finished|closed|yes)$/.test(t)) return "done";
+  if (/cancel|descoped|dropped/.test(t)) return "cancelled";
+  if (/progress|under way|underway|started|ongoing|in work/.test(t)) return "in_progress";
+  return "not_started";
+}
+
+// Rows pasted from a spreadsheet (tabs) or typed (commas), as steps.
+function parsePasted(text: string): { items: ItemRow[]; skipped: number } {
+  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const items: ItemRow[] = [];
+  let skipped = 0;
+  lines.forEach((line, n) => {
+    const cells = (line.includes("\t") ? line.split("\t") : line.split(",")).map((c) => c.trim());
+    if (n === 0 && /^(step|task|title|item|name)s?$/i.test(cells[0])) return;
+    const [title = "", owner = "", status = "", due = "", after = ""] = cells;
+    const finish = isoDate(due);
+    if (!title || !finish) {
+      skipped += 1;
+      return;
+    }
+    items.push({ title, owner: /^(you|me|us|owner|client)$/i.test(owner) ? "you" : owner, status: statusOf(status), finish, after: after.split(";").map((a) => a.trim()).filter(Boolean) });
+  });
+  return { items, skipped };
+}
+
 function slug(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "x";
 }
@@ -168,12 +210,26 @@ export function NewProject({ session }: { session: Session }) {
   const [preview, setPreview] = useState<Preview | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  const [pasted, setPasted] = useState("");
+  const [pasteNote, setPasteNote] = useState("");
   const set = (patch: Partial<Form>) => {
     setF((x) => ({ ...x, ...patch }));
     setPreview(null);
   };
   const setParty = (i: number, patch: Partial<PartyRow>) => set({ parties: f.parties.map((p, j) => (j === i ? { ...p, ...patch } : p)) });
   const setItem = (i: number, patch: Partial<ItemRow>) => set({ items: f.items.map((it, j) => (j === i ? { ...it, ...patch } : it)) });
+  const addPasted = () => {
+    const { items, skipped } = parsePasted(pasted);
+    const kept = f.items.filter((it) => it.title.trim() || it.finish);
+    const known = new Set(["you", ...f.parties.map((p) => p.name.trim())]);
+    const newOwners = [...new Set(items.map((it) => it.owner).filter((o) => o && !known.has(o)))];
+    set({
+      items: [...kept, ...items],
+      parties: [...f.parties.filter((p) => p.name.trim()), ...newOwners.map((name) => ({ name, role: "contractor" as Role, contact: "", email: "" }))],
+    });
+    setPasteNote(say.steps.paste.added(items.length, skipped));
+    if (items.length) setPasted("");
+  };
   const owners = [{ id: "you", label: say.steps.you }, ...f.parties.filter((p) => p.name.trim()).map((p) => ({ id: p.name, label: p.name }))];
   const titles = f.items.map((it) => it.title).filter((t) => t.trim());
   const finishIndex = f.finish_item >= 0 && f.finish_item < f.items.length ? f.finish_item : f.items.length - 1;
@@ -305,6 +361,20 @@ export function NewProject({ session }: { session: Session }) {
               {say.steps.add}
             </Button>
           </div>
+          <Accordion overrides={{ Content: { style: { paddingLeft: 0, paddingRight: 0 } }, Header: { style: { paddingLeft: 0, paddingRight: 0 } } }}>
+            <Panel title={say.steps.paste.title}>
+              <div className={css({ display: "grid", gap: theme.sizing.scale300 })}>
+                <Muted>{say.steps.paste.hint}</Muted>
+                <Textarea value={pasted} onChange={(e) => setPasted((e.target as HTMLTextAreaElement).value)} placeholder={say.steps.paste.placeholder} rows={6} overrides={{ Input: { props: { "data-testid": "paste-steps" } } }} />
+                <div>
+                  <Button kind={KIND.secondary} size={SIZE.mini} onClick={addPasted} disabled={!pasted.trim()} data-testid="paste-add">
+                    {say.steps.paste.add}
+                  </Button>
+                </div>
+                {pasteNote && <Muted testId="paste-note">{pasteNote}</Muted>}
+              </div>
+            </Panel>
+          </Accordion>
           {titles.length > 1 && (
             <FormControl label={say.steps.finishing}>
               {select(f.items.map((it, i) => ({ id: String(i), label: it.title || say.steps.numbered(i + 1) })), String(finishIndex), (v) => set({ finish_item: Number(v) }), say.steps.finishingLabel)}

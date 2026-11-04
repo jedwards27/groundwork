@@ -107,9 +107,11 @@ class RangedDelay:
     high: int
     calendar: CalendarKind = "calendar"
     label: str = ""
+    mid: int | None = None  # the middle case, when it isn't halfway between low and high
 
     def at(self, which: Literal["low", "mid", "high"]) -> Delay:
-        days = {"low": self.low, "high": self.high, "mid": round((self.low + self.high) / 2)}[which]
+        middle = round((self.low + self.high) / 2) if self.mid is None else self.mid
+        days = {"low": self.low, "high": self.high, "mid": middle}[which]
         return Delay(self.key, days, self.calendar, self.label)
 
 

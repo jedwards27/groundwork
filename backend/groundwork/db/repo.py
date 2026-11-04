@@ -158,6 +158,7 @@ def seed_bundle(s: Session, b: SiteBundle, *, replace: bool = True) -> uuid.UUID
             provenance=i.provenance,
             source=i.source,
             notes=i.notes,
+            date_estimated=i.estimated,
         )
         s.add(row)
         s.flush()
@@ -363,6 +364,7 @@ def load_state(s: Session, site_key: str) -> SiteState:
             i.provenance,
             i.source,
             i.notes,
+            i.date_estimated,
         )
         for i in items_db
     ]
@@ -466,6 +468,7 @@ def load_state(s: Session, site_key: str) -> SiteState:
         reference_rows=refs,
         org_id=org_id,
         site_id=site.id,
+        archived_at=site.archived_at,
         ids=ids,
         timezone=_org_timezone(s, org_id),
     )

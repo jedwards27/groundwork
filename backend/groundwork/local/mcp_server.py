@@ -60,8 +60,16 @@ def projects() -> dict[str, Any]:
 @server.tool()
 def status(project: str) -> dict[str, Any]:
     """One project: what it is waiting on, what sets its finish date, the slack left, the forecast,
-    unplayed messages and the mandate in plain words."""
+    steps past plan with no word, unplayed messages and the mandate in plain words. It lists the
+    first 12 open steps; call steps for all of them."""
     return _run(tools.status, project)
+
+
+@server.tool()
+def steps(project: str, status: Literal["all", "open", "done", "cancelled", "past_due"] = "all") -> dict[str, Any]:
+    """Every step in a project, done and cancelled ones included: title, kind, owner, status, dates,
+    whether a date is an estimate, what it waits on and its source. Use it to check or list steps."""
+    return _run(tools.steps, project, status)
 
 
 @server.tool()
@@ -157,9 +165,50 @@ def draft_mandate(project: str, words: str, terms: MandateTerms) -> dict[str, An
 @server.tool()
 def start_project(draft: tools.ProjectDraft) -> dict[str, Any]:
     """Draft a new project from what the person told you, their tracker or their email: parties,
-    people with emails, items with dates and dependencies, and what finishing means. It is created
-    only when the person confirms it in the Groundwork app."""
+    people with emails, items with dates and dependencies, and what finishing means. Mark estimated
+    dates as approximate, descoped steps as cancelled, and leave finish empty for a done step whose
+    date isn't known. Warns when people or parties are also on another project. It is created only
+    when the person confirms it in the Groundwork app. To change a project that exists, use
+    edit_steps or edit_project instead."""
     return _run(tools.start_project, draft)
+
+
+@server.tool()
+def edit_steps(
+    project: str,
+    why: str,
+    add: list[tools.ItemIn] | None = None,
+    change: list[tools.StepChange] | None = None,
+    remove: list[str] | None = None,
+) -> dict[str, Any]:
+    """Draft changes to a project's steps after it exists: add steps; change any field (title, kind,
+    owner, status, dates, estimated, what it waits on); mark a step cancelled when it's descoped (kept
+    on record, ignored by the forecast); or remove one entered by mistake. Shows the forecast before
+    and after. The person confirms in the Groundwork app."""
+    return _run(tools.edit_steps, project, why, add, change, remove)
+
+
+@server.tool()
+def edit_project(project: str, why: str, change: tools.ProjectChange) -> dict[str, Any]:
+    """Draft changes to a project's details: name, location, finish (label, target date, the step
+    that marks it), parties (add or rename), or the earlier project it follows on from. The person
+    confirms in the Groundwork app."""
+    return _run(tools.edit_project, project, why, change)
+
+
+@server.tool()
+def archive_project(project: str, why: str, restore: bool = False) -> dict[str, Any]:
+    """Draft archiving a project (a duplicate, a finished one, one to park) or restoring one.
+    Archived projects leave home and mail routing; nothing is deleted. The person confirms in the
+    Groundwork app."""
+    return _run(tools.archive_project, project, why, restore)
+
+
+@server.tool()
+def delete_project(project: str, why: str) -> dict[str, Any]:
+    """Draft deleting a project for good, with its messages and ledger. The person confirms in the
+    Groundwork app by typing the project's key. Suggest archiving unless they're sure."""
+    return _run(tools.delete_project, project, why)
 
 
 @server.tool()
