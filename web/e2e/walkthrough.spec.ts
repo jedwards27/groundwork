@@ -161,7 +161,7 @@ test("two visitors at once each get a private copy", async ({ page, browser }) =
     await open(page, `/projects/${SITE}`);
     await open(bob, `/projects/${SITE}`);
     await page.getByTestId("you").click();
-    await expect(page.getByTestId("account-menu")).toContainText("your copy is deleted in");
+    await expect(page.getByTestId("account-menu")).toContainText("(deleted in");
     await page.keyboard.press("Escape");
     const start = await api<Chain>(bob, `sites/${SITE}/chain`);
     await play(page, "event-a");
