@@ -163,7 +163,6 @@ export const project = {
     demoTip: "Plays the same written plan every time, so the tour repeats.",
     played: "Played",
     play: "Play",
-    playThis: "Play this message",
     claudePlans: "Claude plans this",
     claudePlansTip: "Ask Claude to play it. Claude plans; the gateway decides each action.",
     message: "Message",

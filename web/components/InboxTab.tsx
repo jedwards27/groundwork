@@ -119,17 +119,6 @@ export function InboxTab({ events, site, run, onPlay, claudePlans, onSeeActions,
         onClose={() => setOpen(null)}
         title={msg?.title}
         testId="message-drawer"
-        footer={
-          msg && (
-            <>
-              {playable(msg) && !thisRun && (
-                <Button onClick={() => start(msg.key)} disabled={busy} data-testid="drawer-play">
-                  {say.playThis}
-                </Button>
-              )}
-            </>
-          )
-        }
       >
         {msg && (
           <>
