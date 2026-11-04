@@ -20,7 +20,7 @@ import { project } from "@/copy/project";
 import { tutorial as t } from "@/copy/tutorial";
 import { Chip, Drawer, Empty, Field, Grow, Line, Muted, Outgoing, Page, Row, Section } from "./ui";
 
-// "Did 1 on its own, asked you about 1, refused 1", leaving out what's zero.
+// "Did 1 on its own, asked you about 1, denied 1", leaving out what's zero.
 function did(c: { allow: number; ask: number; deny: number }): string {
   const parts = [c.allow ? say.activity.did(c.allow) : "", c.ask ? say.activity.asked(c.ask) : "", c.deny ? say.activity.refused(c.deny) : ""].filter(Boolean);
   const text = parts.join(", ") || say.activity.nothing;

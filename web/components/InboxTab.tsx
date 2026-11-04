@@ -7,7 +7,7 @@ import { LabelSmall, ParagraphSmall } from "baseui/typography";
 import { useEffect, useState } from "react";
 import type { EventView, SiteView, Step } from "@/lib/types";
 import { project } from "@/copy/project";
-import { Chip, Drawer, Empty, Field, Grow, Line, Muted, Quote, Row } from "./ui";
+import { Chip, Drawer, Empty, Field, Grow, Line, matches, Muted, Quote, Row, Search, usePages } from "./ui";
 
 const say = project.inbox;
 const sayRun = project.run;
@@ -31,8 +31,9 @@ const FILTERS = [
   { key: "evidence", label: say.filters.evidence, test: (e: EventView) => e.kind !== "schedule_change" },
 ];
 
-export function InboxTab({ events, site, run, onPlay, claudePlans, onSeeActions }: {
+export function InboxTab({ events, site, run, onPlay, claudePlans, onSeeActions, note }: {
   events: EventView[];
+  note?: string;
   site: SiteView;
   run: RunState | null;
   onPlay: (key: string) => void;
@@ -41,6 +42,7 @@ export function InboxTab({ events, site, run, onPlay, claudePlans, onSeeActions 
 }) {
   const [css, theme] = useStyletron();
   const [filter, setFilter] = useState(0);
+  const [q, setQ] = useState("");
   const [open, setOpen] = useState<string | null>(null);
   // Playing a message opens it, so its steps are in view; coming back to the tab later does not.
   const start = (key: string) => {
@@ -50,7 +52,8 @@ export function InboxTab({ events, site, run, onPlay, claudePlans, onSeeActions 
   const party = (k: string | null) => (k === "public" ? say.publicSource : (site.parties.find((p) => p.key === k)?.name ?? k ?? ""));
   const rank = (k: string) => (ORDER.includes(k) ? ORDER.indexOf(k) : 99);
   const sorted = [...events].sort((a, b) => rank(a.key) - rank(b.key) || (a.received_at < b.received_at ? 1 : -1));
-  const shown = sorted.filter(FILTERS[filter].test);
+  const shown = sorted.filter((e) => FILTERS[filter].test(e) && matches(q, e.title, e.body, party(e.from_party), e.forwarded_from ? party(e.forwarded_from) : ""));
+  const { rows: page, pager } = usePages(shown, 20, `${filter}|${q}`);
   const busy = run?.status === "running";
   const msg = events.find((e) => e.key === open) ?? null;
   const thisRun = run && msg && run.event === msg.key ? run : null;
@@ -58,16 +61,20 @@ export function InboxTab({ events, site, run, onPlay, claudePlans, onSeeActions 
 
   return (
     <div className={css({ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: theme.sizing.scale400 })}>
-      <ButtonGroup mode={MODE.radio} size={SIZE.compact} selected={filter} onClick={(_, i) => setFilter(i)} overrides={{ Root: { style: { flexWrap: "wrap" } } }}>
-        {FILTERS.map((f) => (
-          <Button key={f.key} kind={KIND.secondary}>
-            {say.filterCount(f.label, sorted.filter(f.test).length)}
-          </Button>
-        ))}
-      </ButtonGroup>
+      <div className={css({ display: "flex", flexWrap: "wrap", gap: theme.sizing.scale400, alignItems: "center" })}>
+        <ButtonGroup mode={MODE.radio} size={SIZE.compact} selected={filter} onClick={(_, i) => setFilter(i)} overrides={{ Root: { style: { flexWrap: "wrap" } } }}>
+          {FILTERS.map((f) => (
+            <Button key={f.key} kind={KIND.secondary}>
+              {say.filterCount(f.label, sorted.filter(f.test).length)}
+            </Button>
+          ))}
+        </ButtonGroup>
+        <Search value={q} onChange={setQ} placeholder={say.search} testId="inbox-search" />
+      </div>
       <div>
         {shown.length === 0 && <Empty>{say.empty}</Empty>}
-        {shown.map((e) => (
+        {note && <Muted testId="inbox-note">{note}</Muted>}
+        {page.map((e) => (
           <Row key={e.key} onClick={() => setOpen(e.key)} testId={`message-${e.key}`}>
             <span className={css({ width: "44px", flex: "0 0 auto" })}>
               <Muted>{new Date(e.received_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</Muted>
@@ -76,7 +83,7 @@ export function InboxTab({ events, site, run, onPlay, claudePlans, onSeeActions 
               <Line>{e.title}</Line>
               <Muted nowrap>
                 {party(e.from_party)}
-                {e.forwarded_from ? say.forwarding(party(e.forwarded_from)) : ""} · {KIND_LABEL[e.kind] ?? e.kind}
+                {e.forwarded_from ? say.forwarding(party(e.forwarded_from)) : ""} ({KIND_LABEL[e.kind] ?? e.kind})
               </Muted>
             </Grow>
             {e.scripted && (
@@ -104,6 +111,7 @@ export function InboxTab({ events, site, run, onPlay, claudePlans, onSeeActions 
             )}
           </Row>
         ))}
+        {pager}
       </div>
 
       <Drawer
@@ -127,9 +135,8 @@ export function InboxTab({ events, site, run, onPlay, claudePlans, onSeeActions 
           <>
             <Muted>
               {party(msg.from_party)}
-              {msg.forwarded_from ? say.forwardingComma(party(msg.forwarded_from)) : ""} ·{" "}
-              {new Date(msg.received_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })} ·{" "}
-              {KIND_LABEL[msg.kind] ?? msg.kind}
+              {msg.forwarded_from ? say.forwardingComma(party(msg.forwarded_from)) : ""},{" "}
+              {new Date(msg.received_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })} ({KIND_LABEL[msg.kind] ?? msg.kind})
             </Muted>
             {thisRun && (
               <RunSteps

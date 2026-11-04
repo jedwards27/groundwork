@@ -22,6 +22,11 @@ const STORE = "gw-tutorial";
 // Remembered for good once someone finishes, so home stops offering it.
 const DONE = "gw-tutorial-done";
 const P = `/projects/${DEMO_PROJECT}`;
+// The message the tour plays, and the ones its inbox leaves out until the tour is over: a second
+// telling of the same delay, the email the tour plays in the background later, the offer that follows
+// it, and the two injection tests.
+export const TOUR_MESSAGE = "demo-monday";
+export const TOUR_HIDES = new Set(["event-a", "event-b", "event-b-expedite", "injection-expedite-po", "injection-date-change"]);
 
 interface Step {
   title: string;
@@ -43,6 +48,9 @@ interface Step {
   inDrawer?: boolean;
   // Reaching this step plays this message in the background, so a later page has something new on it.
   plays?: string;
+  // Skip ahead to the plan if the tour's message was already played (say, before the tour began),
+  // since there's nothing left to click here.
+  skipIfPlayed?: boolean;
   end?: boolean;
 }
 
@@ -56,7 +64,7 @@ export const STEPS: Step[] = [
   { ...say.path, route: P, target: "path", inDrawer: true },
   { ...say.graph, route: P, target: "graph" },
   { ...say.inbox, route: P, target: "tab-inbox", click: click(say.inbox), doneAt: `${P}/inbox` },
-  { ...say.email, route: `${P}/inbox`, target: "play-demo-monday", click: click(say.email) },
+  { ...say.email, route: `${P}/inbox`, target: "play-demo-monday", click: click(say.email), skipIfPlayed: true },
   {
     ...say.run,
     route: `${P}/inbox`,
@@ -68,8 +76,8 @@ export const STEPS: Step[] = [
   { ...say.plan, route: `${P}/actions`, target: "actions-list" },
   { ...say.rules, route: `${P}/actions`, highlight: "actions-list", target: "action-a2", click: click(say.rules) },
   { ...say.approve, route: `${P}/actions`, target: "approve", click: click(say.approve), after: 800, inDrawer: true },
-  { ...say.mandateTab, route: `${P}/actions`, target: "tab-mandate", click: click(say.mandateTab), doneAt: `${P}/mandate` },
-  { ...say.mandate, route: `${P}/mandate`, highlight: "template", target: "tab-ledger", click: click(say.mandate), doneAt: `${P}/ledger` },
+  { ...say.mandateTab, route: `${P}/actions`, target: "tab-settings", click: click(say.mandateTab), doneAt: `${P}/settings` },
+  { ...say.mandate, route: `${P}/settings`, highlight: "template", target: "tab-ledger", click: click(say.mandate), doneAt: `${P}/ledger` },
   {
     ...say.ledger,
     route: `${P}/ledger`,
@@ -323,6 +331,14 @@ function Panel({ step, review, local, go, play, pause, finish }: {
     if (!s.inDrawer) closeDrawers();
     if (here !== s.route) navigate(s.route);
     if (s.plays && !review) play(s.plays);
+    if (s.skipIfPlayed && !review) {
+      const ahead = STEPS.findIndex((x) => x.target === "actions-list");
+      void get<EventView[]>(`sites/${DEMO_PROJECT}/events`)
+        .then((events) => {
+          if (events.find((e) => e.key === TOUR_MESSAGE)?.status === "applied") go(ahead);
+        })
+        .catch(() => undefined);
+    }
   }, [step]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Arriving at the step's goal page some other way also finishes it. Arriving, not being there:

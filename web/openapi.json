@@ -134,6 +134,60 @@
     }
    }
   },
+  "/projects/{key}/details": {
+   "post": {
+    "summary": "Details",
+    "description": "Rename a project (its key stays the same). A ledger record says who changed it.",
+    "operationId": "details_projects__key__details_post",
+    "parameters": [
+     {
+      "name": "key",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Key"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/Details"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": {
+          "type": "string"
+         },
+         "title": "Response Details Projects  Key  Details Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/projects/{key}/restore": {
    "post": {
     "summary": "Restore",
@@ -632,6 +686,7 @@
    },
    "post": {
     "summary": "Play Event",
+    "description": "Play a message. A visitor may send their own model API key with the request to have\nClaude plan it live. The key is used for this run, in memory, and never stored or logged. It\nisn't accepted on a person's own computer, where Claude in their app does the planning.",
     "operationId": "play_event_sites__site__events_post",
     "parameters": [
      {
@@ -1957,6 +2012,27 @@
     },
     "type": "object",
     "title": "DemoSignIn"
+   },
+   "Details": {
+    "properties": {
+     "name": {
+      "type": "string",
+      "maxLength": 120,
+      "minLength": 1,
+      "title": "Name"
+     },
+     "location": {
+      "type": "string",
+      "maxLength": 200,
+      "title": "Location",
+      "default": ""
+     }
+    },
+    "type": "object",
+    "required": [
+     "name"
+    ],
+    "title": "Details"
    },
    "DraftVerdict": {
     "properties": {

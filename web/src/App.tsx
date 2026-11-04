@@ -9,7 +9,7 @@ import { Project } from "@/components/Project";
 import { TutorialProvider } from "@/components/Tutorial";
 import { Empty, Page, Rich } from "@/components/ui";
 import { app } from "@/copy/app";
-import { VerifyRecord } from "@/components/VerifyRecord";
+import { Navigate, useSearchParams } from "react-router";
 import { get, send } from "@/lib/client";
 import type { Session } from "@/lib/types";
 import { Banner, KIND as BANNER } from "baseui/banner";
@@ -64,7 +64,7 @@ export function App() {
         <Route path="/" element={<Home session={s} />} />
         <Route path="/projects/new" element={<NewProject session={s} />} />
         <Route path="/projects/:key/:tab?" element={<Project session={s} />} />
-        <Route path="/verify" element={<VerifyRecord />} />
+        <Route path="/verify" element={<VerifyRedirect />} />
         <Route
           path="*"
           element={
@@ -77,4 +77,12 @@ export function App() {
       <ToasterContainer autoHideDuration={6000} placement="bottomRight" />
     </TutorialProvider>
   );
+}
+
+// Old links to the Verify page land on the project's Settings, under Receipts.
+function VerifyRedirect() {
+  const [params] = useSearchParams();
+  const project = params.get("project");
+  const record = params.get("record");
+  return <Navigate replace to={project ? `/projects/${project}/settings${record ? `?record=${record}` : ""}` : "/"} />;
 }

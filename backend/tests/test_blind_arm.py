@@ -54,7 +54,7 @@ class FakeLivePlanner:
 def live(monkeypatch):
     real = pipeline.choose_tools
 
-    def fake(s, site_key, force_simulated=False):
+    def fake(s, site_key, force_simulated=False, api_key=None):
         t = real(s, site_key, force_simulated=True)
         t.live, t.note = True, ""
         t.planner = FakeLivePlanner(t.simulated)

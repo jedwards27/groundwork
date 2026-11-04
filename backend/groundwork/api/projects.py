@@ -106,6 +106,30 @@ def archive(key: str, body: Archive, v: Viewer = Depends(viewer)) -> dict[str, s
     return {"message": f"Archived {ref.name}."}
 
 
+class Details(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    location: str = Field(default="", max_length=200)
+
+
+@router.post("/projects/{key}/details")
+def details(key: str, body: Details, v: Viewer = Depends(viewer)) -> dict[str, str]:
+    """Rename a project (its key stays the same). A ledger record says who changed it."""
+    from groundwork.db.session import org_session
+    from groundwork.service import edits
+
+    ref = _mine(v, key)
+    with org_session(ref.org_id) as s:
+        state = repo.load_state(s, key)
+    change = {k: val for k, val in {"name": body.name.strip(), "location": body.location.strip()}.items() if val != getattr(state, k)}
+    if not change:
+        return {"message": "Nothing changed."}
+    try:
+        edits.apply_project(ref.org_id, ref.site_id, state, {"why": "Changed in the app", "change": change}, _by(), set(overview.index(v.orgs, archived=None)))
+    except edits.EditProblem as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+    return {"message": "Saved."}
+
+
 @router.post("/projects/{key}/restore")
 def restore(key: str, v: Viewer = Depends(viewer)) -> dict[str, str]:
     ref = _mine(v, key)

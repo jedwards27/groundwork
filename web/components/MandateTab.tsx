@@ -46,7 +46,7 @@ export function MandateTab({ site, mandate, compare, plan, me }: {
           (moved.length
             ? say.decidedAgain(moved.map((x) => say.move(x.ref, DECISION_LABEL[x.from] ?? x.from, DECISION_LABEL[x.to] ?? x.to)).join(", "))
             : say.noneChanged) +
-          (r.executed.length ? say.ranDry(r.executed.join(", ")) : ""),
+          (r.executed.length ? say.ran(r.executed.join(", ")) : ""),
         {},
       );
       await qc.invalidateQueries();

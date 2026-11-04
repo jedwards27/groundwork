@@ -3,8 +3,6 @@ import { useStyletron } from "baseui";
 import { Accordion, Panel } from "baseui/accordion";
 import { Button, KIND, SIZE } from "baseui/button";
 import { Banner, KIND as BANNER } from "baseui/banner";
-import { Input } from "baseui/input";
-import { Modal, ModalBody, ModalButton, ModalFooter, ModalHeader } from "baseui/modal";
 import { Skeleton } from "baseui/skeleton";
 import { Tab, Tabs } from "baseui/tabs-motion";
 import { toaster } from "baseui/toast";
@@ -13,20 +11,21 @@ import { HeadingLarge, LabelSmall, ParagraphSmall } from "baseui/typography";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { get, send, stream } from "@/lib/client";
+import { getKey } from "@/lib/key";
 import { DEMO_PROJECT, fmt, fmtLong, lateness } from "@/lib/format";
 import type { ChainView, CompareRow, EventView, MandateView, Me, PlanView, RunView, Session, SiteView, Step } from "@/lib/types";
 import { ActionsTab } from "./ActionsTab";
 import { InboxTab, type RunState } from "./InboxTab";
 import { LedgerTab } from "./LedgerTab";
-import { MandateTab } from "./MandateTab";
 import { Overview } from "./Overview";
+import { SettingsTab } from "./SettingsTab";
 import { StepsTab } from "./StepsTab";
-import { useTutorial } from "./Tutorial";
+import { TOUR_HIDES, useTutorial } from "./Tutorial";
 import { Chip, Drawer, Field, Muted, Page, Quote } from "./ui";
 import { project as say } from "@/copy/project";
 import { tutorial as t } from "@/copy/tutorial";
 
-const TABS = ["overview", "steps", "inbox", "actions", "mandate", "ledger"] as const;
+const TABS = ["overview", "steps", "inbox", "actions", "ledger", "settings"] as const;
 const PANEL = { TabPanel: { style: { paddingLeft: 0, paddingRight: 0, minWidth: 0 } } };
 
 export function Project({ session }: { session: Session }) {
@@ -34,7 +33,9 @@ export function Project({ session }: { session: Session }) {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const { key = "", tab: rawTab } = useParams();
-  const tab = (TABS as readonly string[]).includes(rawTab ?? "") ? (rawTab as string) : "overview";
+  // The mandate used to have its own tab; old links land on Settings, where it lives now.
+  const wanted = rawTab === "mandate" ? "settings" : rawTab;
+  const tab = (TABS as readonly string[]).includes(wanted ?? "") ? (wanted as string) : "overview";
   const site = useQuery({ queryKey: ["site", key], queryFn: () => get<SiteView>(`sites/${key}`) });
   const chain = useQuery({ queryKey: ["chain", key], queryFn: () => get<ChainView>(`sites/${key}/chain`) });
   const events = useQuery({ queryKey: ["events", key], queryFn: () => get<EventView[]>(`sites/${key}/events`) });
@@ -44,8 +45,6 @@ export function Project({ session }: { session: Session }) {
   const me = useQuery({ queryKey: ["me", key], queryFn: () => get<Me>(`sites/${key}/me`) });
   const [run, setRun] = useState<RunState | null>(null);
   const [why, setWhy] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [typed, setTyped] = useState("");
   const [busy, setBusy] = useState(false);
   const tutorial = useTutorial();
   const source = useRef<EventSource | null>(null);
@@ -57,18 +56,11 @@ export function Project({ session }: { session: Session }) {
 
   const refresh = useCallback(() => qc.invalidateQueries(), [qc]);
 
-  // Archive, restore and delete: the person acting in the app, on their own computer. Each is a
-  // ledger record (a delete, a line in deleted.jsonl, since the ledger goes with the project).
-  const lifecycle = async (what: "archive" | "restore" | "delete") => {
+  const restore = async () => {
     setBusy(true);
     try {
-      const body = what === "archive" ? { why: say.menu.archiveWhy } : what === "delete" ? { typed } : undefined;
-      const r = await send<{ message: string }>("POST", `projects/${key}/${what}`, body);
+      const r = await send<{ message: string }>("POST", `projects/${key}/restore`);
       toaster.info(r.message, {});
-      if (what === "delete") {
-        setDeleting(false);
-        navigate("/");
-      }
       await qc.invalidateQueries();
     } catch (e) {
       toaster.negative((e as Error).message, {});
@@ -80,7 +72,9 @@ export function Project({ session }: { session: Session }) {
   // Play a message: the run streams its steps; the views refresh as the forecast and decisions land.
   const play = async (eventKey: string) => {
     try {
-      const { run_id } = await send<{ run_id: string }>("POST", `sites/${key}/events`, { event: eventKey });
+      // With a key set for this tab, Claude plans it live; the key goes with this request only.
+      const apiKey = getKey();
+      const { run_id } = await send<{ run_id: string }>("POST", `sites/${key}/events`, { event: eventKey }, apiKey ? { "x-anthropic-api-key": apiKey } : undefined);
       setRun({ id: run_id, event: eventKey, status: "running", steps: [] });
       source.current?.close();
       const es = stream(`runs/${run_id}/stream`);
@@ -127,7 +121,11 @@ export function Project({ session }: { session: Session }) {
   const party = (k: string) => s.parties.find((p) => p.key === k)?.name ?? k;
   const p = plan.data ?? null;
   const asks = p ? p.actions.filter((a) => a.state === "pending").length : 0;
-  const fresh = (events.data ?? []).filter((e) => e.status !== "applied").length;
+  // During the tour, the demo's inbox is shorter: what the tour doesn't use waits until it's over.
+  const touring = key === DEMO_PROJECT && tutorial.open;
+  const inbox = (events.data ?? []).filter((e) => !touring || !TOUR_HIDES.has(e.key) || e.status === "applied");
+  const later = (events.data ?? []).length - inbox.length;
+  const fresh = inbox.filter((e) => e.status !== "applied").length;
   const claudePlans = session.local && key !== DEMO_PROJECT;
   const mine = session.local && !session.health.hosted;
   const stale = Object.keys(c.stale ?? {}).length;
@@ -148,18 +146,9 @@ export function Project({ session }: { session: Session }) {
         <Banner
           kind={BANNER.info}
           overrides={{ Root: { style: { marginLeft: 0, marginRight: 0, marginTop: 0 } } }}
-          action={
-            mine
-              ? { label: say.archived.restore, onClick: () => void lifecycle("restore") }
-              : undefined
-          }
+          action={mine && !busy ? { label: say.archived.restore, onClick: () => void restore() } : undefined}
         >
-          <span data-testid="archived-banner">{say.archived.banner(fmtLong(s.archived_at.slice(0, 10)))}</span>{" "}
-          {mine && key !== DEMO_PROJECT && (
-            <Button kind={KIND.tertiary} size={SIZE.mini} onClick={() => setDeleting(true)} data-testid="delete-project">
-              {say.archived.delete}
-            </Button>
-          )}
+          <span data-testid="archived-banner">{say.archived.banner(fmtLong(s.archived_at.slice(0, 10)))}</span>
         </Banner>
       )}
       <section data-testid="summary">
@@ -167,18 +156,13 @@ export function Project({ session }: { session: Session }) {
           <LabelSmall color={theme.colors.contentTertiary}>{ms.label}</LabelSmall>
           {follows && (
             <LabelSmall color={theme.colors.contentTertiary}>
-              · <a href={`/projects/${follows}`} onClick={(e) => { e.preventDefault(); navigate(`/projects/${follows}`); }}>{say.follows(follows)}</a>
+              (<a href={`/projects/${follows}`} onClick={(e) => { e.preventDefault(); navigate(`/projects/${follows}`); }}>{say.follows(follows)}</a>)
             </LabelSmall>
           )}
           <span className={css({ marginLeft: "auto", display: "inline-flex", gap: theme.sizing.scale200 })}>
             {key === DEMO_PROJECT && !tutorial.open && (
               <Button kind={KIND.secondary} size={SIZE.mini} onClick={tutorial.start} data-testid="tutorial-start">
                 {t.projectButton}
-              </Button>
-            )}
-            {mine && !s.archived_at && (
-              <Button kind={KIND.tertiary} size={SIZE.mini} onClick={() => void lifecycle("archive")} isLoading={busy} title={say.menu.archiveTip} data-testid="archive-project">
-                {say.menu.archive}
               </Button>
             )}
           </span>
@@ -236,35 +220,20 @@ export function Project({ session }: { session: Session }) {
             <StepsTab chain={c} site={s} />
           </Tab>
           <Tab key="inbox" overrides={PANEL} title={title(say.tabs.inbox, fresh, "tab-inbox")}>
-            <InboxTab events={events.data ?? []} site={s} run={run} onPlay={play} claudePlans={claudePlans} onSeeActions={() => navigate(`/projects/${key}/actions`)} />
+            <InboxTab events={inbox} note={later ? say.inbox.afterTour(later) : undefined} site={s} run={run} onPlay={play} claudePlans={claudePlans} onSeeActions={() => navigate(`/projects/${key}/actions`)} />
           </Tab>
           <Tab key="actions" overrides={PANEL} title={title(say.tabs.actions, asks, "tab-actions", true)}>
             <ActionsTab plan={p} site={s} chain={c} me={me.data ?? null} onOpenInbox={() => navigate(`/projects/${key}/inbox`)} />
           </Tab>
-          <Tab key="mandate" overrides={PANEL} title={title(say.tabs.mandate, 0, "tab-mandate")}>
-            {mandate.data && <MandateTab site={key} mandate={mandate.data} compare={compare.data?.presets ?? []} plan={p} me={me.data ?? null} />}
-          </Tab>
           <Tab key="ledger" overrides={PANEL} title={title(say.tabs.ledger, 0, "tab-ledger")}>
             <LedgerTab site={key} tamper={key === DEMO_PROJECT && !session.health.hosted} />
+          </Tab>
+          <Tab key="settings" overrides={PANEL} title={title(say.tabs.settings, 0, "tab-settings")}>
+            <SettingsTab site={s} mandate={mandate.data} compare={compare.data?.presets ?? []} plan={p} me={me.data ?? null} mine={mine} session={session} />
           </Tab>
         </Tabs>
       </div>
 
-      <Modal isOpen={deleting} onClose={() => setDeleting(false)} closeable autoFocus>
-        <ModalHeader>{say.deleting.title(s.name)}</ModalHeader>
-        <ModalBody>
-          <ParagraphSmall>{say.deleting.body}</ParagraphSmall>
-          <Input value={typed} onChange={(e) => setTyped((e.target as HTMLInputElement).value)} placeholder={say.deleting.type(key)} overrides={{ Input: { props: { "data-testid": "delete-typed" } } }} />
-        </ModalBody>
-        <ModalFooter>
-          <ModalButton kind={KIND.tertiary} onClick={() => setDeleting(false)}>
-            {say.deleting.cancel}
-          </ModalButton>
-          <ModalButton onClick={() => void lifecycle("delete")} disabled={typed.trim() !== key} isLoading={busy} data-testid="delete-confirm">
-            {say.deleting.confirm}
-          </ModalButton>
-        </ModalFooter>
-      </Modal>
 
       <Drawer open={why} onClose={() => setWhy(false)} title={say.why.title} testId="why-drawer">
         <Muted>
@@ -283,7 +252,7 @@ export function Project({ session }: { session: Session }) {
                   {i.title} {i.key === c.gate && <Chip kind={i.finish_shift_days > 0 ? "red" : "gray"}>{say.why.now}</Chip>}
                 </ParagraphSmall>
                 <Muted>
-                  {party(i.owner)} · {i.status === "done" ? say.why.done : say.why.due(fmt(i.early_finish))}
+                  {party(i.owner)}, {i.status === "done" ? say.why.done : say.why.due(fmt(i.early_finish))}
                   {i.finish_shift_days > 0 ? say.why.later(i.finish_shift_days) : ""}
                 </Muted>
               </li>

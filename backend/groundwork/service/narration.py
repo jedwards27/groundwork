@@ -70,7 +70,7 @@ def decided(allow: int, ask: int, deny: int, held: int) -> str:
 
 
 def executed(count: int) -> str:
-    return f"Did {count} on its own (a demo: recorded, not sent)" if count else "Nothing ran on its own"
+    return f"Did {count} on its own" if count else "Nothing ran on its own"
 
 
 def differential(days_if_they_agree: int) -> str:

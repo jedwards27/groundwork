@@ -70,11 +70,12 @@ def _append(s: Session, run_id: uuid.UUID, kind: str, text: str, **extra: Any) -
     run.summary = summary
 
 
-def execute_run(org_id: uuid.UUID, run_id: uuid.UUID) -> None:
-    """Background entry point; see groundwork.service.pipeline."""
+def execute_run(org_id: uuid.UUID, run_id: uuid.UUID, api_key: str | None = None) -> None:
+    """Background entry point; see groundwork.service.pipeline. `api_key` lives only in memory, for
+    this run."""
     from groundwork.service.pipeline import execute_run as run_pipeline
 
-    run_pipeline(org_id, run_id)
+    run_pipeline(org_id, run_id, api_key=api_key)
 
 
 def sweep_interrupted(now: datetime | None = None) -> int:

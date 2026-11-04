@@ -94,6 +94,11 @@ export function Header({ session }: { session: Session }) {
         <div className={css({ marginLeft: "auto" })}>
           <StatefulPopover
             placement={PLACEMENT.bottomRight}
+            // One surface: the name block and the menu share a background, corners and border.
+            overrides={{
+              Body: { style: { borderRadius: theme.borders.radius400, overflow: "hidden", backgroundColor: theme.colors.backgroundPrimary, border: `1px solid ${theme.colors.borderOpaque}` } },
+              Inner: { style: { backgroundColor: theme.colors.backgroundPrimary, borderRadius: theme.borders.radius400 } },
+            }}
             content={({ close }) => (
               <div className={css({ minWidth: "260px" })} data-testid="account-menu">
                 <div className={css({ display: "flex", gap: theme.sizing.scale400, alignItems: "center", padding: `${theme.sizing.scale500} ${theme.sizing.scale600}`, borderBottom: `1px solid ${theme.colors.borderOpaque}` })}>
@@ -111,7 +116,7 @@ export function Header({ session }: { session: Session }) {
                     close();
                     act((item as Item).id);
                   }}
-                  overrides={{ List: { style: { boxShadow: "none", outline: "none" } } }}
+                  overrides={{ List: { style: { boxShadow: "none", outline: "none", borderRadius: 0, backgroundColor: "transparent", paddingTop: theme.sizing.scale200, paddingBottom: theme.sizing.scale200 } } }}
                 />
               </div>
             )}

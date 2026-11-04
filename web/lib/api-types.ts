@@ -62,6 +62,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/{key}/details": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Details
+         * @description Rename a project (its key stays the same). A ledger record says who changed it.
+         */
+        post: operations["details_projects__key__details_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/projects/{key}/restore": {
         parameters: {
             query?: never;
@@ -285,7 +305,12 @@ export interface paths {
         /** List Events */
         get: operations["list_events_sites__site__events_get"];
         put?: never;
-        /** Play Event */
+        /**
+         * Play Event
+         * @description Play a message. A visitor may send their own model API key with the request to have
+         *     Claude plan it live. The key is used for this run, in memory, and never stored or logged. It
+         *     isn't accepted on a person's own computer, where Claude in their app does the planning.
+         */
         post: operations["play_event_sites__site__events_post"];
         delete?: never;
         options?: never;
@@ -805,6 +830,16 @@ export interface components {
              * @default false
              */
             fresh: boolean;
+        };
+        /** Details */
+        Details: {
+            /** Name */
+            name: string;
+            /**
+             * Location
+             * @default
+             */
+            location: string;
         };
         /** DraftVerdict */
         DraftVerdict: {
@@ -1534,6 +1569,43 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["Archive"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    details_projects__key__details_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Details"];
             };
         };
         responses: {

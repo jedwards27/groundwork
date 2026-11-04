@@ -99,8 +99,8 @@ export function ActionsTab({ plan, site, chain, me, onOpenInbox }: {
               <Muted>
                 {KIND_LABEL[a.kind ?? ""] ?? a.executor}
                 {a.recipient_name ? say.to(a.recipient_name) : ""}
-                {a.amount_cents ? ` · ${money(a.amount_cents)}` : ""}
-                <span className={css({ "@media (min-width: 640px)": { display: "none" } })}> · {outcome(a)}</span>
+                {a.amount_cents ? `, ${money(a.amount_cents)}` : ""}
+                <span className={css({ "@media (min-width: 640px)": { display: "none" } })}>, {outcome(a)}</span>
               </Muted>
             </Grow>
             {a.delta === "over_reach" && (
@@ -160,6 +160,14 @@ function ActionDrawer({ action: a, site, chain, me, name, onClose }: {
           testId="outgoing"
         />
       )}
+      {a.decision === "refuse" && (
+        // Deny isn't a dead end: Groundwork can't do it, so it hands it to you with what it found.
+        <Field label={sayAction.yours.title}>
+          <span data-testid="yours-to-do">
+            {sayAction.yours.body} {a.rationale}
+          </span>
+        </Field>
+      )}
       {a.state === "pending" && (
         <ApproveButtons
           actionId={a.id}
@@ -180,7 +188,7 @@ function ActionDrawer({ action: a, site, chain, me, name, onClose }: {
           )}
         </Muted>
       ))}
-      {a.external_ref && <Muted>{sayAction.ranDry(a.execution_detail ?? "", a.external_ref)}</Muted>}
+      {a.external_ref && <Muted>{sayAction.ran(a.execution_detail ?? "", a.external_ref)}</Muted>}
       <Accordion renderAll overrides={{ Content: { style: { paddingLeft: 0, paddingRight: 0 } }, Header: { style: { paddingLeft: 0, paddingRight: 0 } } }}>
         <Panel title={sayAction.details}>
           <div style={{ display: "grid", gap: 16 }}>
@@ -266,7 +274,7 @@ function ReportVsRecord({ plan, project }: { plan: PlanView; project: string }) 
             </Grow>
             <span className={css({ color: s === h ? theme.colors.contentPositive : theme.colors.contentNegative })}>{s === h ? "✓" : "✗"}</span>
             {decided && (
-              <Link to={`/verify?project=${project}&record=${decided.seq}`} className={css({ ...theme.typography.ParagraphXSmall, color: theme.colors.contentSecondary })}>
+              <Link to={`/projects/${project}/settings?record=${decided.seq}`} className={css({ ...theme.typography.ParagraphXSmall, color: theme.colors.contentSecondary })}>
                 #{decided.seq}
               </Link>
             )}

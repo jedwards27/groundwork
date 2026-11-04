@@ -5,7 +5,9 @@ import { useStyletron } from "baseui";
 import { KIND, Tag } from "baseui/tag";
 import { StatefulTooltip } from "baseui/tooltip";
 import { LabelLarge, LabelMedium, LabelSmall, ParagraphSmall, ParagraphXSmall } from "baseui/typography";
-import type { ReactNode } from "react";
+import { Input } from "baseui/input";
+import { Pagination } from "baseui/pagination";
+import { useEffect, useState, type ReactNode } from "react";
 import { DECISION_LABEL } from "@/lib/format";
 import { app } from "@/copy/app";
 
@@ -291,4 +293,61 @@ export function Rich({ text }: { text: string }) {
       })}
     </>
   );
+}
+
+
+// Long lists come a page at a time. The page goes back to the first whenever `reset` changes (a new
+// filter or search), so a narrowed list never opens on an empty page.
+export function usePages<T>(items: T[], size: number, reset: string): { rows: T[]; pager: ReactNode } {
+  const [n, setN] = useState(1);
+  useEffect(() => setN(1), [reset]);
+  const pages = Math.max(1, Math.ceil(items.length / size));
+  const page = Math.min(n, pages);
+  const from = (page - 1) * size;
+  return {
+    rows: items.slice(from, from + size),
+    pager:
+      pages > 1 ? (
+        <Pager page={page} pages={pages} onChange={setN} label={app.common.showing(from + 1, Math.min(from + size, items.length), items.length)} />
+      ) : null,
+  };
+}
+
+function Pager({ page, pages, onChange, label }: { page: number; pages: number; onChange: (n: number) => void; label: string }) {
+  const [css, theme] = useStyletron();
+  return (
+    <div className={css({ display: "flex", alignItems: "center", gap: theme.sizing.scale400, flexWrap: "wrap", marginTop: theme.sizing.scale300 })} data-testid="pager">
+      <Pagination
+        size="compact"
+        numPages={pages}
+        currentPage={page}
+        onPageChange={({ nextPage }) => onChange(Math.min(Math.max(nextPage, 1), pages))}
+        labels={{ prevButton: app.common.previous, nextButton: app.common.next, preposition: app.common.of }}
+      />
+      <Muted>{label}</Muted>
+    </div>
+  );
+}
+
+// A search box for a list.
+export function Search({ value, onChange, placeholder, testId }: { value: string; onChange: (v: string) => void; placeholder: string; testId?: string }) {
+  const [css] = useStyletron();
+  return (
+    <div className={css({ flex: "1 1 200px", maxWidth: "320px" })}>
+      <Input
+        value={value}
+        onChange={(e) => onChange((e.target as HTMLInputElement).value)}
+        placeholder={placeholder}
+        size="compact"
+        clearable
+        overrides={{ Input: { props: { "data-testid": testId, "aria-label": placeholder } } }}
+      />
+    </div>
+  );
+}
+
+// Whether any of these texts contains what was typed (ignoring case).
+export function matches(q: string, ...texts: (string | null | undefined)[]): boolean {
+  const needle = q.trim().toLowerCase();
+  return !needle || texts.some((t) => t?.toLowerCase().includes(needle));
 }

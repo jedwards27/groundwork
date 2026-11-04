@@ -69,7 +69,7 @@ test("the two-minute demo: Allow, Ask through the lessee, Deny, the report besid
   await page.getByTestId("action-a1").click();
   const drawer = page.getByTestId("action-drawer");
   await expect(drawer.getByTestId("clause-a1")).toContainText("routine_messages");
-  await expect(drawer).toContainText("Nothing was sent");
+  await expect(drawer).toContainText("Ran:");
   await page.keyboard.press("Escape");
 
   // Ask: the landlord-bound request, routed Anthropic -> Fluidstack -> TeraWulf, waiting for you.
@@ -90,9 +90,9 @@ test("the two-minute demo: Allow, Ask through the lessee, Deny, the report besid
   const plan = await api<Plan>(page, `sites/${SITE}/latest-plan`);
   expect(plan.simulated).toBe(true);
   expect(plan.report_check?.ok).toBe(true);
-  await page.getByRole("button", { name: "The agent's report beside the ledger" }).click();
+  await page.getByRole("button", { name: "Report vs. ledger" }).click();
   await page.getByTestId("report-vs-record").getByRole("link").last().click();
-  await expect(page).toHaveURL(/\/verify\?project=lake-mariner&record=\d+/);
+  await expect(page).toHaveURL(/\/projects\/lake-mariner\/settings\?record=\d+/);
   await page.getByTestId("verify-run").click();
   await expect(page.getByTestId("verify-verdict")).toHaveText("Match");
   await page.getByRole("button", { name: "Paste the stored record" }).click();
@@ -122,13 +122,13 @@ test("event A: the forecast moves, the gateway holds one action, an auto-reply c
   // plans nothing, so its run ends without next steps to see.
   await tab(page, "Inbox");
   await page.getByTestId("play-ack-approved").click();
-  await expect(page.getByTestId("message-drawer").getByTestId("run-done")).toHaveText("Done. Nothing in this one needed a next step.");
+  await expect(page.getByTestId("message-drawer").getByTestId("run-done")).toHaveText("Done. No next steps needed.");
   await expect(page.getByTestId("message-drawer").getByTestId("see-actions")).toHaveCount(0);
   await page.keyboard.press("Escape");
   const still = await api<Plan>(page, `sites/${SITE}/latest-plan`);
   expect(still.actions.find((a) => a.ref === held!.ref)?.state).toBe("pending");
 
-  // Home lists it under "Needs you"; approving there runs it in dry run, on the record.
+  // Home lists it under "Needs you"; approving there runs it, on the record.
   await page.getByTestId("home-link").click();
   await page.getByTestId(`ask-${held!.ref}`).click();
   const ask = page.getByTestId("ask-drawer");
@@ -142,7 +142,7 @@ test("event A: the forecast moves, the gateway holds one action, an auto-reply c
   const v = await api<Verify>(page, `sites/${SITE}/ledger/verify`);
   expect(v.ok).toBe(true);
   await page.goto(`/projects/${SITE}/ledger`);
-  await expect(page.getByTestId("chain-ok")).toHaveText(`Intact · ${v.count} records`);
+  await expect(page.getByTestId("chain-ok")).toHaveText(`Intact (${v.count} records)`);
 });
 
 test("a state change riding on the cookie needs this app's Origin", async ({ page, baseURL }) => {
@@ -170,7 +170,7 @@ test("two visitors at once each get a private copy", async ({ page, browser }) =
     const still = await api<Chain>(bob, `sites/${SITE}/chain`);
     expect(still.milestone.forecast_finish).toBe(start.milestone.forecast_finish);
     await bob.goto(`/projects/${SITE}/ledger`);
-    await expect(bob.getByTestId("chain-ok")).toHaveText("Intact · 1 record");
+    await expect(bob.getByTestId("chain-ok")).toHaveText("Intact (1 record)");
 
     // Bob starting the tutorial starts his copy over; the first visitor's work is untouched.
     const mine = await api<Plan>(page, `sites/${SITE}/latest-plan`);
@@ -199,7 +199,7 @@ test("tampering with one ledger record fails verification; reset restores the de
   await expect(page.getByTestId("verify-problem")).toContainText("contents do not match its hash");
 
   await page.getByTestId("restore").click();
-  await expect(page.getByTestId("chain-ok")).toHaveText("Intact · 1 record");
+  await expect(page.getByTestId("chain-ok")).toHaveText("Intact (1 record)");
 });
 
 test("a new mandate version decides open actions again; what already ran stays on the record", async ({ page }) => {
@@ -212,7 +212,7 @@ test("a new mandate version decides open actions again; what already ran stays o
   expect(open_.length).toBeGreaterThan(0);
 
   // Preview the Auto template, then issue it as a new mandate version.
-  await tab(page, "Mandate");
+  await tab(page, "Settings");
   await page.getByTestId("template").click();
   await page.getByRole("option", { name: "Auto" }).click();
   await expect(page.getByTestId("mandate-version")).toHaveText("preview");
@@ -289,7 +289,7 @@ async function clickThrough(page: Page): Promise<void> {
   await drawer.getByTestId("approve").click();
   await step(page, 11);
   await expect(drawer).toBeHidden();
-  await ui(page, "tab-mandate").click();
+  await ui(page, "tab-settings").click();
   await step(page, 12);
   await ui(page, "tab-ledger").click();
   await step(page, 13);
@@ -373,13 +373,23 @@ test("every step: the Steps tab lists them all, and the chart can show the whole
   await open(page, `/projects/${SITE}`);
   const chain = await api<{ items: { key: string; status: string }[] }>(page, `sites/${SITE}/chain`);
   await ui(page, "range-all").click();
-  await expect(page.locator('[data-testid="graph"] g[data-key]')).toHaveCount(chain.items.length);
+  await expect(ui(page, "schedule-chart")).toHaveAttribute("data-rows", String(chain.items.length));
   await tab(page, "Steps");
   await expect(page).toHaveURL(new RegExp(`/projects/${SITE}/steps$`));
   await expect(ui(page, "steps")).toContainText(`${chain.items.length} steps`);
-  for (const i of chain.items) await expect(ui(page, `step-${i.key}`)).toHaveCount(1);
+  // A page at a time: every step is on one of the pages.
+  const seen = new Set<string>();
+  const collect = async () => {
+    for (const id of await page.locator('[data-testid^="step-"]').evaluateAll((els) => els.map((e) => e.getAttribute("data-testid")))) seen.add(String(id).slice(5));
+  };
+  await collect();
+  while (await ui(page, "pager").getByRole("button", { name: /next/i }).isEnabled().catch(() => false)) {
+    await ui(page, "pager").getByRole("button", { name: /next/i }).click();
+    await collect();
+  }
+  expect([...seen].sort()).toEqual(chain.items.map((i) => i.key).sort());
   const done = chain.items.filter((i) => i.status === "done").length;
-  await page.getByRole("radio", { name: new RegExp(`^Done ${done}$`) }).click();
+  await page.getByRole("radio", { name: new RegExp(`^Done \\(${done}\\)$`) }).click();
   await expect(ui(page, "steps")).toContainText(`${done} of ${chain.items.length} steps`);
 });
 

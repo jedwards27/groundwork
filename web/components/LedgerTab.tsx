@@ -12,7 +12,7 @@ import { DECISION_LABEL, TEMPLATE_LABEL } from "@/lib/format";
 import type { Attestation, LedgerEntry, Verify } from "@/lib/types";
 import { app } from "@/copy/app";
 import { project } from "@/copy/project";
-import { Chip, Drawer, Empty, Field, Grow, Line, Mono, Muted, Quote, Row } from "./ui";
+import { Chip, Drawer, Empty, Field, Grow, Line, matches, Mono, Muted, Quote, Row, Search, usePages } from "./ui";
 
 const say = project.ledger;
 
@@ -20,7 +20,7 @@ function what(e: LedgerEntry): string {
   const p = e.payload as Record<string, unknown>;
   const preset = typeof p.preset === "string" ? (TEMPLATE_LABEL[p.preset] ?? p.preset) : undefined;
   const decision = typeof p.decision === "string" ? (DECISION_LABEL[p.decision] ?? p.decision) : undefined;
-  return [p.ref, p.title ?? preset ?? p.event ?? p.subject, decision ?? p.verdict].filter(Boolean).join(" · ") || e.type.replace(/_/g, " ");
+  return [p.ref, p.title ?? preset ?? p.event ?? p.subject, decision ?? p.verdict].filter(Boolean).join(", ") || e.type.replace(/_/g, " ");
 }
 
 // `tamper`: the demo's "try to break it" control, on the demo project away from the hosted demo.
@@ -28,7 +28,7 @@ export function LedgerTab({ site, tamper }: { site: string; tamper: boolean }) {
   const [css, theme] = useStyletron();
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const [all, setAll] = useState(false);
+  const [q, setQ] = useState("");
   const [open, setOpen] = useState<number | null>(null);
   const ledger = useQuery({
     queryKey: ["ledger", site, "informed"],
@@ -37,7 +37,8 @@ export function LedgerTab({ site, tamper }: { site: string; tamper: boolean }) {
   const verify = useQuery({ queryKey: ["verify", site], queryFn: () => get<Verify>(`sites/${site}/ledger/verify`) });
   const v = verify.data;
   const entries = [...(ledger.data?.entries ?? [])].reverse();
-  const shown = all ? entries : entries.slice(0, 20);
+  const found = entries.filter((e) => matches(q, what(e), e.type.replace(/_/g, " "), `#${e.seq}`, e.subject, e.text));
+  const { rows: shown, pager } = usePages(found, 25, q);
   const entry = entries.find((e) => e.seq === open) ?? null;
   return (
     <div className={css({ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: theme.sizing.scale400 })}>
@@ -54,11 +55,7 @@ export function LedgerTab({ site, tamper }: { site: string; tamper: boolean }) {
               </Chip>
             ))}
         </span>
-        <span className={css({ marginLeft: "auto" })}>
-          <Button kind={KIND.tertiary} size={SIZE.mini} onClick={() => navigate(`/verify?project=${site}`)} data-testid="verify-receipt">
-            {say.verifyReceipt}
-          </Button>
-        </span>
+        <Search value={q} onChange={setQ} placeholder={say.search} testId="ledger-search" />
       </div>
       {v && !v.ok && <Muted testId="verify-problem">{v.problems[0]}</Muted>}
 
@@ -75,15 +72,10 @@ export function LedgerTab({ site, tamper }: { site: string; tamper: boolean }) {
                 {e.type.replace(/_/g, " ")}
               </Muted>
             </Grow>
-            {e.dry_run && <Chip tip={say.notSentTip}>{say.notSent}</Chip>}
             <ChevronRight size={20} color={theme.colors.contentTertiary} />
           </Row>
         ))}
-        {entries.length > 20 && (
-          <Button kind={KIND.tertiary} size={SIZE.compact} onClick={() => setAll(!all)}>
-            {all ? app.common.showFewer : app.common.showAll(entries.length)}
-          </Button>
-        )}
+        {pager}
       </div>
 
       <Accordion>
@@ -141,7 +133,7 @@ export function LedgerTab({ site, tamper }: { site: string; tamper: boolean }) {
         testId="record-drawer"
         footer={
           entry && (
-            <Button kind={KIND.secondary} onClick={() => navigate(`/verify?project=${site}&record=${entry.seq}`)} data-testid="verify-record">
+            <Button kind={KIND.secondary} onClick={() => navigate(`/projects/${site}/settings?record=${entry.seq}`)} data-testid="verify-record">
               {say.verifyRecord}
             </Button>
           )
@@ -150,12 +142,12 @@ export function LedgerTab({ site, tamper }: { site: string; tamper: boolean }) {
         {entry && (
           <>
             <Muted>
-              {entry.type.replace(/_/g, " ")} · {new Date(entry.recorded_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+              {entry.type.replace(/_/g, " ")}, {new Date(entry.recorded_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
             </Muted>
             <Field label={say.what}>{what(entry)}</Field>
             {typeof entry.payload.clause === "string" && entry.payload.clause && <Field label={say.clause}>{entry.payload.clause}</Field>}
             {(entry.subject || entry.text) && (
-              <Field label={entry.dry_run ? say.wouldHaveSent : say.text}>
+              <Field label={say.text}>
                 {entry.subject && <ParagraphSmall margin={0}>{entry.subject}</ParagraphSmall>}
                 {entry.text && <Quote>{entry.text}</Quote>}
               </Field>

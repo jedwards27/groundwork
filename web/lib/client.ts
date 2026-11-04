@@ -20,12 +20,12 @@ export async function get<T>(path: string): Promise<T> {
 }
 
 // State changes are JSON from this page, which is how the API tells them from a forged request.
-export async function send<T>(method: "POST" | "PUT", path: string, body?: unknown): Promise<T> {
+export async function send<T>(method: "POST" | "PUT", path: string, body?: unknown, extra?: Record<string, string>): Promise<T> {
   return unwrap<T>(
     await fetch(`/api/${path}`, {
       method,
       credentials: "same-origin",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", ...extra },
       body: JSON.stringify(body ?? {}),
     }),
   );

@@ -10,13 +10,13 @@ export function parseDate(s: string | null | undefined): Date | null {
 
 export function fmt(s: string | null | undefined, withYear = false): string {
   const d = parseDate(s);
-  if (!d) return "—";
+  if (!d) return "not set";
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric", ...(withYear ? { year: "numeric" } : {}) });
 }
 
 export function fmtLong(s: string | null | undefined): string {
   const d = parseDate(s);
-  return d ? d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" }) : "—";
+  return d ? d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" }) : "not set";
 }
 
 export function daysBetween(a: string | null | undefined, b: string | null | undefined): number {

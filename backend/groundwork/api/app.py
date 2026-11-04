@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -206,10 +207,26 @@ def list_events(site: str, s: Session = Depends(db)) -> list[EventView]:
     return [views.event_view(state, e) for e in state.events]
 
 
+VISITOR_KEY = re.compile(r"^sk-ant-[A-Za-z0-9_\-]{20,300}$")
+
+
 @app.post("/sites/{site}/events", response_model=RunStarted, status_code=status.HTTP_202_ACCEPTED)
 def play_event(
-    site: str, body: PlayEvent, background: BackgroundTasks, who: Identity = Depends(identity)
+    site: str,
+    body: PlayEvent,
+    background: BackgroundTasks,
+    who: Identity = Depends(identity),
+    x_anthropic_api_key: str | None = Header(default=None, include_in_schema=False),
 ) -> RunStarted:
+    """Play a message. A visitor may send their own model API key with the request to have
+    Claude plan it live. The key is used for this run, in memory, and never stored or logged. It
+    isn't accepted on a person's own computer, where Claude in their app does the planning."""
+    key = (x_anthropic_api_key or "").strip() or None
+    if key is not None:
+        if get_settings().groundwork_local:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "On your own computer, Claude in the app plans; no key is needed.")
+        if not VISITOR_KEY.match(key):
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "That doesn't look like a Claude API key (it starts with sk-ant-).")
     # The run row must be committed before the background task looks for it, so this handler opens
     # (and closes) its own transaction instead of using the request-scoped session.
     try:
@@ -221,7 +238,7 @@ def play_event(
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
     except runs.RunLimit as exc:
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, str(exc)) from exc
-    background.add_task(runs.execute_run, who.org_id, run_id)
+    background.add_task(runs.execute_run, who.org_id, run_id, key)
     return RunStarted(run_id=str(run_id), stream=f"/runs/{run_id}/stream")
 
 

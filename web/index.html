@@ -7,8 +7,10 @@
     <title>Groundwork</title>
     <style>
       /* The tutorial points at one thing at a time. */
-      [data-tour="on"] { outline: 3px solid #276ef1; outline-offset: 3px; border-radius: 6px; box-shadow: 0 0 0 8px rgba(39, 110, 241, 0.18); animation: gw-tour 1.6s ease-in-out infinite; }
-      @keyframes gw-tour { 50% { box-shadow: 0 0 0 12px rgba(39, 110, 241, 0.06); } }
+      /* The tour's highlight sits inside the element, so a scrolling or clipped container never cuts it
+         and it never covers the text around it. */
+      [data-tour="on"] { outline: 2px solid #276ef1; outline-offset: -2px; animation: gw-tour 1.6s ease-in-out infinite; }
+      @keyframes gw-tour { 0%, 100% { outline-color: rgba(39, 110, 241, 1); } 50% { outline-color: rgba(39, 110, 241, 0.45); } }
       @media (prefers-reduced-motion: reduce) { [data-tour="on"] { animation: none; } }
     </style>
   </head>

@@ -17,8 +17,7 @@
   "dependencies": {
     "@tanstack/react-query": "^5.105.1",
     "baseui": "18.2.0",
-    "d3-scale": "^4.0.2",
-    "d3-time": "^3.1.0",
+    "echarts": "6.0.0",
     "openapi-fetch": "^0.17.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
@@ -28,8 +27,6 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",
-    "@types/d3-scale": "^4.0.9",
-    "@types/d3-time": "^3.0.4",
     "@types/node": "^26.6.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",

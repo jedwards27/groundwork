@@ -84,8 +84,8 @@ def draft_view(d: dict[str, Any]) -> dict[str, Any]:
     elif d["kind"] == "project":
         lines = [
             {"text": f"{p['finish']}: target {p['target']}, forecast {p['forecast']}", "change": None},
-            {"text": f"Sets the date: {p['sets_the_date'] or '—'}", "change": None},
-            {"text": f"{p['items']} items · {', '.join(p['parties'])}", "change": None},
+            {"text": f"Sets the date: {p['sets_the_date'] or 'none'}", "change": None},
+            {"text": f"{p['items']} steps, with {', '.join(p['parties'])}", "change": None},
             {"text": f"Mandate template: {str(p['template']).capitalize()}", "change": None},
         ] + [{"text": f"Inferred link, not stated in a source: {x}", "change": "assumed"} for x in p.get("assumed_links") or []]
         note = f"As of {p.get('as_of', '')}."
@@ -171,7 +171,7 @@ def _forecast_lines(p: dict[str, Any]) -> list[dict[str, Any]]:
     b, a = p.get("before"), p.get("after")
     if not b or not a or (b["forecast"], b["sets_the_date"]) == (a["forecast"], a["sets_the_date"]):
         return []
-    return [{"text": f"Forecast: {b['forecast']} → {a['forecast']}; sets the date: {a['sets_the_date'] or '—'}", "change": None}]
+    return [{"text": f"Forecast: {b['forecast']} → {a['forecast']}; sets the date: {a['sets_the_date'] or 'none'}", "change": None}]
 
 
 @router.get("/home")

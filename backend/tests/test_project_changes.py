@@ -264,3 +264,17 @@ def page_home(client):  # noqa: ARG001 - the home folder the fixture set
     from pathlib import Path
 
     return Path(os.environ["GROUNDWORK_HOME"])
+
+
+def test_the_person_renames_a_project_in_its_settings(page):
+    client, _ = page
+    tools.setup("Jude Test", "jude@example.test")
+    key = _create()
+    r = client.post(f"/api/projects/{key}/details", json={"name": "Connaught Place (Monette)", "location": "Toronto"}, headers=ORIGIN)
+    assert r.status_code == 200 and r.json()["message"] == "Saved."
+    site = client.get(f"/api/sites/{key}").json()
+    assert site["name"] == "Connaught Place (Monette)" and site["location"] == "Toronto"
+    with org_session(tools._ref(key).org_id) as s:
+        rec = s.execute(select(m.LedgerEntry).where(m.LedgerEntry.entry_type == "project_changed")).scalar_one()
+    assert rec.payload["by"] == "Jude Test" and rec.payload["change"]["name"] == "Connaught Place (Monette)"
+    assert client.post(f"/api/projects/{key}/details", json={"name": "Connaught Place (Monette)", "location": "Toronto"}, headers=ORIGIN).json()["message"] == "Nothing changed."

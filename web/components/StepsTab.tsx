@@ -1,13 +1,12 @@
 import { useStyletron } from "baseui";
 import { ButtonGroup, MODE } from "baseui/button-group";
 import { Button, SIZE } from "baseui/button";
-import { Input, SIZE as INPUT_SIZE } from "baseui/input";
 import { TableBuilder, TableBuilderColumn } from "baseui/table-semantic";
 import { useMemo, useState } from "react";
 import { fmt } from "@/lib/format";
 import type { ChainView, ItemView, SiteView } from "@/lib/types";
 import { project } from "@/copy/project";
-import { Chip, Muted, Section } from "./ui";
+import { Chip, matches, Muted, Search, Section, usePages } from "./ui";
 
 const say = project.steps;
 
@@ -44,9 +43,7 @@ export function StepsTab({ chain, site }: { chain: ChainView; site: SiteView }) 
     });
   }, [chain, site]);
 
-  const needle = q.trim().toLowerCase();
-  const matches = (r: Row) => !needle || [r.title, r.owner_name, r.source, r.notes, r.key].some((v) => v?.toLowerCase().includes(needle));
-  const shown = rows.filter((r) => FILTERS[filter].test(r) && matches(r));
+  const shown = rows.filter((r) => FILTERS[filter].test(r) && matches(q, r.title, r.owner_name, r.source, r.notes, r.key));
   const key = (r: Row): string | number =>
     sort.col === "status" ? STATUS_ORDER[r.status] ?? 9 : sort.col === "owner" ? r.owner_name : sort.col === "kind" ? r.kind : sort.col === "title" ? r.title.toLowerCase() : r.date;
   shown.sort((a, b) => {
@@ -54,6 +51,7 @@ export function StepsTab({ chain, site }: { chain: ChainView; site: SiteView }) 
     const c = x < y ? -1 : x > y ? 1 : a.date < b.date ? -1 : a.date > b.date ? 1 : 0;
     return sort.dir === "ASC" ? c : -c;
   });
+  const { rows: page, pager } = usePages(shown, 25, `${filter}|${q}|${sort.col}|${sort.dir}`);
   const onSort = (id: string) => setSort((s) => ({ col: id as Col, dir: s.col === id && s.dir === "ASC" ? "DESC" : "ASC" }));
   const statusChip = (r: Row) => {
     const kind = r.status === "done" ? "green" : r.status === "cancelled" ? "gray" : r.status === "in_progress" ? "blue" : "gray";
@@ -68,14 +66,12 @@ export function StepsTab({ chain, site }: { chain: ChainView; site: SiteView }) 
             <Button key={f.label}>{say.filterCount(f.label, rows.filter(f.test).length)}</Button>
           ))}
         </ButtonGroup>
-        <div className={css({ flex: "1 1 220px", maxWidth: "320px" })}>
-          <Input value={q} onChange={(e) => setQ((e.target as HTMLInputElement).value)} placeholder={say.search} size={INPUT_SIZE.compact} clearable overrides={{ Input: { props: { "data-testid": "steps-search" } } }} />
-        </div>
+        <Search value={q} onChange={setQ} placeholder={say.search} testId="steps-search" />
         <Muted>{say.count(shown.length, rows.length)}</Muted>
       </div>
       <div className={css({ overflowX: "auto" })} data-testid="steps-table">
         <TableBuilder
-          data={shown}
+          data={page}
           sortColumn={sort.col}
           sortOrder={sort.dir}
           onSort={onSort}
@@ -112,7 +108,7 @@ export function StepsTab({ chain, site }: { chain: ChainView; site: SiteView }) 
                 </span>
                 <Muted>
                   {r.status === "done" ? say.date.finished : r.status === "cancelled" ? say.date.planned : say.date.due}
-                  {!closed(r) && r.planned_finish !== r.early_finish ? ` · ${say.date.planned} ${fmt(r.planned_finish)}` : ""}
+                  {!closed(r) && r.planned_finish !== r.early_finish ? `, ${say.date.planned} ${fmt(r.planned_finish)}` : ""}
                 </Muted>
                 {r.past !== null && (
                   <div className={css({ color: theme.colors.contentNegative, ...theme.typography.ParagraphXSmall })}>{say.pastDue(r.past)}</div>
@@ -123,19 +119,20 @@ export function StepsTab({ chain, site }: { chain: ChainView; site: SiteView }) 
           <TableBuilderColumn<Row> header={say.cols.waits} id="waits">
             {(r) => (
               <div className={css({ maxWidth: "220px" })}>
-                <Muted>{r.waits.map((k) => titles.get(k) ?? k).join("; ") || "—"}</Muted>
+                <Muted>{r.waits.map((k) => titles.get(k) ?? k).join("; ")}</Muted>
               </div>
             )}
           </TableBuilderColumn>
           <TableBuilderColumn<Row> header={say.cols.source} id="source">
             {(r) => (
               <div className={css({ maxWidth: "200px", overflowWrap: "anywhere" })}>
-                <Muted>{r.source || "—"}</Muted>
+                <Muted>{r.source}</Muted>
               </div>
             )}
           </TableBuilderColumn>
         </TableBuilder>
       </div>
+      {pager}
       <Muted>{say.change}</Muted>
     </Section>
   );

@@ -1,11 +1,14 @@
 import { useStyletron } from "baseui";
 import { Accordion, Panel } from "baseui/accordion";
 import { LabelMedium, ParagraphSmall } from "baseui/typography";
-import type { ReactNode } from "react";
+import { Skeleton } from "baseui/skeleton";
+import { lazy, Suspense, type ReactNode } from "react";
 import { daysBetween, fmt, PROVENANCE_LABEL } from "@/lib/format";
 import type { ChainView, PlanView, SiteView } from "@/lib/types";
-import { Chain } from "./Chain";
+// The chart and its library load on their own, so home and the other tabs don't wait for them.
+const Chain = lazy(() => import("./Chain").then((m) => ({ default: m.Chain })));
 import { project } from "@/copy/project";
+import { Calendar } from "./Calendar";
 import { Grow, Hint, Line, Muted, Row, Section } from "./ui";
 
 const say = project.overview;
@@ -28,7 +31,9 @@ export function Overview({ chain, site, plan }: { chain: ChainView; site: SiteVi
   return (
     <div className={css({ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: theme.sizing.scale600 })}>
       <Section title={say.graph.title} hint={say.graph.hint} testId="graph">
-        <Chain key={chain.site} chain={chain} />
+        <Suspense fallback={<Skeleton rows={4} height="200px" width="100%" animation />}>
+          <Chain key={chain.site} chain={chain} />
+        </Suspense>
       </Section>
       <Accordion>
         <Panel
@@ -38,15 +43,9 @@ export function Overview({ chain, site, plan }: { chain: ChainView; site: SiteVi
         >
           <Differential chain={chain} plan={plan} />
         </Panel>
-        {chain.calendar_losses.length > 0 && (
-          <Panel title={<Titled title={say.holidays.title} about={say.holidays.about} />}>
-            {chain.calendar_losses.map((l, n) => (
-              <ParagraphSmall key={n} marginTop={0}>
-                {l.sentence}
-              </ParagraphSmall>
-            ))}
-          </Panel>
-        )}
+        <Panel title={<Titled title={say.calendar.title} about={say.calendar.about} />}>
+          <Calendar chain={chain} site={site} />
+        </Panel>
         {site.facts.length > 0 && (
           <Panel title={<Titled title={say.about.title} about={site.attrs.blurb || say.about.aboutFallback} />}>
             {site.facts.map((f) => (
@@ -98,10 +97,11 @@ function Differential({ chain, plan }: { chain: ChainView; plan: PlanView | null
             />
           </div>
           <ParagraphSmall margin={0} className={css({ textAlign: "right" })}>
-            {deltas[i] > 0 ? say.winBack.late(deltas[i]) : deltas[i] < 0 ? say.winBack.early(-deltas[i]) : say.winBack.onTime} · {fmt(r.date)}
+            {deltas[i] > 0 ? say.winBack.late(deltas[i]) : deltas[i] < 0 ? say.winBack.early(-deltas[i]) : say.winBack.onTime}, {fmt(r.date)}
           </ParagraphSmall>
         </div>
       ))}
+      {d && d.recovered_if_they_agree === 0 && <Muted testId="recovery-none">{say.winBack.none}</Muted>}
       <Muted>{say.winBack.note}</Muted>
     </div>
   );

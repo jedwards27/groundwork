@@ -1,256 +1,297 @@
+// The schedule: every step on the calendar, one row each, grouped by who owes it. The steps that
+// decide the date are blue and joined by arrows; the one the date waits on now is amber. Drawn with
+// Apache ECharts (a custom series per layer), so it zooms, pans and explains each bar on hover.
 import { useStyletron } from "baseui";
 import { Button, KIND, SIZE } from "baseui/button";
 import { ButtonGroup, MODE } from "baseui/button-group";
-import { scaleTime } from "d3-scale";
-import { timeMonth, timeWeek } from "d3-time";
+import { CustomChart } from "echarts/charts";
+import { AriaComponent, DataZoomComponent, GridComponent, MarkLineComponent, TooltipComponent } from "echarts/components";
+import * as echarts from "echarts/core";
+import { SVGRenderer } from "echarts/renderers";
+import type { CustomSeriesRenderItemAPI, CustomSeriesRenderItemParams, CustomSeriesRenderItemReturn, EChartsOption } from "echarts";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { fmt, parseDate } from "@/lib/format";
 import type { ChainView, ItemView } from "@/lib/types";
 import { project } from "@/copy/project";
 import { Muted } from "./ui";
 
-const say = project.overview.graph;
+echarts.use([CustomChart, GridComponent, TooltipComponent, DataZoomComponent, MarkLineComponent, AriaComponent, SVGRenderer]);
 
-const W = 900;
-const LEFT = 150;
-const RIGHT = 14;
-const TOP = 34;
-const NODE_W = 168;
-const NODE_H = 44;
-const ROW = 52;
-const DAY_PX = 3.2; // the whole project: about a year per 1,170 pixels, scrolled sideways
-const LINE = 27; // characters per title line
+const say = project.overview.graph;
+const DAY = 86_400_000;
+const ROW = 26;
+const LABEL_W = 230;
 
 type Range = "near" | "all";
+type Row = { kind: "lane"; label: string } | { kind: "step"; item: ItemView; start: number; end: number };
 
-// A step's title on up to two lines, broken between words; the full title is in the tooltip.
-function wrap(title: string): [string, string] {
-  if (title.length <= LINE) return [title, ""];
-  const cut = title.lastIndexOf(" ", LINE);
-  const first = cut > 8 ? title.slice(0, cut) : title.slice(0, LINE);
-  const rest = title.slice(first.length).trim();
-  return [first, rest.length > LINE ? rest.slice(0, LINE - 1) + "…" : rest];
-}
+const closed = (i: ItemView) => i.status === "done" || i.status === "cancelled";
+const ms = (d: string | null | undefined) => parseDate(d ?? null)?.getTime() ?? NaN;
 
-type Placed = { item: ItemView; x: number; y: number; clipped: boolean };
-
-type Palette = Record<
-  "paper" | "paperSoft" | "accent" | "accentSoft" | "crit" | "panel" | "base" | "line" | "line2" | "fg" | "muted" | "dim" | "body" | "mono",
-  string
->;
-
-// The steps that decide the date stand out: blue, heavier, bold. The one the date waits on now is
-// amber. Finished steps fade back; everything else is quiet.
-function color(i: ItemView, gate: string | null, c: Palette): { stroke: string; fill: string; width: number; text: string; bold: boolean } {
-  if (i.status === "cancelled") return { stroke: c.line2, fill: "transparent", width: 1, text: c.dim, bold: false };
-  if (i.key === gate) return { stroke: c.paper, fill: c.paperSoft, width: 2.6, text: c.fg, bold: true };
-  if (i.status === "done") return { stroke: c.line, fill: c.panel, width: 1, text: c.dim, bold: false };
-  if (i.critical) return { stroke: c.accent, fill: c.accentSoft, width: 2.2, text: c.fg, bold: true };
-  return { stroke: c.line2, fill: c.base, width: 1, text: c.muted, bold: false };
-}
-
-// The paper chain: what gates delivery, by who does the work, on a time axis.
 export function Chain({ chain }: { chain: ChainView }) {
   const [css, theme] = useStyletron();
   const t = theme.colors;
-  const c: Palette = {
-    paper: t.contentWarning,
-    paperSoft: t.backgroundWarningLight,
-    accent: t.contentAccent,
-    accentSoft: t.backgroundAccentLight,
-    crit: t.contentNegative,
-    panel: t.backgroundSecondary,
-    base: t.backgroundPrimary,
-    line: t.borderOpaque,
-    line2: t.contentTertiary,
-    fg: t.contentPrimary,
-    muted: t.contentSecondary,
-    dim: t.contentTertiary,
-    body: theme.typography.LabelXSmall.fontFamily as string,
-    mono: theme.typography.MonoLabelXSmall.fontFamily as string,
-  };
-  const closed = (i: ItemView) => i.status === "done" || i.status === "cancelled";
-  // Steps that finished well before today drop out of the default view. When that's most of the
-  // project, start on the whole project instead.
-  const nearStart = useMemo(() => new Date(parseDate(chain.as_of)!.getTime() - 42 * 86_400_000), [chain.as_of]);
-  const hidden = chain.items.filter((i) => closed(i) && parseDate(i.early_finish)! < nearStart).length;
+  const box = useRef<HTMLDivElement>(null);
+  const chart = useRef<echarts.ECharts | null>(null);
+
+  const asOf = ms(chain.as_of);
+  const nearStart = asOf - 42 * DAY;
+  const hidden = chain.items.filter((i) => closed(i) && ms(i.early_finish) < nearStart).length;
+  // When most steps finished long ago, start on the whole project.
   const [range, setRange] = useState<Range>(hidden > chain.items.length - hidden ? "all" : "near");
-  const scroller = useRef<HTMLDivElement>(null);
 
-  const layout = useMemo(() => {
-    const asOf = parseDate(chain.as_of)!;
-    const target = parseDate(chain.milestone.target_date)!;
-    const forecast = parseDate(chain.milestone.forecast_finish ?? chain.milestone.target_date)!;
-    const near = chain.items.filter((i) => i.on_target_path || !closed(i)).map((i) => parseDate(i.early_finish)!);
-    const horizon = new Date(Math.max(target.getTime(), forecast.getTime()) + 35 * 86_400_000);
+  const { rows, x0, x1 } = useMemo(() => {
+    const target = ms(chain.milestone.target_date);
+    const forecast = ms(chain.milestone.forecast_finish ?? chain.milestone.target_date);
+    const horizon = Math.max(target, forecast) + 35 * DAY;
     const all = range === "all";
-    const earliest = Math.min(...chain.items.map((i) => parseDate(i.planned_start ?? i.early_finish)!.getTime()), asOf.getTime());
-    const latest = Math.max(...chain.items.map((i) => parseDate(i.early_finish)!.getTime()), horizon.getTime());
-    const start = all ? new Date(earliest - 14 * 86_400_000) : nearStart;
-    const t1 = all ? new Date(latest + 14 * 86_400_000) : new Date(Math.min(horizon.getTime(), Math.max(...near.map((d) => d.getTime()), horizon.getTime())));
-    const width = all ? Math.max(W, Math.round(LEFT + RIGHT + NODE_W + ((t1.getTime() - start.getTime()) / 86_400_000) * DAY_PX)) : W;
-    const x = scaleTime().domain([start, t1]).range([LEFT, width - RIGHT]);
-    const placed: Placed[] = [];
-    let y = TOP;
-    const lanes = chain.lanes.map((lane) => {
-      const items = chain.items
-        .filter((i) => i.lane === lane.key && (all || !(closed(i) && parseDate(i.early_finish)! < start)))
-        .sort((a, b) => (a.early_finish < b.early_finish ? -1 : 1));
-      const rowsEnd: number[] = [];
-      const laneTop = y;
-      for (const item of items) {
-        const end = parseDate(item.early_finish)!;
-        let right = x(end);
-        let clipped = false;
-        if (end > t1) { right = width - RIGHT; clipped = true; }
-        const left = Math.max(LEFT, right - NODE_W);
-        let row = rowsEnd.findIndex((r) => r < left - 4);
-        if (row === -1) { row = rowsEnd.length; rowsEnd.push(0); }
-        rowsEnd[row] = left + NODE_W;
-        placed.push({ item, x: left, y: laneTop + 6 + row * ROW, clipped });
-      }
-      const h = rowsEnd.length ? rowsEnd.length * ROW + 10 : 0;
-      y += h;
-      return { ...lane, top: laneTop, h, items: items.length };
-    });
-    return { x, placed, lanes: lanes.filter((l) => l.items > 0), H: y + 40, asOf, target, forecast, start, t1, width };
-  }, [chain, range, nearStart]);
+    const shown = chain.items.filter((i) => all || !(closed(i) && ms(i.early_finish) < nearStart));
+    const span = (i: ItemView) => {
+      const end = ms(i.status === "done" ? (i.actual_finish ?? i.early_finish) : i.status === "cancelled" ? i.planned_finish : i.early_finish);
+      const start = Math.min(end, ms(i.status === "not_started" ? i.early_start : (i.planned_start ?? i.early_start)) || end);
+      return { start, end };
+    };
+    const out: Row[] = [];
+    for (const lane of chain.lanes) {
+      const items = shown
+        .filter((i) => i.lane === lane.key)
+        .map((i) => ({ item: i, ...span(i) }))
+        .sort((a, b) => a.start - b.start || a.end - b.end);
+      if (!items.length) continue;
+      out.push({ kind: "lane", label: lane.label });
+      for (const r of items) out.push({ kind: "step", ...r });
+    }
+    const steps = out.filter((r): r is Extract<Row, { kind: "step" }> => r.kind === "step");
+    const first = Math.min(...steps.map((r) => r.start), asOf);
+    const last = Math.max(...steps.map((r) => r.end), horizon);
+    return { rows: out, x0: all ? first - 14 * DAY : nearStart, x1: all ? last + 14 * DAY : horizon };
+  }, [chain, range, nearStart, asOf]);
 
-  const { x, placed, lanes, H, asOf, target, forecast, start, t1, width } = layout;
-  // On the whole project, open scrolled to a little before today.
+  const option = useMemo<EChartsOption>(() => {
+    const row = new Map<string, number>();
+    rows.forEach((r, n) => r.kind === "step" && row.set(r.item.key, n));
+    const steps = rows.flatMap((r, n) => (r.kind === "step" ? [{ r, n }] : []));
+    const critical = new Set(chain.critical_path);
+    const pairs = chain.critical_path.slice(1).map((k, n) => [chain.critical_path[n], k] as const).filter(([a, b]) => row.has(a) && row.has(b));
+    const font = theme.typography.LabelXSmall.fontFamily as string;
+    const mono = theme.typography.MonoLabelXSmall.fontFamily as string;
+    const late = (chain.milestone.delta_days ?? 0) > 0;
+
+    const style = (i: ItemView) => {
+      if (i.status === "cancelled") return { fill: "transparent", stroke: t.contentTertiary, dash: [3, 3], text: t.contentTertiary };
+      if (i.key === chain.gate) return { fill: t.backgroundWarningLight, stroke: t.contentWarning, dash: null, text: t.contentPrimary };
+      if (i.status === "done") return { fill: t.backgroundTertiary, stroke: t.borderOpaque, dash: null, text: t.contentTertiary };
+      if (critical.has(i.key)) return { fill: t.backgroundAccentLight, stroke: t.contentAccent, dash: null, text: t.contentPrimary };
+      return { fill: t.backgroundSecondary, stroke: t.contentTertiary, dash: null, text: t.contentSecondary };
+    };
+
+    // A bar from start to finish, or a diamond for a single date; the date sits to its right.
+    const bar = (params: CustomSeriesRenderItemParams, api: CustomSeriesRenderItemAPI): CustomSeriesRenderItemReturn => {
+      const { r, n } = steps[params.dataIndex];
+      const i = r.item;
+      // Clamp to the plot, so a step that runs past the window doesn't spill over the labels.
+      const sys = params.coordSys as unknown as { x: number; width: number };
+      const [ra, y] = api.coord([r.start, n]);
+      const [rb] = api.coord([r.end, n]);
+      const xa = Math.max(sys.x, ra);
+      const xb = Math.min(sys.x + sys.width, rb);
+      if (rb < sys.x || ra > sys.x + sys.width) return { type: "group", children: [] } as CustomSeriesRenderItemReturn;
+      const h = (api.size?.([0, 1]) as number[])[1] * 0.56;
+      const s = style(i);
+      const stale = chain.stale?.[i.key];
+      const shifted = !closed(i) && i.finish_shift_days > 0;
+      const label =
+        (i.status === "cancelled" ? say.cancelled : (i.estimated ? say.estimated : "") + fmt(i.status === "done" ? (i.actual_finish ?? i.early_finish) : i.early_finish)) +
+        (shifted ? ` +${i.finish_shift_days}d` : "") +
+        (stale ? say.noWord : "");
+      const point = rb - ra < 6;
+      const shape = point
+        ? { type: "polygon" as const, shape: { points: [[xb, y - h / 2], [xb + h / 2, y], [xb, y + h / 2], [xb - h / 2, y]] } }
+        : { type: "rect" as const, shape: { x: xa, y: y - h / 2, width: xb - xa, height: h, r: 3 } };
+      return {
+        type: "group",
+        children: [
+          {
+            ...shape,
+            style: { fill: s.fill, stroke: s.stroke, lineWidth: critical.has(i.key) || i.key === chain.gate ? 1.6 : 1, lineDash: s.dash ?? undefined },
+          },
+          {
+            type: "text",
+            invisible: rb > sys.x + sys.width,
+            x: xb + (point ? h / 2 + 4 : 5),
+            y,
+            style: { text: label, fill: shifted || stale ? t.contentNegative : t.contentTertiary, font: `10px ${mono}`, verticalAlign: "middle" },
+          },
+        ],
+      } as CustomSeriesRenderItemReturn;
+    };
+
+    // The chain that decides the date: from one step's finish down to the next one's start.
+    const link = (params: CustomSeriesRenderItemParams, api: CustomSeriesRenderItemAPI): CustomSeriesRenderItemReturn => {
+      const [a, b] = pairs[params.dataIndex];
+      const ra = rows[row.get(a)!] as Extract<Row, { kind: "step" }>;
+      const rb = rows[row.get(b)!] as Extract<Row, { kind: "step" }>;
+      const [xa, ya] = api.coord([ra.end, row.get(a)!]);
+      const [xb, yb] = api.coord([rb.start, row.get(b)!]);
+      const bend = Math.max(xa + 6, Math.min(xb - 6, xa + 10));
+      const color = t.contentAccent;
+      return {
+        type: "group",
+        children: [
+          { type: "polyline", shape: { points: [[xa, ya], [bend, ya], [bend, yb], [xb - 4, yb]] }, style: { stroke: color, lineWidth: 1.4, fill: "none", opacity: 0.8 } },
+          { type: "polygon", shape: { points: [[xb, yb], [xb - 6, yb - 3.5], [xb - 6, yb + 3.5]] }, style: { fill: color, opacity: 0.8 } },
+        ],
+      } as CustomSeriesRenderItemReturn;
+    };
+
+    // A faint band behind each owner's rows.
+    const bands = rows.flatMap((r, n) => (r.kind === "lane" ? [n] : []));
+    const band = (params: CustomSeriesRenderItemParams, api: CustomSeriesRenderItemAPI): CustomSeriesRenderItemReturn => {
+      const from = bands[params.dataIndex];
+      const to = (bands[params.dataIndex + 1] ?? rows.length) - 1;
+      const sys = params.coordSys as unknown as { x: number; width: number };
+      const [, y0] = api.coord([x0, from]);
+      const [, y1] = api.coord([x0, to]);
+      const half = ROW / 2;
+      return params.dataIndex % 2
+        ? { type: "rect", shape: { x: sys.x - LABEL_W, y: y0 - half, width: sys.width + LABEL_W, height: y1 - y0 + ROW }, style: { fill: t.backgroundSecondary, opacity: 0.55 }, silent: true }
+        : ({ type: "group", children: [] } as CustomSeriesRenderItemReturn);
+    };
+
+    // Today, the target and the forecast. When the target and forecast are close, the earlier
+    // label sits left of its line and the later one right, so they never overlap.
+    const target = ms(chain.milestone.target_date);
+    const forecast = chain.milestone.forecast_finish && chain.milestone.forecast_finish !== chain.milestone.target_date ? ms(chain.milestone.forecast_finish) : null;
+    const side = (d: number, other: number | null) => (other === null ? "center" : d < other ? "right" : "left");
+    const marks = [
+      { xAxis: asOf, name: say.today, lineStyle: { color: t.contentPrimary, type: [2, 3] as number[] }, label: { align: "center" } },
+      { xAxis: target, name: say.target(fmt(chain.milestone.target_date)), lineStyle: { color: t.contentTertiary, type: "dashed" as const }, label: { align: side(target, forecast) } },
+      ...(forecast !== null
+        ? [{ xAxis: forecast, name: say.forecast(fmt(chain.milestone.forecast_finish)), lineStyle: { color: late ? t.contentNegative : t.contentAccent, type: "dashed" as const }, label: { align: side(forecast, target), color: late ? t.contentNegative : t.contentAccent } }]
+        : []),
+    ];
+
+    return {
+      animation: false,
+      aria: { enabled: true, label: { description: say.aria(steps.length) } },
+      textStyle: { fontFamily: font },
+      grid: { left: LABEL_W + 8, right: 70, top: 28, bottom: 44 },
+      xAxis: {
+        type: "time",
+        min: x0,
+        max: x1,
+        position: "top",
+        axisLine: { show: false },
+        axisTick: { show: false },
+        splitLine: { show: true, lineStyle: { color: t.borderOpaque, opacity: 0.6 } },
+        axisLabel: { color: t.contentTertiary, fontSize: 10, fontFamily: mono, hideOverlap: true },
+      },
+      yAxis: {
+        type: "category",
+        inverse: true,
+        data: rows.map((r) => (r.kind === "lane" ? r.label : r.item.title)),
+        axisLine: { show: false },
+        axisTick: { show: false },
+        axisLabel: {
+          interval: 0,
+          margin: LABEL_W,
+          align: "left",
+          formatter: (value: string, n: number) => {
+            const r = rows[n];
+            if (r?.kind === "lane") return `{lane|${value}}`;
+            return closed((r as Extract<Row, { kind: "step" }>).item) ? `{done|${value}}` : `{step|${value}}`;
+          },
+          rich: {
+            lane: { fontSize: 11, fontWeight: 600, color: t.contentSecondary, width: LABEL_W - 12, overflow: "truncate" },
+            step: { fontSize: 11.5, color: t.contentPrimary, width: LABEL_W - 24, overflow: "truncate", padding: [0, 0, 0, 12] },
+            done: { fontSize: 11.5, color: t.contentTertiary, width: LABEL_W - 24, overflow: "truncate", padding: [0, 0, 0, 12] },
+          },
+        },
+      },
+      dataZoom: [
+        { type: "inside", xAxisIndex: 0, filterMode: "none", zoomOnMouseWheel: "ctrl", moveOnMouseWheel: false, moveOnMouseMove: true },
+        { type: "slider", xAxisIndex: 0, filterMode: "none", height: 16, bottom: 10, brushSelect: false, showDetail: false, borderColor: t.borderOpaque, fillerColor: "rgba(127,140,170,0.15)", dataBackground: { lineStyle: { opacity: 0 }, areaStyle: { opacity: 0 } } },
+      ],
+      tooltip: {
+        trigger: "item",
+        confine: true,
+        backgroundColor: t.backgroundPrimary,
+        borderColor: t.borderOpaque,
+        textStyle: { color: t.contentPrimary, fontSize: 12 },
+        formatter: (p: unknown) => {
+          const { seriesId, dataIndex } = p as { seriesId: string; dataIndex: number };
+          if (seriesId !== "steps") return "";
+          const i = steps[dataIndex].r.item;
+          const waits = chain.links.filter((l) => l.succ === i.key).map((l) => chain.items.find((x) => x.key === l.pred)?.title ?? l.pred);
+          const esc = (x: string) => x.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]!);
+          return [
+            `<b>${esc(i.title)}</b>`,
+            say.tooltip(i.status.replace("_", " "), fmt(i.planned_finish, true), fmt(i.status === "done" ? (i.actual_finish ?? i.early_finish) : i.early_finish, true)) +
+              (i.total_float !== null && i.total_float !== undefined && !closed(i) ? say.float(i.total_float) : ""),
+            i.estimated ? say.estimatedTip : "",
+            chain.stale?.[i.key] ? say.staleTip(chain.stale[i.key]) : "",
+            waits.length ? say.waitsOn(waits.map(esc).join("; ")) : "",
+            i.notes ? esc(i.notes) : "",
+          ]
+            .filter(Boolean)
+            .join("<br/>");
+        },
+      },
+      series: [
+        { id: "bands", type: "custom", renderItem: band, data: bands.map((n) => [x0, n]), silent: true, z: 0, clip: false },
+        { id: "links", type: "custom", renderItem: link, data: pairs.map((_, n) => [n]), silent: true, z: 1 },
+        {
+          id: "steps",
+          type: "custom",
+          renderItem: bar,
+          data: steps.map(({ r, n }) => [r.start, n, r.end]),
+          encode: { x: [0, 2], y: 1 },
+          z: 2,
+          markLine: {
+            silent: true,
+            symbol: "none",
+            label: { formatter: "{b}", position: "end", fontFamily: mono, fontSize: 10, color: t.contentSecondary },
+            data: marks,
+          },
+        },
+      ],
+    } as EChartsOption;
+  }, [rows, x0, x1, chain, theme, t, asOf]);
+
   useEffect(() => {
-    if (range === "all" && scroller.current) scroller.current.scrollLeft = Math.max(0, x(asOf) - 320);
-  }, [range, x, asOf]);
-  const pos = new Map(placed.map((p) => [p.item.key, p]));
-  const critLinks = new Set(chain.critical_path.slice(1).map((k, n) => `${chain.critical_path[n]}>${k}`));
-  const months = timeMonth.range(timeMonth.ceil(start), t1);
-  const weeks = timeWeek.range(start, t1);
-  const late = (chain.milestone.delta_days ?? 0) > 0;
+    if (!box.current) return;
+    const c = echarts.init(box.current, null, { renderer: "svg" });
+    chart.current = c;
+    const ro = new ResizeObserver(() => c.resize());
+    ro.observe(box.current);
+    return () => {
+      ro.disconnect();
+      c.dispose();
+      chart.current = null;
+    };
+  }, []);
+  useEffect(() => {
+    chart.current?.setOption(option, { notMerge: true });
+  }, [option]);
+
+  const height = rows.length * ROW + 72;
   return (
     <div>
-      <div className={css({ display: "flex", flexWrap: "wrap", alignItems: "center", gap: theme.sizing.scale400, marginBottom: theme.sizing.scale400 })}>
+      <div className={css({ display: "flex", flexWrap: "wrap", alignItems: "center", gap: theme.sizing.scale400, marginBottom: theme.sizing.scale300 })}>
         <ButtonGroup mode={MODE.radio} size={SIZE.compact} selected={range === "near" ? 0 : 1} onClick={(_, i) => setRange(i === 0 ? "near" : "all")}>
           <Button data-testid="range-near">{say.near}</Button>
           <Button data-testid="range-all">{say.all}</Button>
         </ButtonGroup>
         {range === "near" && hidden > 0 && (
           <span className={css({ display: "inline-flex", alignItems: "center", gap: theme.sizing.scale200 })} data-testid="hidden-steps">
-            <Muted>{say.hidden(hidden, fmt(nearStart.toISOString().slice(0, 10)))}</Muted>
+            <Muted>{say.hidden(hidden)}</Muted>
             <Button kind={KIND.tertiary} size={SIZE.mini} onClick={() => setRange("all")}>
               {say.showAll}
             </Button>
           </span>
         )}
       </div>
-      <div className={css({ position: "relative" })}>
-      {range === "all" && (
-        // On the scrolled view the row labels stay put, so you can tell whose row is whose.
-        <svg width={LEFT - 8} height={H} aria-hidden className={css({ position: "absolute", left: 0, top: 0, pointerEvents: "none", zIndex: 1 })}>
-          {lanes.map((lane) => (
-            <g key={lane.key}>
-              <rect x={0} y={lane.top} width={LEFT - 8} height={lane.h} fill={c.base} opacity={0.92} />
-              <text x={8} y={lane.top + 20} fill={c.muted} fontSize={11} fontFamily={c.body}>
-                {lane.label.length > 22 ? lane.label.slice(0, 21) + "…" : lane.label}
-              </text>
-            </g>
-          ))}
-        </svg>
-      )}
-      <div ref={scroller} className={css({ overflowX: "auto" })}>
-        <svg
-          viewBox={`0 0 ${width} ${H}`}
-          role="img"
-          aria-label={say.aria(placed.length)}
-          className={css(range === "all" ? { width: `${width}px`, display: "block" } : { width: "100%", minWidth: "640px", display: "block" })}
-        >
-          <defs>
-            <marker id="gw-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-              <path d="M 0 0 L 10 5 L 0 10 z" fill={c.accent} />
-            </marker>
-          </defs>
-          {lanes.map((lane, n) => (
-            <g key={lane.key}>
-              <rect x={0} y={lane.top} width={width} height={lane.h} fill={n % 2 ? "rgba(127,140,170,0.05)" : "transparent"} />
-              <text x={8} y={lane.top + 20} fill={c.muted} fontSize={11} fontFamily={c.body}>
-                {lane.label.length > 24 ? lane.label.slice(0, 23) + "…" : lane.label}
-              </text>
-            </g>
-          ))}
-          {weeks.map((w) => (
-            <line key={+w} x1={x(w)} x2={x(w)} y1={TOP - 4} y2={H - 32} stroke={c.line} strokeOpacity={0.35} />
-          ))}
-          {months.map((m) => (
-            <g key={+m}>
-              <line x1={x(m)} x2={x(m)} y1={TOP - 8} y2={H - 32} stroke={c.line} />
-              <text x={x(m) + 4} y={TOP - 12} fill={c.dim} fontSize={10} fontFamily={c.mono}>
-                {m.toLocaleDateString("en-US", { month: "short", year: m.getMonth() === 0 ? "2-digit" : undefined })}
-              </text>
-            </g>
-          ))}
-          <g fill="none" strokeWidth={1.2}>
-            {/* Critical links last, so they draw over the rest. */}
-            {[...chain.links.filter((l) => !critLinks.has(`${l.pred}>${l.succ}`)), ...chain.links.filter((l) => critLinks.has(`${l.pred}>${l.succ}`))].map((l) => {
-              const a = pos.get(l.pred);
-              const b = pos.get(l.succ);
-              if (!a || !b) return null;
-              const x1 = a.x + NODE_W, y1 = a.y + NODE_H / 2, x2 = b.x, y2 = b.y + NODE_H / 2;
-              const k = Math.max(36, Math.abs(x2 - x1) / 2);
-              const crit = critLinks.has(`${l.pred}>${l.succ}`);
-              return (
-                <path key={`${l.pred}-${l.succ}`} d={`M${x1} ${y1} C${x1 + k} ${y1} ${x2 - k} ${y2} ${x2} ${y2}`}
-                  stroke={crit ? c.accent : c.line2} strokeOpacity={crit ? 0.95 : 0.35} strokeWidth={crit ? 2.4 : 1}
-                  strokeDasharray={a.item.status === "done" ? "3 3" : undefined} markerEnd={crit ? "url(#gw-arrow)" : undefined} />
-              );
-            })}
-          </g>
-          {[
-            { d: asOf, label: say.today, c: c.fg, dash: "2 3" },
-            { d: target, label: say.target(fmt(chain.milestone.target_date)), c: c.dim, dash: "5 4" },
-            ...(+forecast !== +target ? [{ d: forecast, label: say.forecast(fmt(chain.milestone.forecast_finish)), c: late ? c.crit : c.accent, dash: "5 4" }] : []),
-          ].map((m, n) => (
-            <g key={m.label}>
-              <line x1={x(m.d)} x2={x(m.d)} y1={TOP - 4} y2={n === 2 ? H - 18 : H - 32} stroke={m.c} strokeDasharray={m.dash} strokeWidth={1.4} opacity={0.85} />
-              <text x={x(m.d)} y={n === 2 ? H - 6 : H - 20} fill={m.c} fontSize={10} fontFamily={c.mono}
-                textAnchor={x(m.d) > width - 110 ? "end" : "start"} dx={x(m.d) > width - 110 ? -4 : 4}>
-                {m.label}
-              </text>
-            </g>
-          ))}
-          {placed.map(({ item, x: nx, y: ny, clipped }) => {
-            const box = color(item, chain.gate, c);
-            const [l1, l2] = wrap(item.title);
-            const cancelled = item.status === "cancelled";
-            const stale = chain.stale?.[item.key];
-            return (
-              <g key={item.key} transform={`translate(${nx} ${ny})`} data-key={item.key}>
-                <title>
-                  {say.tooltip(item.title, item.status.replace("_", " "), fmt(item.planned_finish, true), fmt(item.early_finish, true)) +
-                    (item.total_float !== null && item.total_float !== undefined ? say.float(item.total_float) : "") +
-                    (item.notes ? `\n${item.notes}` : "")}
-                </title>
-                <rect width={NODE_W} height={NODE_H} rx={6} fill={box.fill} stroke={box.stroke} strokeWidth={box.width} strokeDasharray={cancelled ? "4 3" : undefined} />
-                <text x={8} y={13} fill={box.text} fontSize={10.5} fontWeight={box.bold ? 700 : 500} fontFamily={c.body} textDecoration={cancelled ? "line-through" : undefined}>
-                  {l1}
-                  {l2 && <tspan x={8} dy={12}>{l2}</tspan>}
-                </text>
-                <text x={8} y={NODE_H - 6} fill={!cancelled && item.finish_shift_days > 0 ? c.crit : c.dim} fontSize={9} fontFamily={c.mono}>
-                  {cancelled ? say.cancelled : (
-                    <>
-                      {item.status === "done" ? say.done : ""}
-                      {item.estimated ? say.estimated : ""}
-                      {fmt(item.early_finish)}
-                      {item.finish_shift_days > 0 ? ` (+${item.finish_shift_days}d)` : ""}
-                      {stale ? say.noWord : ""}
-                      {clipped ? " →" : ""}
-                    </>
-                  )}
-                </text>
-              </g>
-            );
-          })}
-        </svg>
-      </div>
-      </div>
+      <div ref={box} data-testid="schedule-chart" data-rows={rows.filter((r) => r.kind === "step").length} className={css({ width: "100%", height: `${height}px` })} />
       <Muted>{say.legend}</Muted>
     </div>
   );

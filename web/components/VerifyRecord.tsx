@@ -8,28 +8,24 @@ import { HeadingSmall, ParagraphSmall } from "baseui/typography";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router";
 import { get, send } from "@/lib/client";
-import type { HomeView, LedgerEntry, VerifyEntry } from "@/lib/types";
+import type { LedgerEntry, VerifyEntry } from "@/lib/types";
 import { app } from "@/copy/app";
-import { Field, Mono, Muted, Page } from "./ui";
+import { Field, Mono } from "./ui";
 
 const c = app.verify;
 
 // Anyone holding a copy of a record (from a receipt, an export, a screenshot typed back in) can check
 // it against the ledger: the record's hash is recomputed, the chain up to it is walked, and the copy
-// must hash to exactly what the ledger holds.
-export function VerifyRecord() {
+// must hash to exactly what the ledger holds. It lives in a project's Settings, under Receipts.
+export function VerifyRecord({ site }: { site: string }) {
   const [css, theme] = useStyletron();
   const [params] = useSearchParams();
-  const home = useQuery({ queryKey: ["home"], queryFn: () => get<HomeView>("home") });
-  const [project, setProject] = useState(params.get("project") || "");
+  const project = site;
   const [seq, setSeq] = useState<number | null>(/^\d+$/.test(params.get("record") ?? "") ? Number(params.get("record")) : null);
   const [copy, setCopy] = useState("");
   const [result, setResult] = useState<VerifyEntry | null>(null);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
-  useEffect(() => {
-    if (!project && home.data?.projects.length) setProject(home.data.projects[0].project);
-  }, [home.data, project]);
   const ledger = useQuery({
     queryKey: ["ledger", project, "all"],
     queryFn: () => get<{ entries: LedgerEntry[] }>(`sites/${project}/ledger?arm=`),
@@ -71,29 +67,9 @@ export function VerifyRecord() {
       setBusy(false);
     }
   };
-  const projects = home.data?.projects ?? [];
   return (
-    <Page>
-      <HeadingSmall marginTop={0} marginBottom={theme.sizing.scale300}>
-        {c.title}
-      </HeadingSmall>
-      <Muted>{c.intro}</Muted>
-      <div className={css({ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: theme.sizing.scale200, marginTop: theme.sizing.scale700, maxWidth: "640px" })}>
-        {projects.length > 1 && (
-          <FormControl label={c.project}>
-            <Select
-              options={projects.map((p) => ({ id: p.project, label: p.name }))}
-              value={project ? [{ id: project, label: projects.find((p) => p.project === project)?.name ?? project }] : []}
-              onChange={({ value }) => {
-                setProject(String(value[0]?.id ?? ""));
-                setSeq(null);
-                setResult(null);
-              }}
-              clearable={false}
-              searchable={false}
-            />
-          </FormControl>
-        )}
+    <div>
+      <div className={css({ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: theme.sizing.scale200, maxWidth: "640px" })}>
         <FormControl label={c.record}>
           <Select
             options={entries.map((e) => ({ id: e.seq, label: label(e) }))}
@@ -160,6 +136,6 @@ export function VerifyRecord() {
           )}
         </section>
       )}
-    </Page>
+    </div>
   );
 }

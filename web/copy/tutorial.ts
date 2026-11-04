@@ -33,7 +33,7 @@ export const tutorial = {
   },
 
   panel: {
-    count: (step: number, total: number) => `Tutorial · ${step} of ${total}`,
+    count: (step: number, total: number) => `Tutorial, step ${step} of ${total}`,
     shortCount: (step: number, total: number) => `${step} of ${total}`,
     next: "Next",
     back: "Back",
@@ -60,8 +60,8 @@ export const tutorial = {
       body: "These steps have to happen, in this order, for the data center to be ready. Any delay to one of them moves the date. Everything else has some slack.",
     },
     graph: {
-      title: "What depends on what",
-      body: "Here is every step of the project on the calendar, with arrows for what waits on what. The blue ones decide the date; amber is the one it waits on now.",
+      title: "The schedule",
+      body: "Every step on the calendar, one row each, grouped by who owes it. The blue ones, joined by arrows, decide the date; amber is the one it waits on now.",
     },
     inbox: {
       title: "The inbox",
@@ -100,9 +100,9 @@ export const tutorial = {
     },
     mandateTab: {
       title: "Where the rules live",
-      body: "Approved. Next, the mandate itself.",
-      bubble: "Click Mandate",
-      cta: "Click the Mandate tab.",
+      body: "Approved. Next, the mandate itself. It lives in the project's settings.",
+      bubble: "Click Settings",
+      cta: "Click the Settings tab.",
     },
     mandate: {
       title: "Your rules, in plain words",

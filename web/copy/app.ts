@@ -1,5 +1,5 @@
 // Words used across the app: the header and account menu, what shows when the app can't load,
-// shared labels (allow / ask / deny, templates, dates), and the Verify a receipt page.
+// shared labels (allow / ask / deny, templates, dates), and the receipt check in a project's Settings.
 // Edit freely. **Like this** makes text bold and `like this` shows as code.
 
 export const app = {
@@ -19,7 +19,7 @@ export const app = {
     fallbackName: "You",
     onThisComputer: "On this computer",
     demo: "Demo account",
-    demoWithExpiry: (left: string) => `Demo account · your copy is deleted in ${left}`,
+    demoWithExpiry: (left: string) => `Demo account (deleted in ${left})`,
     underAnHour: "under an hour",
     hours: (h: number) => `${h} hours`,
   },
@@ -46,6 +46,10 @@ export const app = {
     showAll: (n: number) => `Show all ${n}`,
     showFewer: "Show fewer",
     loading: "Loading…",
+    previous: "Previous",
+    next: "Next",
+    of: "of",
+    showing: (from: number, to: number, total: number) => `${from} to ${to} of ${total}`,
     nothingHere: "Nothing here.",
   },
 
@@ -55,7 +59,7 @@ export const app = {
     project: "Project",
     record: "Record",
     recordOption: (seq: number, type: string, ref?: string, title?: string) =>
-      `#${seq} · ${type}${ref ? ` · ${ref}` : ""}${title ? ` · ${title}` : ""}`,
+      `#${seq} ${type}${ref ? ` (${ref})` : ""}${title ? `: ${title}` : ""}`,
     paste: "Or paste a copy of a record (JSON)",
     pasteCaption: "For example from a receipt someone sent you. Leave it empty to recompute the stored record.",
     notJson: "The pasted copy is not valid JSON.",
@@ -69,7 +73,7 @@ export const app = {
     mismatchBody:
       "Something differs from what was recorded. The ledger is append-only, so a mismatch means the copy or the stored record was changed.",
     recordLine: (seq: number | undefined, type: string | undefined, version: number | null | undefined) =>
-      `#${seq} · ${type} · ${version ? `issued under mandate v${version}` : "not tied to a mandate decision"}`,
+      `#${seq} ${type}, ${version ? `issued under mandate v${version}` : "not tied to a mandate decision"}`,
     storedHash: "Stored hash",
     yourCopy: "Your copy",
   },

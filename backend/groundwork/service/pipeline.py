@@ -121,7 +121,7 @@ def spent_today(s: Session, tz_name: str) -> int:
 
 # --- planner selection -------------------------------------------------------------------------
 class Tools:
-    def __init__(self, site_key: str, live: bool, note: str):
+    def __init__(self, site_key: str, live: bool, note: str, api_key: str | None = None):
         cfg = get_settings()
         self.live, self.note = live, note
         self.simulated = SimulatedPlanner(
@@ -134,15 +134,22 @@ class Tools:
         if live:
             from groundwork.agent.claude import ClaudeClassifier, ClaudePlanner, ClaudeReporter, make_client
 
-            client = make_client(cfg.anthropic_api_key)
+            # A visitor's own key, for this run only, or the server's.
+            client = make_client(api_key or cfg.anthropic_api_key)
             self.planner = ClaudePlanner(client, cfg.groundwork_planner_model)
             self.reporter = ClaudeReporter(client, cfg.groundwork_report_model)
             self.classifier = ClaudeClassifier(client, cfg.groundwork_classifier_model)
 
 
-def choose_tools(s: Session, site_key: str, force_simulated: bool = False) -> Tools:
+def choose_tools(s: Session, site_key: str, force_simulated: bool = False, api_key: str | None = None) -> Tools:
+    """The planner for a run. `api_key` is a visitor's own key, sent with this one request from their
+    browser tab: it plans live, at their cost, outside the server's daily cap, and is never stored."""
     cfg = get_settings()
-    if force_simulated or not cfg.anthropic_api_key:
+    if force_simulated:
+        return Tools(site_key, False, "No ANTHROPIC_API_KEY: the simulated planner wrote this plan by hand.")
+    if api_key:
+        return Tools(site_key, True, "", api_key=api_key)
+    if not cfg.anthropic_api_key:
         return Tools(site_key, False, "No ANTHROPIC_API_KEY: the simulated planner wrote this plan by hand.")
     # Counted across every org (each hosted visitor has their own), so the cap bounds total spend.
     if not repo.claim_daily("live_runs", cfg.groundwork_daily_live_run_cap):
@@ -590,7 +597,7 @@ def _apply_message(org_id: uuid.UUID, run_id: uuid.UUID) -> tuple[str, str, bool
     return site_key, event_kind, scripted
 
 
-def execute_run(org_id: uuid.UUID, run_id: uuid.UUID, *, force_simulated: bool = False) -> None:
+def execute_run(org_id: uuid.UUID, run_id: uuid.UUID, *, force_simulated: bool = False, api_key: str | None = None) -> None:
     try:
         site_key, event_kind, scripted = _apply_message(org_id, run_id)
         # The demo path is scripted: it always plays the hand-written plan, model or no model.
@@ -600,7 +607,7 @@ def execute_run(org_id: uuid.UUID, run_id: uuid.UUID, *, force_simulated: bool =
             _finish(org_id, run_id)
             return
         with org_session(org_id) as s:
-            tools = choose_tools(s, site_key, force_simulated)
+            tools = choose_tools(s, site_key, force_simulated, api_key)
         plan_id = plan_phase(org_id, run_id, Arm.informed, tools)
         decide_phase(org_id, run_id, plan_id, tools)
         execute_phase(org_id, run_id, plan_id)
@@ -612,7 +619,7 @@ def execute_run(org_id: uuid.UUID, run_id: uuid.UUID, *, force_simulated: bool =
                 decide_phase(org_id, run_id, blind_id, tools)
             except Exception as exc:  # noqa: BLE001 - the blind arm is measurement only
                 with org_session(org_id) as s:
-                    step(s, run_id, "blind_failed", say.comparison_failed(f"{type(exc).__name__}: {exc}"))
+                    step(s, run_id, "blind_failed", say.comparison_failed(_scrub(f"{type(exc).__name__}: {exc}", api_key)))
         else:
             with org_session(org_id) as s:
                 step(s, run_id, "blind_skipped", say.comparison_skipped())
@@ -620,9 +627,14 @@ def execute_run(org_id: uuid.UUID, run_id: uuid.UUID, *, force_simulated: bool =
         with org_session(org_id) as s:
             run = s.get(m.Run, run_id)
             if run is not None:
-                message = f"{type(exc).__name__}: {exc}"
+                message = _scrub(f"{type(exc).__name__}: {exc}", api_key)
                 run.status, run.finished_at, run.error = "failed", datetime.now(UTC), message
-                step(s, run_id, "failed", message, trace=traceback.format_exc()[-2000:])
+                step(s, run_id, "failed", message, trace=_scrub(traceback.format_exc()[-2000:], api_key))
+
+
+def _scrub(text: str, api_key: str | None) -> str:
+    """A visitor's key never lands in a run's record, even inside an error message."""
+    return text.replace(api_key, "[your API key]") if api_key else text
 
 
 def _milestone(state: SiteState) -> dict[str, Any]:

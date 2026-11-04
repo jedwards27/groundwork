@@ -12,7 +12,7 @@ export const newProject = {
   },
 
   project: {
-    title: "The project",
+    title: "Project",
     name: "Name",
     namePlaceholder: "Kitchen remodel",
     where: "Where (optional)",
@@ -24,8 +24,8 @@ export const newProject = {
   },
 
   parties: {
-    title: "Who you're waiting on",
-    hint: "Each organization that owes you something. A contact's email lets the plugin file their mail to this project.",
+    title: "Organizations",
+    hint: "Each organization that owes you something. A contact's email routes their mail here.",
     organization: "Organization",
     role: "Role",
     contact: "Contact (optional)",
@@ -49,8 +49,8 @@ export const newProject = {
   },
 
   steps: {
-    title: "What has to happen",
-    hint: "Each step, who owes it, when it's due, and which steps must finish first. Groundwork works out what sets the finish date.",
+    title: "Steps",
+    hint: "Each step, who owes it, when it's due and what it waits on. Groundwork works out what sets the date.",
     step: "Step",
     stepPlaceholder: "Building permit issued",
     owner: "Who owes it",
@@ -65,7 +65,7 @@ export const newProject = {
     statuses: { not_started: "Not started", in_progress: "Under way", done: "Done", cancelled: "Cancelled" },
     paste: {
       title: "Paste steps from a spreadsheet",
-      hint: "Copy rows from a spreadsheet or type one step per line. Columns, in order: step, who owes it, status, due date, and the steps it waits on (separated by ;). A header row is skipped. New names in the owner column become parties you can set a role for.",
+      hint: "One step per row. Columns: step, who owes it, status, due date, and the steps it waits on (separated by ;). A header row is skipped; new owners become organizations.",
       placeholder: "Building permit issued\tCity permits\tunder way\t2026-12-01\nCabinets installed\tBayside Builders\tnot started\t2027-01-20\tBuilding permit issued",
       add: "Add these steps",
       added: (n: number, skipped: number) => `Added ${n} ${n === 1 ? "step" : "steps"}${skipped ? `; skipped ${skipped} ${skipped === 1 ? "row" : "rows"} missing a step name or a readable date` : ""}.`,
@@ -73,7 +73,7 @@ export const newProject = {
   },
 
   more: {
-    title: "More options",
+    title: "Options",
     template: "Mandate template",
     templateCaption: "Supervised asks you before anything goes out. You can widen it later.",
     asOf: "The project's date",
@@ -90,7 +90,7 @@ export const newProject = {
   },
 
   preview: {
-    forecast: (finish: string) => `Forecast · ${finish}`,
+    forecast: (finish: string) => `Forecast: ${finish}`,
     waitingOn: (what: string) => `Waiting on: ${what}`,
   },
 
