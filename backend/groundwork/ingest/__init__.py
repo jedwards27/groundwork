@@ -5,6 +5,6 @@ arrive in slice 4 and produce the same envelope.
 """
 
 from groundwork.ingest.envelope import Envelope
-from groundwork.ingest.site_loader import LoadError, SiteBundle, load_site
+from groundwork.ingest.site_loader import LoadError, SiteBundle, fixture_fingerprint, load_site
 
-__all__ = ["Envelope", "LoadError", "SiteBundle", "load_site"]
+__all__ = ["Envelope", "LoadError", "SiteBundle", "fixture_fingerprint", "load_site"]

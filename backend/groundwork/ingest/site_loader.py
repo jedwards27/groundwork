@@ -18,6 +18,7 @@ from __future__ import annotations
 import csv
 import email
 import email.policy
+import hashlib
 import re
 from dataclasses import dataclass, field
 from datetime import date, datetime
@@ -294,6 +295,24 @@ def _read_message(path: Path) -> str:
     msg = email.message_from_bytes(path.read_bytes(), policy=email.policy.default)
     body = msg.get_body(preferencelist=("plain",))
     return body.get_content().strip() if body is not None else ""  # type: ignore[union-attr]
+
+
+def fixture_fingerprint(root: Path | str) -> str:
+    """A hash of everything in a site folder: each file's path and contents, in path order.
+
+    It covers files the loader doesn't read, such as the scripted plans, because those are part of
+    what a demo plays. Hidden files (``.DS_Store``) don't count. The plugin stores it with the demo
+    it seeds and reloads the demo when an update brings a folder that hashes differently.
+    """
+    root = Path(root)
+    h = hashlib.sha256()
+    files = sorted(
+        p for p in root.rglob("*") if p.is_file() and not any(part.startswith(".") for part in p.relative_to(root).parts)
+    )
+    for path in files:
+        h.update(path.relative_to(root).as_posix().encode() + b"\0")
+        h.update(hashlib.sha256(path.read_bytes()).digest())
+    return h.hexdigest()
 
 
 def load_site(root: Path | str) -> SiteBundle:

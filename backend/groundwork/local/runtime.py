@@ -1,5 +1,5 @@
 """Start Groundwork on this computer: an embedded Postgres under ``~/.groundwork/pgdata``, the two
-database roles, migrations, and the Lake Mariner demo project.
+database roles, migrations, and the Lake Mariner demo project (reloaded when an update changes it).
 
 The embedded database is ``pgserver`` (a real Postgres 16 in a Python wheel), so row-level
 security, the ledger's append-only trigger and the advisory lock behave exactly as in the hosted
@@ -18,7 +18,7 @@ from typing import Any, Literal
 from urllib.parse import parse_qs, urlparse
 
 import structlog
-from sqlalchemy import select
+from sqlalchemy import select, text, update
 
 from groundwork.config import REPO_ROOT, get_settings
 from groundwork.local.home import home, local_secrets
@@ -75,18 +75,42 @@ def migrate() -> None:
     command.upgrade(cfg, "head")
 
 
-def seed_demo() -> bool:
-    """Load Lake Mariner the first time. Returns True if it was loaded now."""
+def seed_demo() -> Literal["loaded", "refreshed", "current"]:
+    """Load Lake Mariner on first launch, and load it again when an update changes it.
+
+    The demo belongs to the plugin, not the person. An update that changes its fixture folder also
+    changes what the scripted plans and the demo skill expect, so the old mandate and the old run
+    would no longer match them. The demo's org is replaced; as with every reseed, a reset starts a
+    new ledger chain (repo.delete_org_data). The person's own projects are separate orgs and are
+    never touched. A restart with the same folder keeps whatever the person did in the demo.
+
+    The fingerprint is written in the same transaction as the seed, under an advisory lock, so two
+    Claude sessions starting at once load the demo only once.
+    """
     from groundwork.db import models as m
     from groundwork.db import repo
     from groundwork.db.session import owner_session
-    from groundwork.ingest import load_site
+    from groundwork.ingest import fixture_fingerprint, load_site
 
+    folder = get_settings().groundwork_fixtures_dir / DEMO_SITE
+    fingerprint = fixture_fingerprint(folder)
+    bundle = load_site(folder)
     with owner_session() as s:
-        if s.execute(select(m.Site).where(m.Site.key == DEMO_SITE)).first() is not None:
-            return False
-        repo.seed_bundle(s, load_site(get_settings().groundwork_fixtures_dir / DEMO_SITE))
-    return True
+        s.execute(text("select pg_advisory_xact_lock(hashtextextended('groundwork:seed_demo', 0))"))
+        demo = s.execute(
+            select(m.Site)
+            .join(m.Org, m.Org.id == m.Site.org_id)
+            .where(m.Org.name == bundle.org_name, m.Site.key == bundle.site_key)
+        ).scalar_one_or_none()
+        if demo is not None and demo.fixture_fingerprint == fingerprint:
+            return "current"
+        org_id = repo.seed_bundle(s, bundle)
+        s.execute(
+            update(m.Site)
+            .where(m.Site.org_id == org_id, m.Site.key == bundle.site_key)
+            .values(fixture_fingerprint=fingerprint)
+        )
+    return "loaded" if demo is None else "refreshed"
 
 
 def boot(database: Literal["embedded", "existing"] = "embedded") -> dict[str, Any]:
@@ -95,6 +119,6 @@ def boot(database: Literal["embedded", "existing"] = "embedded") -> dict[str, An
     quiet_stdout_logging()
     configure(database)
     migrate()
-    seeded = seed_demo()
+    demo = seed_demo()
     swept = sweep_interrupted()
-    return {"home": str(home()), "database": database, "demo_seeded": seeded, "runs_swept": swept}
+    return {"home": str(home()), "database": database, "demo": demo, "runs_swept": swept}

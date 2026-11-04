@@ -536,3 +536,83 @@ def test_a_project_made_in_the_app_on_this_computer_is_yours(page):
     assert "bathroom-refresh" in tools._index()
     assert client.get("/api/sites/bathroom-refresh/me").json()["name"] == "Jude Test"
     assert tools.status("bathroom-refresh")["mandate"]["template"] == "Supervised"
+
+
+def _site(key: str) -> tuple[object, str | None, int]:
+    """A project's site id, its demo fingerprint and how many records its ledger holds."""
+    with owner_session() as s:
+        site = s.execute(select(m.Site).where(m.Site.key == key)).scalar_one()
+        records = len(s.execute(select(m.LedgerEntry.seq).where(m.LedgerEntry.org_id == site.org_id)).all())
+    return site.id, site.fixture_fingerprint, records
+
+
+def test_the_demo_fingerprint_covers_every_file_and_ignores_hidden_ones(tmp_path):
+    import shutil
+
+    from groundwork.ingest import fixture_fingerprint
+
+    folder = tmp_path / "lake-mariner"
+    shutil.copytree(FIXTURE, folder)
+    before = fixture_fingerprint(folder)
+    assert before == fixture_fingerprint(FIXTURE)  # the same files in another place
+    (folder / ".DS_Store").write_bytes(b"\0")
+    assert fixture_fingerprint(folder) == before
+    # The scripted plans aren't loaded into the database, but they are part of what the demo plays.
+    plans = folder / "simulated_plans.yaml"
+    plans.write_text(plans.read_text() + "\n")
+    assert fixture_fingerprint(folder) != before
+
+
+def test_an_update_that_changes_the_demo_starts_it_fresh_and_leaves_your_projects_alone(local, tmp_path, monkeypatch):
+    """The plugin used to seed the demo only on first launch, so an update kept the old build's
+    mandate and run, and the demo message said it had already been played. A launch now reloads the
+    demo when its folder changed and keeps it when it didn't."""
+    import dataclasses
+    import shutil
+    from concurrent.futures import ThreadPoolExecutor
+
+    from groundwork.local.runtime import seed_demo
+
+    fixtures = tmp_path / "fixtures"
+    shutil.copytree(FIXTURE, fixtures / "lake-mariner")
+    monkeypatch.setenv("GROUNDWORK_FIXTURES_DIR", str(fixtures))
+    get_settings.cache_clear()
+    own = dataclasses.replace(
+        load_site(FIXTURE), org_name="Groundwork project: My own build", site_key="my-own-build", site_name="My own build"
+    )
+    with owner_session() as s:
+        repo.seed_bundle(s, own)
+    own_before = _site("my-own-build")
+
+    # An install from before the fingerprint may hold an older build's demo, so it's reloaded once.
+    old_id, fingerprint, _ = _site("lake-mariner")
+    assert fingerprint is None
+    assert seed_demo() == "refreshed"
+    new_id, fingerprint, _ = _site("lake-mariner")
+    assert fingerprint is not None and new_id != old_id
+
+    # A restart with the same demo keeps what the person did in it.
+    tools.play_message("lake-mariner", "demo-monday")
+    played = _site("lake-mariner")
+    assert seed_demo() == "current"
+    assert _site("lake-mariner") == played
+
+    # An update that changes the demo starts it fresh, and two sessions launching at once load it once.
+    plans = fixtures / "lake-mariner" / "simulated_plans.yaml"
+    plans.write_text(plans.read_text() + "\n# changed in an update\n")
+    with ThreadPoolExecutor(2) as pool:
+        outcomes = sorted(pool.map(lambda _: seed_demo(), range(2)))
+    assert outcomes == ["current", "refreshed"]
+    assert _site("lake-mariner")[2] == 1  # only the mandate: a reset starts a new chain
+    assert tools.play_message("lake-mariner", "demo-monday")["status"] == "done"
+
+    # The person's own project was never touched.
+    assert _site("my-own-build") == own_before
+
+    # On a first launch there's nothing to compare, so the demo is loaded.
+    with owner_session() as s:
+        for org in s.execute(select(m.Org)).scalars().all():
+            repo.delete_org_data(s, org.id)
+            s.delete(org)
+    assert seed_demo() == "loaded"
+    assert _site("lake-mariner")[1] is not None

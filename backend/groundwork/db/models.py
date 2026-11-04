@@ -93,6 +93,9 @@ class Site(Base):
     holidays: Mapped[list[str]] = mapped_column(JSONB, nullable=False)
     calendar_note: Mapped[str] = mapped_column(Text, nullable=False)
     facts: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, nullable=False)
+    # Set only on the plugin's demo: the fingerprint of the fixture folder it was seeded from, so
+    # an update that changes the demo reloads it (local/runtime.seed_demo).
+    fixture_fingerprint: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = _created()
 
 
