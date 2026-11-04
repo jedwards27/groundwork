@@ -1,3 +1,3 @@
 # Architecture decision records
 
-One short file per decision: context, options considered, decision, consequences. Name them `NNNN-short-title.md`. These become the content of the technical-design discussion; write one whenever a `[DECIDE]` in `docs/ARCHITECTURE.md` is settled.
+One short file per decision: context, options considered, decision, consequences. Name them `NNNN-short-title.md`. Write one whenever a choice has a real tradeoff.

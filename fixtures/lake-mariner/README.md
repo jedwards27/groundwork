@@ -4,7 +4,7 @@ A site folder in the layout `groundwork inspect` and `groundwork seed` read. Use
 
 **Posture.** The agent works for Anthropic as the end user. TeraWulf (Lake Mariner Data LLC) is landlord, developer and interconnection customer; Fluidstack is the lessee; Anthropic is not a party to the lease. Routing is data: each party's `reached_via` says who you go through to reach it, and the gateway derives every action's path from that.
 
-**Provenance.** Every row says `public` (with a URL), `synthetic` (written for the demo) or `assumption_to_verify`. The `source` column on schedule rows points at the synthetic status report the schedule was transcribed from, or at a public URL. Questions that would confirm the assumptions are in `docs/PRACTITIONER-QUESTIONS.md`.
+**Provenance.** Every row says `public` (with a URL), `synthetic` (written for the demo) or `assumption_to_verify`. The `source` column on schedule rows points at the synthetic status report the schedule was transcribed from, or at a public URL.
 
 | File | What it is | Provenance |
 |---|---|---|

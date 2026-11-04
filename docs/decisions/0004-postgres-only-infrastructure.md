@@ -1,6 +1,6 @@
 # 0004. Postgres only; runs are rows; no queue library in v1
 
-**Status:** accepted. Settles the queue part of ARCHITECTURE §3.
+**Status:** accepted.
 
 **Context.** The original sketch had Postgres plus Redis for a job queue. v1 has one kind of background work (playing an event: plan, decide, record, execute in dry run, recompute) and one process.
 

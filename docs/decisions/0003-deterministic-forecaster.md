@@ -1,6 +1,6 @@
 # 0003. The forecast is deterministic code; recovered days are computed, not estimated
 
-**Status:** accepted. Settles ARCHITECTURE §2.3.
+**Status:** accepted.
 
 **Context.** The countdown, the gating item and the "days recovered" bars are the numbers a project manager will check first. If a model writes them, they change between runs and can be moved by text in a document.
 

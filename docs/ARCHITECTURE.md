@@ -1,8 +1,6 @@
 # Groundwork architecture
 
-The system as built on Nov 4, 2026. The ADRs in `docs/decisions/` say why each choice was made, and `docs/TECH-DESIGN-DISCUSSION.md` answers the likely questions, including the path to an MVP.
-
-The first version of this file was a starting point with open decisions. ADRs 0001 to 0007 cite its numbered sections, and it stays in git history.
+The system as built on Nov 4, 2026. The ADRs in `docs/decisions/` say why each choice was made.
 
 ## The shape
 

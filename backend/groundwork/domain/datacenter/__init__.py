@@ -1,8 +1,7 @@
 """Data-center build profile.
 
 Every rule below that is marked ``assumption=True`` is an assumption about how utilities,
-inspectors or commissioning teams behave. Each maps to a question in
-docs/PRACTITIONER-QUESTIONS.md and must be checked with a practitioner.
+inspectors or commissioning teams behave, and must be checked with a practitioner.
 """
 
 from groundwork.core.profile import DomainProfile, OrderRule

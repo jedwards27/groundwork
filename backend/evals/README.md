@@ -52,4 +52,4 @@ of three): below about 1% per arm per model, and about 0.15% across all six arms
 
 `datasets/scope.yaml` lists, per event, the action signatures a good coordinator in the end user's
 seat would lead with. They come from the plan reviews' domain lane and are **pending practitioner
-review** (see docs/PRACTITIONER-QUESTIONS.md); plan quality is only as good as that set.
+review**; plan quality is only as good as that set.

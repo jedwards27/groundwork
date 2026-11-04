@@ -195,21 +195,18 @@ It validates the folder, lists every problem at once if there are any, and other
 
 ## Docs
 
-- `docs/TECH-DESIGN-DISCUSSION.md`: the questions an engineering manager is likely to ask, with current answers, including the path to an MVP.
 - `docs/ARCHITECTURE.md`: the system as it is built today.
 - `docs/decisions/`: ADRs 0001 to 0011.
 - `backend/evals/README.md`: what each eval measures and how it is graded.
 - `docs/HOSTING.md`: deploying, checking and running the hosted demo.
 - `docs/LEDGER.md`: the ledger's hash format, a test vector, and what verification does and does not catch.
-- `docs/PRACTITIONER-QUESTIONS.md`: the 21 questions that confirm or correct the fixture's and the forecast's assumptions.
 - `docs/DATA-BOUNDARY.md`: exactly what leaves your machine.
-- `docs/reviews/`: three rounds of plan review that shaped this design.
 
 ## Known limits
 
 - The evals cover one synthetic project and six messages, and their numbers predate three later gateway changes.
-- Nothing is ever sent. Real sending needs an outbox that records each send exactly once (`docs/TECH-DESIGN-DISCUSSION.md`).
+- Nothing is ever sent. Real sending needs an outbox that records each send exactly once.
 - The plugin has one person per install, and its local database trusts every program on the laptop.
 - The hosted demo is one machine, so a deploy stops a running message, which is then marked interrupted.
 - The Docker setup hasn't been run.
-- A practitioner hasn't yet confirmed the gating item, the forecast's assumptions or the reviewed plans (`docs/PRACTITIONER-QUESTIONS.md`).
+- A practitioner hasn't yet confirmed the gating item, the forecast's assumptions or the reviewed plans. The fixture marks each assumption `assumption_to_verify`.

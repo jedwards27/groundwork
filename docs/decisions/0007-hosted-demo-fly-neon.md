@@ -1,6 +1,6 @@
 # 0007. Hosted demo: two Fly.io machines and a free Neon Postgres; no database role needs BYPASSRLS
 
-**Status:** accepted. Settles the hosting `[DECIDE]` in ARCHITECTURE §3.
+**Status:** accepted.
 
 **Update (Nov 3, 2026):** ADR 0009 folds the two Fly machines into one. The API now serves the web app from the same origin, so there is no web machine, no private-network hop and no admin token on a second box. The rest of this record (Neon, sandboxes, caps, the preflight, the rehearsal) stands.
 

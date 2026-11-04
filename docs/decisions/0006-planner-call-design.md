@@ -1,10 +1,10 @@
 # 0006. One structured-output call per arm; two arms; two reports
 
-**Status:** accepted. Settles ARCHITECTURE §2.4 (own loop vs Agent SDK vs Managed Agents) for v1.
+**Status:** accepted. Settles how the planner calls the model for v1: its own loop, a ready-made agent loop, or Managed Agents.
 
 **Context.** The planner must return a plan the gateway can type-check, the prompt must be cacheable, and the system must measure the capability it predicts (staying in scope, reporting truthfully) rather than only enforce it.
 
-**Options.** (a) A tool-use loop with read-only tools (own loop, or the SDK tool runner). (b) A forced tool call to get JSON (a 400 on Opus 5.5). (c) One call with structured outputs, the site state inlined. (d) Managed Agents.
+**Options.** (a) A tool-use loop with read-only tools (our own loop, or a ready-made tool runner). (b) A forced tool call to get JSON (a 400 on Opus 5.5). (c) One call with structured outputs, the site state inlined. (d) Managed Agents.
 
 **Decision.** (c), with two arms and two reports.
 - **The call.** `client.beta.messages.parse(output_format=WirePlan, output_config={"effort": "high"})` on `claude-opus-5-5`, with the server-side refusal fallback (`fallbacks="default"`, beta `server-side-fallback-2026-07-01`). The plan is schema-valid by construction. The model writes a wire form (`agent/wire.py`) in which every field is required and none is nullable (`""`, `[]` or `-1` mean "does not apply"), and `to_plan` maps it to the domain `Plan` the gateway validates. Structured outputs cap one request at 24 optional and 16 union-typed fields; the domain `Plan`'s flat, nullable parameter bag has 28 and 19, and the API rejected it as "Schema is too complex" after a 180-second compile. A test pins the wire schema at zero optional and zero union fields. A refusal or an unparseable result falls back to the simulated planner and writes a `planner_fallback` ledger entry. Order: system (role, executors, rules, never-list, goals, glossary) → site state → ledger tail → arm block → event, with cache breakpoints after the system prompt, the site state and the ledger tail; the site state is about 6,400 tokens, well above the 512-token minimum, and identical across arms, so the blind arm reads the informed arm's cache. Email addresses are redacted from everything the model sees.

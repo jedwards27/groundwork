@@ -1,6 +1,6 @@
 # 0001. Python API and worker, Next.js web, one OpenAPI contract
 
-**Status:** accepted (Nov 1, 2026; decided by Jude). Settles ARCHITECTURE §4 and §2.7. The Next.js half is superseded by ADR 0009 (one Vite app, served by the API).
+**Status:** accepted (Nov 1, 2026; decided by Jude). The Next.js half is superseded by ADR 0009 (one Vite app, served by the API).
 
 **Context.** Two languages were on the table: TypeScript end to end, or a Python backend with a Next.js front end. The backend's hardest code is scheduling math, extraction and evals, all of which Python does well; the front end is a port of the prototype's control room, which React does well. The risk of two languages is the shared contract (mandate, action, plan, ledger entry) drifting between them.
 
