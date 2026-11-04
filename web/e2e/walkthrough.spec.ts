@@ -379,6 +379,20 @@ test("closing the tutorial pauses it; opening it again picks up where you left o
   await step(page, 1);
 });
 
+test("with your own API key in the tab, the inbox shows the hard cases for Claude to plan", async ({ page }) => {
+  await open(page, `/projects/${SITE}/inbox`);
+  for (const k of EXTRAS) await expect(ui(page, `play-${k}`)).toHaveCount(0);
+  await menu(page, /Use your own API key/);
+  // A made-up key: nothing is played, so it never leaves this page.
+  await ui(page, "live-key").fill("sk-ant-test-not-a-real-key-000000000000");
+  await ui(page, "live-use").click();
+  await expect(ui(page, "live-tag")).toBeVisible();
+  for (const k of EXTRAS) await expect(ui(page, `play-${k}`)).toBeVisible();
+  await menu(page, /Forget the API key/);
+  await expect(ui(page, "live-tag")).toBeHidden();
+  for (const k of EXTRAS) await expect(ui(page, `play-${k}`)).toHaveCount(0);
+});
+
 test("a new project from the website: check its forecast, then create it", async ({ page }) => {
   await open(page, "/projects/new");
   if ((await health(page)).hosted) {

@@ -37,7 +37,7 @@ export const app = {
     forgetKey: "Forget the API key",
     keyTitle: "Watch Claude plan, live",
     keyBody:
-      "The demo plays a written plan, so no AI model runs. Add your own Anthropic API key and Claude plans each email you play from now on, billed to your key. Claude also writes a second plan without the mandate, to measure what the mandate changes. That plan never runs. The tour's email keeps its written plan.",
+      "The demo plays a written plan, so no AI model runs. Add your own Anthropic API key and Claude plans the emails you play, billed to your key. The inbox then shows five more, including two with hidden instructions for AI. Claude also writes a second plan without the mandate, to measure what the mandate changes. That plan never runs. The tour's email keeps its written plan.",
     keyPrivacy: "The key stays in this tab's memory and goes with each Play. It's never saved; reloading the tab forgets it.",
     keyPlaceholder: "sk-ant-…",
     keyUse: "Use for this tab",

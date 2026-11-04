@@ -11,7 +11,7 @@ import { HeadingLarge, LabelSmall, ParagraphSmall } from "baseui/typography";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { get, send, stream } from "@/lib/client";
-import { getKey } from "@/lib/key";
+import { getKey, useKey } from "@/lib/key";
 import { DEMO_PROJECT, fmt, fmtLong, lateness } from "@/lib/format";
 import type { ChainView, CompareRow, EventView, MandateView, Me, PlanView, RunView, Session, SiteView, Step } from "@/lib/types";
 import { ActionsTab } from "./ActionsTab";
@@ -47,6 +47,7 @@ export function Project({ session }: { session: Session }) {
   const [why, setWhy] = useState(false);
   const [busy, setBusy] = useState(false);
   const tutorial = useTutorial();
+  const keyInTab = useKey();
   const source = useRef<EventSource | null>(null);
   useEffect(() => () => source.current?.close(), []);
   useEffect(() => {
@@ -121,8 +122,10 @@ export function Project({ session }: { session: Session }) {
   const party = (k: string) => s.parties.find((p) => p.key === k)?.name ?? k;
   const p = plan.data ?? null;
   const asks = p ? p.actions.filter((a) => a.state === "pending").length : 0;
-  // The demo's inbox keeps to the messages worth playing; the extras show once played.
-  const inbox = (events.data ?? []).filter((e) => key !== DEMO_PROJECT || !DEMO_EXTRAS.has(e.key) || e.status === "applied");
+  // The demo's inbox keeps to the messages worth playing. The extras show once played, or whenever this
+  // tab has an API key, so Claude has the hard cases to plan. Never during the tour, which plays one of them.
+  const showExtras = Boolean(keyInTab) && !tutorial.open;
+  const inbox = (events.data ?? []).filter((e) => key !== DEMO_PROJECT || showExtras || !DEMO_EXTRAS.has(e.key) || e.status === "applied");
   const fresh = inbox.filter((e) => e.status !== "applied").length;
   const claudePlans = session.local && key !== DEMO_PROJECT;
   const mine = session.local && !session.health.hosted;
