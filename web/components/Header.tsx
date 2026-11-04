@@ -11,6 +11,7 @@ import { LabelLarge, LabelMedium, LabelSmall, ParagraphXSmall } from "baseui/typ
 import { Link, useMatch, useNavigate } from "react-router";
 import { get } from "@/lib/client";
 import { setKey, useKey } from "@/lib/key";
+import { DEMO_PROJECT } from "@/lib/format";
 import type { Session, SiteView } from "@/lib/types";
 import { app } from "@/copy/app";
 import { tutorial as t } from "@/copy/tutorial";
@@ -109,6 +110,9 @@ export function Header({ session }: { session: Session }) {
         ) : session.local ? (
           <Chip kind="gray" tip={app.yours.tagTip} testId="yours-tag">{app.yours.tag}</Chip>
         ) : null}
+        {session.local && key === DEMO_PROJECT && you?.demo_as && (
+          <Chip kind="gray" tip={app.yours.actsAsTip(you.demo_as)} testId="acts-as-tag">{app.yours.actsAs(you.demo_as)}</Chip>
+        )}
         {key && site.data && (
           <LabelMedium color={theme.colors.contentTertiary} className={css({ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "none", "@media (min-width: 640px)": { display: "block" } })}>
             / {site.data.name}

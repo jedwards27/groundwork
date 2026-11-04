@@ -631,3 +631,13 @@ def test_starting_the_demo_over_in_the_app_is_not_undone_by_the_next_launch(loca
     played = _site("lake-mariner")
     assert seed_demo() == "current"
     assert _site("lake-mariner") == played
+
+
+def test_the_header_names_the_person_from_setup_before_they_have_a_project(page):
+    client, _ = page
+    # Before setup, the only person on this computer is the demo's lead.
+    assert client.get("/api/session").json()["you"]["name"] == "Jordan Brooks"
+    tools.setup("Jude Test", "jude@example.test")
+    you = client.get("/api/session").json()["you"]
+    assert you["name"] == "Jude Test" and you["email"] == "jude@example.test" and you["person"] == "me"
+    assert you["demo_lead"] is False and you["demo_as"] == "Jordan Brooks"

@@ -15,6 +15,8 @@ export const app = {
   yours: {
     tag: "On this computer",
     tagTip: "Your projects and their ledgers live on this computer. Lake Mariner is the demo.",
+    actsAs: (name: string) => `As ${name}`,
+    actsAsTip: (name: string) => `In the demo you act as ${name}, its project manager, so approvals here are recorded under that name. Your own projects use yours.`,
   },
 
   shell: {

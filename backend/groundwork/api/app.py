@@ -622,7 +622,25 @@ def get_session(request: Request) -> dict[str, Any]:
                     # In the demo you act as its fictional lead; the app says so.
                     "demo_lead": person.key != "me",
                     "sandbox_expires_at": org.expires_at.isoformat() if org.expires_at else None,
+                    "demo_as": None,
                 }
+            if v.local:
+                # On a person's computer the header always names the person from setup, even
+                # before they have a project of their own. In the demo they act as its lead.
+                from groundwork.local.home import me as local_me
+
+                who = local_me()
+                demo = next((p for i, p in people if p is not None and p.key != "me"), None)
+                if who is not None:
+                    you = {
+                        "name": who.name,
+                        "email": who.email,
+                        "person": "me",
+                        "approver": True,
+                        "demo_lead": False,
+                        "sandbox_expires_at": None,
+                        "demo_as": demo.name if demo is not None else None,
+                    }
     return {
         "signed_in": v is not None,
         "local": bool(v and v.local),
