@@ -19,14 +19,14 @@ primary_region = "iad"  # Ashburn, next to Neon's aws-us-east-1
   EXECUTORS_DRY_RUN = "true"
   GROUNDWORK_DEMO_LOGIN = "true"        # the visitor is the demo's fictional lead; synthetic data only
   GROUNDWORK_DB_NULLPOOL = "true"       # let Neon's free compute scale to zero between visits
-  GROUNDWORK_DAILY_RUN_CAP = "300"      # every run, per day
+  GROUNDWORK_DAILY_RUN_CAP = "600"      # every run, per day
   GROUNDWORK_DAILY_LIVE_RUN_CAP = "30"  # runs that call Claude, per day; then the simulated planner
   GROUNDWORK_NIGHTLY_RESET_UTC_HOUR = "8"  # 3 or 4 a.m. Eastern
   GROUNDWORK_SANDBOXES = "true"         # every visitor gets a private copy of the demo
   GROUNDWORK_SANDBOX_TTL_HOURS = "12"   # then it is deleted, ledger and all
-  GROUNDWORK_SANDBOX_DAILY_CAP = "200"  # new sandboxes per day, across all visitors
-  GROUNDWORK_SANDBOXES_PER_IP = "20"    # per visitor address per day, so one script can't use them all
-  GROUNDWORK_RUNS_PER_IP = "100"
+  GROUNDWORK_SANDBOX_DAILY_CAP = "500"  # new sandboxes per day, across all visitors
+  GROUNDWORK_SANDBOXES_PER_IP = "60"    # per visitor address per day: room for a team behind one office address,
+  GROUNDWORK_RUNS_PER_IP = "200"        # while one script still can't use up the day for everyone
 
 [processes]
   # 0.0.0.0, not "::": Python opens an IPv6 socket as IPv6-only, and Fly's proxy connects over IPv4.

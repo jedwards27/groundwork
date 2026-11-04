@@ -58,8 +58,8 @@ browser ──HTTPS──▶ Groundwork (one Fly machine: the web app, and its A
 
 - **Sandboxes.** A visitor's first visit signs them in and creates their sandbox. Starting the tour replaces it with a fresh copy. It is deleted 12 hours after it was created; a visitor who returns after their one-hour session gets a new one.
 - **Nightly sweep.** At 08:00 UTC (3 or 4 a.m. Eastern) the API deletes expired sandboxes and reloads the shared fixture that sandboxes are copied from. A deploy also reloads it.
-- **Caps, across all visitors.** Up to 200 new sandboxes, 300 runs and 30 runs that call Claude a day. After the Claude cap, the simulated planner takes over with its banner. They are set in `fly.toml`; redeploy after changing them.
-- **Caps per visitor.** Each address can start 20 sandboxes and play 100 emails a day, so one script can't use up the day for everyone. The count is kept under a keyed hash of the address, never the address, and deleted after two days.
+- **Caps, across all visitors.** Up to 500 new sandboxes, 600 runs and 30 runs that call Claude a day. After the Claude cap, the simulated planner takes over with its banner. They are set in `fly.toml`; redeploy after changing them.
+- **Caps per visitor.** Each address can start 60 sandboxes and play 200 emails a day: room for a team sharing one office address, while one script still can't use up the day for everyone. The count is kept under a keyed hash of the address, never the address, and deleted after two days.
 - **If the demo is locked out on the day.** Clear today's counts in the Neon SQL editor:
 
   ```sql

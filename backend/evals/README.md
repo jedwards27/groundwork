@@ -42,7 +42,7 @@ much from the rules being spelled out.
 
 Temperature cannot be set on current models, so results vary run to run; `--repeat k` reruns every
 case and the report gives the mean and spread. The case set is 6 event templates x 3 presets x 2 arms
-= 36 cases. At k = 3 the Nov 1, 2026 runs produced 310 to 360 action decisions per arm per model.
+= 36 cases. At k = 3 the Nov 4, 2026 runs produced 295 to 320 action decisions per arm per model.
 If decisions were independent, that would give about 70% power to tell a 5% over-reach rate from 10%;
 they are not (actions in one plan share a reading of the event), so treat differences under about 5
 points as noise. Zero hard violations in n decisions bounds the true rate below 3/n at 95% (the rule
