@@ -19,7 +19,7 @@ from groundwork.db import repo
 from groundwork.db.session import owner_session, require_org
 from groundwork.service import narration as say
 
-STALE_AFTER = timedelta(minutes=10)
+STALE_AFTER = timedelta(minutes=2)
 
 
 class RunConflict(ValueError):
@@ -35,7 +35,14 @@ def start_run(s: Session, site_key: str, event_key: str, person_id: uuid.UUID | 
     state = repo.load_state(s, site_key)
     if event_key not in state.event_status:
         raise KeyError(event_key)
-    if state.event_status[event_key] == "applied":
+    event_id = state.ids[f"event:{event_key}"]
+    # Lock the message's row until this request commits, so a second Play of it waits here and then
+    # sees the first one's run. Only a run that failed leaves the message free to play again.
+    s.execute(select(m.Event.id).where(m.Event.id == event_id).with_for_update())
+    taken = s.execute(
+        select(m.Run.id).where(m.Run.event_id == event_id, m.Run.status != "failed").limit(1)
+    ).first()
+    if state.event_status[event_key] == "applied" or taken is not None:
         raise RunConflict(f"event {event_key!r} has already been played; reset the site to play it again")
     # Counted across every org (each hosted visitor has their own), so the cap bounds the database.
     cap = get_settings().groundwork_daily_run_cap
@@ -46,7 +53,7 @@ def start_run(s: Session, site_key: str, event_key: str, person_id: uuid.UUID | 
     run = m.Run(
         org_id=org_id,
         site_id=state.site_id,
-        event_id=state.ids[f"event:{event_key}"],
+        event_id=event_id,
         status="queued",
         created_by_person_id=person_id,
         summary={"steps": [_step(1, "queued", say.received(state.event(event_key).title))]},
@@ -78,18 +85,25 @@ def execute_run(org_id: uuid.UUID, run_id: uuid.UUID, api_key: str | None = None
     run_pipeline(org_id, run_id, api_key=api_key)
 
 
-def sweep_interrupted(now: datetime | None = None) -> int:
-    """Startup sweep (owner role, across orgs): runs left queued or running by a dead process."""
-    cutoff = (now or datetime.now(UTC)) - STALE_AFTER
+def sweep_interrupted(now: datetime | None = None, *, older_than: timedelta | None = None) -> int:
+    """Startup sweep (owner role, across orgs): fail the runs a dead process left queued or running.
+
+    The hosted demo is one process, and the only one that runs anything, so at its start every
+    such run is a leftover and all of them are swept. On a laptop each Claude session starts its own
+    Groundwork process, and another one may be mid-run, so runs younger than STALE_AFTER are spared
+    until the next start. A run waiting for Claude's report is not stuck, so it is left alone."""
+    if older_than is None:
+        older_than = timedelta(0) if get_settings().groundwork_hosted else STALE_AFTER
+    cutoff = (now or datetime.now(UTC)) - older_than
     with owner_session() as s:
         stale = list(
             s.execute(
-                select(m.Run).where(m.Run.status.in_(("queued", "running")), m.Run.created_at < cutoff)
+                select(m.Run).where(m.Run.status.in_(("queued", "running")), m.Run.created_at <= cutoff)
             ).scalars()
         )
         for run in stale:
             run.status, run.finished_at = "failed", datetime.now(UTC)
-            run.error = "interrupted: the process restarted mid-run; replay or re-run"
+            run.error = "Interrupted: Groundwork restarted during this run, so it stopped here."
             summary = dict(run.summary or {})
             steps = list(summary.get("steps", []))
             steps.append(_step(len(steps) + 1, "run_aborted", run.error))

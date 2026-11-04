@@ -16,7 +16,7 @@ from groundwork.policy import PRESETS, Mandate, build_preset
 from groundwork.schemas.action import Autonomy, ProposedAction
 from groundwork.schemas.plan import Intent, Plan
 from groundwork.service import actions as actions_svc
-from groundwork.service.decisions import decide_plan
+from groundwork.service.decisions import decide_plan, record_decision
 from groundwork.service.differential import EffectInput, compute
 from groundwork.service.state import SiteState
 
@@ -140,56 +140,8 @@ def issue(
         for d in decided:
             row = rows[d.action.ref]
             prev = open_refs[d.action.ref]["decision"]
+            record_decision(s, row, d, new, redecided=True, previous_decision=prev)
             dec = d.decision
-            approvers = new.approvers_for(dec.kind) if dec.decision == Autonomy.ask else []
-            context = {
-                **d.resolved.details,
-                "approvers": approvers,
-                "clause": dec.clause,
-                "missing_params": list(d.resolved.ctx.missing_params),
-            }
-            s.add(
-                m.Decision(
-                    org_id=state.org_id,
-                    action_id=row.id,
-                    mandate_version=new.version,
-                    decision=dec.decision.value,
-                    reason=dec.reason,
-                    rule=dec.rule,
-                    delta=dec.delta,
-                    kind=dec.kind.value,
-                    effect_class=dec.effect_class.value,
-                    channel=dec.channel.value,
-                    record_bearing=dec.record_bearing,
-                    content_class=d.resolved.details["content_class"],
-                    classifier=d.resolved.ctx.classifier,
-                    amount_cents=dec.amount_cents,
-                    context=context,
-                )
-            )
-            append(
-                s,
-                "decided",
-                {
-                    "ref": row.ref,
-                    "title": row.title,
-                    "decision": dec.decision.value,
-                    "reason": dec.reason,
-                    "rule": dec.rule,
-                    "clause": dec.clause,
-                    "delta": dec.delta,
-                    "kind": dec.kind.value,
-                    "record_bearing": dec.record_bearing,
-                    "amount_cents": dec.amount_cents,
-                    "mandate_version": new.version,
-                    "redecided": True,
-                    "previous_decision": prev,
-                    "approvers": approvers,
-                },
-                run_id=row.run_id,
-                action_id=row.id,
-                arm=row.arm,
-            )
             changes.append({"ref": row.ref, "from": prev, "to": dec.decision.value, "reason": dec.reason})
             if dec.decision == Autonomy.auto:
                 newly_auto.append(row)

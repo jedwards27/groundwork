@@ -138,3 +138,38 @@ def test_without_sandboxes_everyone_shares_the_demo_org(seeded, env):
         assert get(c, a, "/me").json()["org"] == get(c, b, "/me").json()["org"]
         assert get(c, a, "/me").json()["sandbox_expires_at"] is None
     assert sandbox_count() == 0
+
+
+def test_one_address_cant_use_up_the_days_copies_for_everyone(client, env):
+    env(GROUNDWORK_HOSTED="true", GROUNDWORK_SANDBOXES_PER_IP="2")
+    one = {"Fly-Client-IP": "203.0.113.7"}
+    for _ in range(2):
+        assert client.post("/auth/demo-login", json={}, headers=one).status_code == 200
+    r = client.post("/auth/demo-login", json={}, headers=one)
+    assert r.status_code == 429 and "started the demo over a lot" in r.json()["detail"]
+    # Someone else still gets in, and no address is stored, only a keyed hash of it.
+    assert client.post("/auth/demo-login", json={}, headers={"Fly-Client-IP": "198.51.100.9"}).status_code == 200
+    with owner_session() as s:
+        metrics = s.execute(select(m.DailyUsage.metric)).scalars().all()
+    assert not any("203.0.113.7" in x for x in metrics)
+    assert sum(x.startswith("sandboxes:") for x in metrics) == 2
+
+
+def test_one_address_cant_play_every_run_of_the_day(client, env):
+    token = login(client)
+    env(GROUNDWORK_HOSTED="true", GROUNDWORK_RUNS_PER_IP="1")
+    h = {"Authorization": f"Bearer {token}", "Fly-Client-IP": "203.0.113.7"}
+    assert client.post(f"/sites/{SITE}/events", json={"event": "event-a"}, headers=h).status_code == 202
+    r = client.post(f"/sites/{SITE}/events", json={"event": "event-b"}, headers=h)
+    assert r.status_code == 429 and "a lot today" in r.json()["detail"]
+
+
+def test_usage_counts_are_kept_for_two_days(client):
+    from groundwork.service import sandboxes
+
+    old = (datetime.now(UTC) - timedelta(days=3)).date()
+    with owner_session() as s:
+        s.add(m.DailyUsage(day=old, metric="sandboxes:0123456789abcdef", n=1))
+    sandboxes.sweep()
+    with owner_session() as s:
+        assert s.execute(select(func.count()).select_from(m.DailyUsage).where(m.DailyUsage.day == old)).scalar_one() == 0

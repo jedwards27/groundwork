@@ -11,7 +11,7 @@ A site folder in the layout `groundwork inspect` and `groundwork seed` read. Use
 | `site.yaml` | Org, site, CB-5 and its milestones, parties with roles and routing, the demo's people (a visitor is Jordan Brooks, the lead and only approver), site facts | Facts and roles public with URLs; people fictional (`.example` addresses) |
 | `schedule.csv` | 26 items, 31 links (predecessor column, e.g. `to_accept FS+15bd`) | Dates synthetic, transcribed from the status report; several items public |
 | `status-report-2026-10-30.md` | The landlord's weekly report the schedule is transcribed from | Synthetic |
-| `events.yaml` | Playable events: two schedule changes, an expedite offer, two public evidence items, an auto-reply, two injection attempts | Synthetic except the two public items |
+| `events.yaml` | Playable events: three schedule changes (one is the scripted demo message), an expedite offer, two public evidence items, an auto-reply, two injection attempts | Synthetic except the two public items |
 | `inbox/*.eml` | The messages behind the events | Synthetic |
 | `evidence/*.yaml` | Structured evidence: the IE's quote, the vendor's expedite offer | Synthetic |
 | `reference_projects.csv` | Comparable items for forecasting (shared across orgs) | Public, several via secondary sources (marked) |

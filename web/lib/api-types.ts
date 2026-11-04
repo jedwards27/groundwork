@@ -365,7 +365,9 @@ export interface paths {
         };
         /**
          * Stream Run
-         * @description Server-sent events. Each step has an id; reconnect with Last-Event-ID to resume.
+         * @description Server-sent events. Each step has an id; reconnect with Last-Event-ID to resume. The stream
+         *     ends when the run does, when it waits for Claude's report, or after STREAM_FOR seconds, so a
+         *     stuck run can't hold a connection open.
          */
         get: operations["stream_run_runs__run_id__stream_get"];
         put?: never;

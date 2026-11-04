@@ -55,8 +55,9 @@ class Org(Base):
 
 class DailyUsage(Base):
     """How many times something happened today, across every org: the hosted demo's caps (runs,
-    live planner calls, new sandboxes). Counters only, no org data, so no row-level security; a
-    sandbox's deletion never resets a cap."""
+    live planner calls, new sandboxes), and each visitor's share under a keyed hash of their
+    address. Counters only, no org data, so no row-level security; a sandbox's deletion never
+    resets a cap. Days before yesterday are deleted."""
 
     __tablename__ = "daily_usage"
     day: Mapped[date] = mapped_column(Date, primary_key=True)

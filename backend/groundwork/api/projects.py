@@ -1,9 +1,8 @@
 """Creating a project on the website: the person fills in a form, checks the forecast it gives,
 then creates it. The same service builds and checks it as the plugin's drafts (`service/projects`).
 
-On a person's computer the project belongs to them ("me", set up through the plugin). In the demo,
-a visitor's project is its own org next to their copy of the demo: it lasts as long as that copy,
-and their sign-in widens to include it.
+On a person's computer the project belongs to them ("me", set up through the plugin). The hosted
+demo refuses to create projects (403), so real data stays on people's own computers (ADR 0010).
 """
 
 from __future__ import annotations

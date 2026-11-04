@@ -83,6 +83,8 @@ def sweep(now: datetime | None = None) -> int:
         )
         for org_id in expired:
             _delete(s, org_id)
+        # Keep usage counts for today and yesterday only, each visitor's (a keyed hash) included.
+        s.execute(delete(m.DailyUsage).where(m.DailyUsage.day < (now - timedelta(days=1)).date()))
     return len(expired)
 
 

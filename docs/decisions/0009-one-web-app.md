@@ -33,4 +33,4 @@ Option 3.
 - The plugin bundle carries the built web app (static files, about 1 MB) and still needs only uv.
 - Uber says it is "limiting our engagement" with Base Web while still mirroring internal development; a fork or a swap to plain components is possible later, since the app uses about fifteen of them.
 - Node is needed only to build the web app, not to run Groundwork.
-- `docs/HOSTING.md` and ADR 0007's machine count need updating; the deploy itself waits for Jude.
+- `docs/HOSTING.md` describes one machine, and ADR 0007 has an update note for the change. The hosted demo has run this way since Nov 3, 2026.

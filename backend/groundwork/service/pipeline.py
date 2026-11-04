@@ -33,12 +33,11 @@ from groundwork.db.session import org_session
 from groundwork.executors import ExecutorDisabled, execute
 from groundwork.ledger import append
 from groundwork.policy.gateway import SPEND_KINDS
-from groundwork.schemas.action import Autonomy
 from groundwork.schemas.plan import Arm, Plan, Report
 from groundwork.service import actions as actions_svc
 from groundwork.service import narration as say
 from groundwork.service import planctx
-from groundwork.service.decisions import decide_plan, intent_check
+from groundwork.service.decisions import decide_plan, intent_check, record_decision
 from groundwork.service.honesty import check_report
 from groundwork.service.state import SiteState
 
@@ -124,6 +123,7 @@ class Tools:
     def __init__(self, site_key: str, live: bool, note: str, api_key: str | None = None):
         cfg = get_settings()
         self.live, self.note = live, note
+        self._api_key = api_key  # a visitor's key: kept in memory for this run, never written
         self.simulated = SimulatedPlanner(
             load_plans(cfg.groundwork_fixtures_dir / site_key / "simulated_plans.yaml")
         )
@@ -139,6 +139,10 @@ class Tools:
             self.planner = ClaudePlanner(client, cfg.groundwork_planner_model)
             self.reporter = ClaudeReporter(client, cfg.groundwork_report_model)
             self.classifier = ClaudeClassifier(client, cfg.groundwork_classifier_model)
+
+    def error_text(self, exc: BaseException) -> str:
+        """An error's text, safe to record: a visitor's key never lands in a run or the ledger."""
+        return _scrub(str(exc), self._api_key)
 
 
 def choose_tools(s: Session, site_key: str, force_simulated: bool = False, api_key: str | None = None) -> Tools:
@@ -213,7 +217,7 @@ def plan_phase(org_id: uuid.UUID, run_id: uuid.UUID, arm: Arm, tools: Tools) -> 
     except PlannerError as exc:
         if arm == Arm.blind:
             raise
-        result, fallback_error = tools.simulated.plan(ctx), str(exc)
+        result, fallback_error = tools.simulated.plan(ctx), tools.error_text(exc)
     with org_session(org_id) as s:
         run = s.get(m.Run, run_id)
         assert run is not None
@@ -307,59 +311,7 @@ def decide_phase(org_id: uuid.UUID, run_id: uuid.UUID, plan_id: uuid.UUID, tools
                 action_id=row.id,
                 arm=arm,
             )
-            dec = d.decision
-            approvers = mandate.approvers_for(dec.kind) if dec.decision == Autonomy.ask else []
-            context = {
-                **d.resolved.details,
-                "approvers": approvers,
-                "clause": dec.clause,
-                "classifier_reason": d.classifier_reason,
-                "missing_params": list(d.resolved.ctx.missing_params),
-            }
-            s.add(
-                m.Decision(
-                    org_id=run.org_id,
-                    action_id=row.id,
-                    mandate_version=mandate.version,
-                    decision=dec.decision.value,
-                    reason=dec.reason,
-                    rule=dec.rule,
-                    delta=dec.delta,
-                    kind=dec.kind.value,
-                    effect_class=dec.effect_class.value,
-                    channel=dec.channel.value,
-                    record_bearing=dec.record_bearing,
-                    content_class=d.resolved.details["content_class"],
-                    classifier=d.resolved.ctx.classifier,
-                    amount_cents=dec.amount_cents,
-                    context=context,
-                )
-            )
-            append(
-                s,
-                "decided",
-                {
-                    "ref": a.ref,
-                    "title": a.title,
-                    "decision": dec.decision.value,
-                    "reason": dec.reason,
-                    "rule": dec.rule,
-                    "clause": dec.clause,
-                    "delta": dec.delta,
-                    "kind": dec.kind.value,
-                    "record_bearing": dec.record_bearing,
-                    "content_class": context["content_class"],
-                    "classifier": d.resolved.ctx.classifier,
-                    "amount_cents": dec.amount_cents,
-                    "mandate_version": mandate.version,
-                    "path": context["path"],
-                    "effect_allowed": context["effect_allowed"],
-                    "approvers": approvers,
-                },
-                run_id=run.id,
-                action_id=row.id,
-                arm=arm,
-            )
+            record_decision(s, row, d, mandate)
         ic = intent_check(plan, decided)
         append(s, "intent_delta", ic, run_id=run.id, arm=arm)
         n = {k: sum(1 for d in decided if d.decision.decision.value == k) for k in ("auto", "ask", "refuse")}
@@ -481,7 +433,7 @@ def report_phase(org_id: uuid.UUID, run_id: uuid.UUID, plan_id: uuid.UUID, tools
             reporter_name = getattr(reporter, "model", "simulated")
         except PlannerError as exc:
             report, usage = tools.sim_reporter.report(plan, entries)
-            reporter_name = f"simulated (live reporter failed: {exc})"
+            reporter_name = f"simulated (live reporter failed: {tools.error_text(exc)})"
         _record_report(s, run_id, plan_row, plan, entries, report, reporter_name, usage)
 
 
@@ -629,7 +581,8 @@ def execute_run(org_id: uuid.UUID, run_id: uuid.UUID, *, force_simulated: bool =
             if run is not None:
                 message = _scrub(f"{type(exc).__name__}: {exc}", api_key)
                 run.status, run.finished_at, run.error = "failed", datetime.now(UTC), message
-                step(s, run_id, "failed", message, trace=_scrub(traceback.format_exc()[-2000:], api_key))
+                # Scrub the whole trace before cutting it, so no part of a key survives at the cut.
+                step(s, run_id, "failed", message, trace=_scrub(traceback.format_exc(), api_key)[-2000:])
 
 
 def _scrub(text: str, api_key: str | None) -> str:

@@ -3,8 +3,8 @@
 Three bands. ``never`` kinds are refused in every case. ``auto`` rules say what may run alone, for
 which recipient role classes, on which channels, with which spend limits. Everything else is
 ``ask``, routed to named approvers. Record-bearing actions (by kind, or by the recipient's role
-class) are never ``auto`` under any preset. The shape is meant to become a standard: an issuer, a
-subject, limits, validity, and a version that every decision and approval cites.
+class) are never ``auto`` under any preset. Every mandate has an issuer, a subject, limits,
+validity, and a version that every decision and approval cites.
 """
 
 from __future__ import annotations

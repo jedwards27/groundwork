@@ -56,9 +56,15 @@ browser ──HTTPS──▶ Groundwork (one Fly machine: the web app, and its A
 
 ## Run it
 
-- **Sandboxes.** A visitor's first visit signs them in and creates their sandbox. "Start over with a fresh copy" in the **You** menu replaces it. It is deleted 12 hours after it was created; a visitor who returns after their one-hour session gets a new one.
+- **Sandboxes.** A visitor's first visit signs them in and creates their sandbox. Starting the tour replaces it with a fresh copy. It is deleted 12 hours after it was created; a visitor who returns after their one-hour session gets a new one.
 - **Nightly sweep.** At 08:00 UTC (3 or 4 a.m. Eastern) the API deletes expired sandboxes and reloads the shared fixture that sandboxes are copied from. A deploy also reloads it.
 - **Caps, across all visitors.** Up to 200 new sandboxes, 300 runs and 30 runs that call Claude a day. After the Claude cap, the simulated planner takes over with its banner. They are set in `fly.toml`; redeploy after changing them.
+- **Caps per visitor.** Each address can start 20 sandboxes and play 100 emails a day, so one script can't use up the day for everyone. The count is kept under a keyed hash of the address, never the address, and deleted after two days.
+- **If the demo is locked out on the day.** Clear today's counts in the Neon SQL editor:
+
+  ```sql
+  DELETE FROM daily_usage WHERE day = current_date;
+  ```
 - **Rotate every secret.** This rotates both database passwords, the signing secret (every token stops working) and the admin token.
 
   ```bash
@@ -103,7 +109,7 @@ E2E_BASE_URL=http://localhost:8100 make e2e
 - **Isolation.** Each visitor's sandbox is a separate org, so row-level security keeps visitors apart, as it does customers.
 - **Who holds what.** The one machine holds every secret. The browser holds only its session token, in a cookie its scripts cannot read, and a state change riding on that cookie must carry the app's own Origin.
 - **Not covered:**
-  - There is no rate limit per visitor beyond the daily caps, so one visitor could use up the day's sandboxes.
+  - The per-visitor limits key on the address, so a script spread over many addresses could still use up the day's caps.
   - The API holds the owner credentials, because the nightly reset needs them.
   - One API machine means a deploy interrupts a running event; the run is marked interrupted.
 

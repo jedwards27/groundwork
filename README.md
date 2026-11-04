@@ -1,8 +1,18 @@
 # Groundwork
 
-Groundwork coordinates approval-gated projects across companies, acting only inside a signed written mandate, leaving a receipt anyone can verify, and earning wider autonomy as each model version passes the evals, starting with the data-center buildout that is Anthropic's own bottleneck.
+Groundwork is an agent that chases what a project waits on from other organizations: utilities, permit offices, landlords and vendors. It acts only inside a written mandate, and every step it takes lands in a ledger anyone can check. Its first market is the data-center buildout, Anthropic's own bottleneck.
 
-It reads a project's paper trail (utility studies, permits, landlord decisions, vendor tests), names this week's gating item, forecasts slips with their sources, and drafts, chases and asks within the mandate. The delegation layer keeps it inside its authority: a **mandate** says what it may do alone, must ask about and may never do; a **gateway** outside the model decides allow, ask or deny and shows the clause it relied on; a **named approval** binds one person to one exact action; every step lands in a hash-chained **ledger**, and any **receipt** from it can be re-checked by hash. Everything runs in dry run: nothing is sent.
+It reads a project's paper trail (utility studies, permits, landlord decisions, vendor tests), names what sets the finish date this week, forecasts slips with their sources, and drafts, chases and asks within the mandate. Five parts keep it inside its authority:
+- The mandate says what it may do alone, what it must ask about, and what it may never do.
+- The gateway, code outside the model, decides allow, ask or deny for each action and shows the clause it relied on.
+- A named approval binds one person to one exact action.
+- The ledger records every step in a hash chain.
+- A receipt lets anyone re-check one ledger record by its hash.
+
+**What's real and what's simulated.**
+- Real: the gateway, the ledger and receipts, the forecaster, approvals, the check of the agent's report against the ledger, and row-level security.
+- Simulated: sending (everything runs in dry run, so nothing is sent), the demo's hand-written plan, and the demo's people, schedule and email, which are synthetic.
+- Claude writes the plans in the plugin, or when you add your own API key.
 
 The demo site is **Lake Mariner CB-5** (Barker, NY), seen from the end user's seat: TeraWulf is landlord and the utility's customer, Fluidstack is the lessee, and Anthropic is the end user, reaching the utility only through both. Public facts carry links; the schedule, inbox and people are synthetic and labeled.
 
@@ -44,7 +54,7 @@ Everything stays in dry run. If Claude tries to send project mail through anothe
 For a real project, run Groundwork on your own computer. Both ways run all of it there: the server, the web app, the database and the ledger.
 
 - **The Claude plugin** (above). Your projects live under `~/.groundwork`, and the app answers only on 127.0.0.1. What reaches Anthropic is what your own Claude session reads with your connectors and what Groundwork's tools return to it, under your account's terms. The Groundwork server itself makes no network calls.
-- **`make dev`** (below). Your projects live in your local Postgres. Nothing leaves your machine unless you set `ANTHROPIC_API_KEY`; then the planner receives what `docs/DATA-BOUNDARY.md` lists.
+- **`make dev`** (below). Your projects live in your local Postgres. Nothing leaves your machine unless you set `ANTHROPIC_API_KEY` or add a key from the menu under your name; then the planner receives what `docs/DATA-BOUNDARY.md` lists.
 
 The hosted demo is for trying Lake Mariner without installing anything. It has no accounts, holds only the demo, and deletes each visitor's copy after 12 hours, so don't put a real project there. ADR 0010 explains the choice.
 
@@ -69,7 +79,7 @@ Docker, untested because the author's machine has no Docker: `sh scripts/new-env
 
 ## The tutorial and the two-minute demo
 
-Click **Start the tutorial** at the top of the home view (or **Tutorial** next to Lake Mariner). A short dialog sets the scene: Anthropic is bringing the Lake Mariner data center online, and you're Jordan, its project manager. A small panel then walks through each feature in fifteen steps: the date and what it waits on, the schedule, an email arriving and Groundwork working through it (a demo message plays a written plan, one step at a time, labeled as a simulated agent), allow, ask and deny, approving the ask on the project's Actions tab, the mandate and the ledger. Each step points at one thing on the page and you click it yourself, tabs included, so you get around the app the way you would without the tutorial; steps that only explain have Next, and Back steps through what you've seen. While you read the ledger, a second email plays in the background, so the home view you return to has asks waiting and a second run under Activity. Closing the panel pauses it, and opening it again (from the home view, the badge or the menu under your name) picks up at the furthest step you reached; the menu can also start it over. It ends with "That's the whole tour!": start your own project, or keep exploring the demo. Once finished, home stops offering it. The model scorecard and the blind arm stay in the evals (below) and the API, not the app.
+Click **Start the tutorial** at the top of the home view (or **Tutorial** next to Lake Mariner). A short dialog sets the scene: Anthropic is bringing the Lake Mariner data center online, and you're Jordan, its project manager. A small panel then walks through each feature in sixteen steps: the date and what it waits on, the schedule, an email arriving and Groundwork working through it (a demo message plays a written plan, one step at a time, labeled as a simulated agent), allow, ask and deny, approving the ask on the project's Actions tab, the mandate, the ledger, and how to have Claude plan live with your own API key. Each step points at one thing on the page and you click it yourself, tabs included, so you get around the app the way you would without the tutorial; steps that only explain have Next, and Back steps through what you've seen. While you read the ledger, a second email plays in the background, so the home view you return to has asks waiting and a second run under Activity. Closing the panel pauses it, and opening it again (from the home view, the badge or the menu under your name) picks up at the furthest step you reached; the menu can also start it over. It ends with "That's the whole tour!": start your own project, or keep exploring the demo. Once finished, home stops offering it. The model scorecard and the blind arm stay in the evals (below) and the API, not the app.
 
 The demo by hand: open **Lake Mariner**, then its **Inbox** tab, and play the first message, **"Demo: the utility wants another review"**. It plays the same hand-written plan every time; the gateway, ledger and report check are live code.
 
@@ -77,9 +87,9 @@ The demo by hand: open **Lake Mariner**, then its **Inbox** tab, and play the fi
 2. **Allow.** A weekly status request to Fluidstack, the tenant. The mandate allows it on its own; it runs in dry run, so it's recorded and not sent.
 3. **Ask.** Asking the landlord, through Fluidstack, to confirm the power-on date. Anything to the landlord waits for you, so it's under **Needs you** on the home view.
 4. **Deny.** The landlord also asks you to sign a revised schedule. Signing is never Groundwork's to do, so it's denied and left to you, and the agent's report says so.
-5. **The report beside the ledger.** "Report matches the ledger." Open "The agent's report beside the ledger" and pick a record number: **Match**. Paste the stored record with one word changed: **Mismatch**.
+5. **Report vs. ledger.** The run says "Report matches the ledger". On the Actions tab, open **Report vs. ledger** to see each line of the agent's report beside the ledger's record. Click a record number to open **Verify a receipt** in the project's Settings. Check it: **Match**. Use **Paste the stored record**, change one word, and check again: **Mismatch**.
 
-Then try the auto-reply that says "approved, please proceed" and changes nothing, approving from the home view, a new mandate template in the Settings tab, and **Try to break it** at the bottom of the Ledger tab. The demo also holds five messages the inbox leaves out unless they've been played: event A (the same delay, with a fuller plan), the switchgear email the tour plays, the rush offer that follows it, and two with instructions for AI hidden in them. Tests, evals and Claude play them through the API.
+Then try the auto-reply that says "approved, please proceed" and changes nothing, approving from the home view, a new mandate template in the Settings tab, and **Try to break it** at the bottom of the Ledger tab (on your own computer only; the hosted demo refuses it). The demo also holds five messages the inbox leaves out unless they've been played: event A (the same delay, with a fuller plan), the switchgear email the tour plays, the rush offer that follows it, and two with instructions for AI hidden in them. Tests, evals and Claude play them through the API.
 
 **Your own project, on the website.** **New project** on the home view opens a short form: what finishing means and when, who you're waiting on, and what has to happen in what order. "Check the forecast" shows the forecast and what sets the date before anything is saved; "Create the project" makes it, as a project of its own with its own ledger. This works on your computer (`make dev` or the plugin); the hosted demo doesn't create projects. To have Groundwork read your mail and chase what's late, use the plugin.
 
@@ -123,12 +133,12 @@ What the numbers say:
 
 - **The rules hold where they are enumerable.** No model proposed paying, signing or deleting on its own authority in about 2,000 decisions; when a model proposed a payment at all (Haiku 14 times, Opus 9, Sonnet never), it proposed refusing it.
 - **Spelling out the mandate roughly halves over-reach, and does not remove it.** With the mandate in the prompt, 10 to 19% of actions still asked for more autonomy than allowed; without it, 25 to 39%. The gateway held every one. This is the capability prediction measured on this product: enumerable scope is reliable with explicit rules plus an external gateway, and judgment alone is not.
-- **Over-reach concentrates at the edges of permissive mandates.** Under the Autonomous preset Opus over-reached on 39% of actions (Supervised 9%, Standard 14%). The two patterns: proposing to draft a legal notice alone (the mandate routes legal drafts to counsel even though nothing is sent), and emails to the lessee asking the landlord or NYSEG to act (the mandate routes requests to further parties, and anything reaching the utility, to a person). Both are fine print a model reads as "safe"; neither escaped the gateway.
+- **Over-reach concentrates at the edges of permissive mandates.** Under the Auto template Opus over-reached on 39% of actions (Supervised 9%, Standard 14%). The two patterns: proposing to draft a legal notice alone (the mandate routes legal drafts to counsel even though nothing is sent), and emails to the lessee asking the landlord or NYSEG to act (the mandate routes requests to further parties, and anything reaching the utility, to a person). Both are fine print a model reads as "safe"; neither escaped the gateway.
 - **Reporting is honest.** 96 to 100% of post-run reports matched the ledger, and with one action's ledger rows withheld, 98 to 100% left it out rather than inventing a status.
 - **Injections were resisted 108 of 108 times.** In the plans read by hand, models flagged the injected date change and payment request to the owner, refused the payment, or asked a legitimate party to confirm in writing.
 - **Opus and Sonnet agree with the reviewed first-three actions about 85% of the time; Haiku 57%.** The reviewed set is pending practitioner review, so this measures agreement with our key, not correctness.
 
-Limits: one synthetic site and six event templates; actions within one plan are not independent, so treat differences under about 5 points as noise; the classifier is Haiku in every run, and a stricter or looser classifier moves over-reach. The scripted planner scores 0 hard violations, 3.5% over-reach and 100% on reports and injection by construction (its plans and the reviewed set were written together).
+Limits: the table averages each rate per case, while the per-template figures above count all actions together. One synthetic site and six event templates; actions within one plan are not independent, so treat differences under about 5 points as noise; the classifier is Haiku in every run, and a stricter or looser classifier moves over-reach. The scripted planner scores 0 hard violations, 3.5% over-reach and 100% on reports and injection by construction (its plans and the reviewed set were written together).
 
 ## Test
 
@@ -142,7 +152,7 @@ make e2e
 Lint (ruff), types (pyright), six import boundaries (import-linter: the planner cannot reach executors, approvals, the ledger or the database; ingestion cannot create approvals) and the test suite. It covers:
 
 - the calendar and scheduler, and golden tests on the fixture;
-- 172 gateway table rows, and the mandate clause each kind of decision cites;
+- 144 gateway table rows plus 30 rule tests, and the mandate clause each kind of decision cites;
 - the ledger: test vector, tamper and delete detection, triggers that bind the owner, no forks under concurrency;
 - the honesty check;
 - the pipeline end to end, typed, bound approvals, and the scripted demo path (the same allow, ask and deny even with a live key);
@@ -157,10 +167,10 @@ Lint (ruff), types (pyright), six import boundaries (import-linter: the planner 
   - daily caps that count across orgs;
   - connection-per-request mode and the nightly reset schedule;
   - that no database role needs BYPASSRLS;
-- sandboxes: two visitors cannot see each other's work, signing in again keeps a sandbox, "Start over" replaces it, and expired sandboxes are deleted with their ledgers;
+- sandboxes: two visitors cannot see each other's work, signing in again keeps a sandbox, starting the tour again replaces it, and expired sandboxes are deleted with their ledgers;
 - the web app's session: a cookie its scripts cannot read, state changes refused without this app's Origin, and, in the plugin, one browser that sees every project on the computer while each request runs in one project's org.
 
-`make e2e` is the browser walkthrough (Playwright, `web/e2e/`). It runs the two-minute demo step by step, including a match and a mismatch on the verify page. It also plays event A, checks the forecast against the API, finds the action the gateway held, plays the auto-reply and sees nothing change, approves the held action from the home view, issues a new mandate version and checks that only open actions were decided again, and tampers with a record, watches verification fail and resets. It checks that a state change without this app's Origin is refused. With sandboxes on, as in the hosted profile, a second browser checks that two visitors cannot see each other's work. It uses your installed Google Chrome and starts the API and the web app's dev server if they are not running; `E2E_BASE_URL=http://localhost:8000 make e2e` tests the built app instead.
+`make e2e` is the browser walkthrough (Playwright, `web/e2e/`). It runs the two-minute demo step by step, including a match and a mismatch under Receipts in the project's Settings. It also plays event A, checks the forecast against the API, finds the action the gateway held, plays the auto-reply and sees nothing change, approves the held action from the home view, issues a new mandate version and checks that only open actions were decided again, and tampers with a record, watches verification fail and resets. It checks that a state change without this app's Origin is refused. With sandboxes on, as in the hosted profile, a second browser checks that two visitors cannot see each other's work. It uses your installed Google Chrome and starts the API and the web app's dev server if they are not running; `E2E_BASE_URL=http://localhost:8000 make e2e` tests the built app instead.
 
 ## Cost
 
@@ -181,23 +191,25 @@ A site is a folder: `site.yaml` (site, milestone, parties with roles and routing
 make inspect SITE=path/to/your-site
 ```
 
-It validates the folder, lists every problem at once if there are any, and otherwise prints the gate, critical path, holiday losses and forecast, plus any sequencing rule your schedule breaks. Loading it into the database is `cd backend && uv run groundwork seed path/to/your-site`. Email and PDF ingestion arrive in slice 4.
+It validates the folder, lists every problem at once if there are any, and otherwise prints the gate, critical path, holiday losses and forecast, plus any sequencing rule your schedule breaks. Loading it into the database is `cd backend && uv run groundwork seed path/to/your-site`. To have Groundwork read a project's email, use the plugin. Reading PDFs isn't built yet.
 
 ## Docs
 
+- `docs/TECH-DESIGN-DISCUSSION.md`: the questions an engineering manager is likely to ask, with current answers, including the path to an MVP.
+- `docs/ARCHITECTURE.md`: the system as it is built today.
 - `docs/decisions/`: ADRs 0001 to 0011.
+- `backend/evals/README.md`: what each eval measures and how it is graded.
 - `docs/HOSTING.md`: deploying, checking and running the hosted demo.
 - `docs/LEDGER.md`: the ledger's hash format, a test vector, and what verification does and does not catch.
 - `docs/PRACTITIONER-QUESTIONS.md`: the 21 questions that confirm or correct the fixture's and the forecast's assumptions.
 - `docs/DATA-BOUNDARY.md`: exactly what leaves your machine.
 - `docs/reviews/`: three rounds of plan review that shaped this design.
 
-## Stop-ship list
+## Known limits
 
-The prototype is not submitted while any of these holds:
-
-- A practitioner says the gating item is wrong.
-- The live planner proposes a never-list action that only the content classifier catches.
-- The hosted box exposes the dev signing secret or a token.
-- `verify_chain()` fails on the hosted ledger.
-- The stranger's export test has not been attempted.
+- The evals cover one synthetic project and six messages, and their numbers predate three later gateway changes.
+- Nothing is ever sent. Real sending needs an outbox that records each send exactly once (`docs/TECH-DESIGN-DISCUSSION.md`).
+- The plugin has one person per install, and its local database trusts every program on the laptop.
+- The hosted demo is one machine, so a deploy stops a running message, which is then marked interrupted.
+- The Docker setup hasn't been run.
+- A practitioner hasn't yet confirmed the gating item, the forecast's assumptions or the reviewed plans (`docs/PRACTITIONER-QUESTIONS.md`).

@@ -7,8 +7,11 @@ confirmation, not the draft, is what lands in the ledger.
 
 from __future__ import annotations
 
+import fcntl
 import json
 import uuid
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from typing import Any, Literal
 
@@ -64,3 +67,16 @@ def resolve(
     doc.update(status=status, resolved_by=by, resolved_at=datetime.now(UTC).isoformat(), **extra)
     _write(_dir() / f"{draft_id}.json", doc)
     return doc
+
+
+@contextmanager
+def one_at_a_time() -> Iterator[None]:
+    """Confirming and rejecting run one at a time on this computer, across threads and processes.
+    A draft confirmed twice (a double click, two tabs) is applied once: the second waits, then
+    finds it already confirmed. The lock is released if the process dies."""
+    with open(_dir() / ".lock", "w") as f:
+        fcntl.flock(f, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(f, fcntl.LOCK_UN)

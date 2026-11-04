@@ -34,7 +34,8 @@ class Settings(BaseSettings):
     executors_dry_run: bool = True
     groundwork_hosted: bool = False
     groundwork_daily_live_run_cap: int = 50
-    # Every run (simulated or live) per org per UTC day; 0 means no cap. The hosted demo sets one.
+    # Every run (simulated or live) per UTC day, across every org; 0 means no cap. The hosted demo
+    # sets one.
     groundwork_daily_run_cap: int = 0
     # Open a database connection per request instead of keeping a pool, so a scale-to-zero
     # Postgres (Neon's free plan) can suspend between visits. Hosted only.
@@ -46,6 +47,10 @@ class Settings(BaseSettings):
     groundwork_sandboxes: bool = False
     groundwork_sandbox_ttl_hours: int = 12
     groundwork_sandbox_daily_cap: int = 200
+    # Per visitor address and UTC day, so one script can't use up those caps for everyone. Hosted
+    # only; 0 means no limit. Generous, because one office can share an address.
+    groundwork_sandboxes_per_ip: int = 20
+    groundwork_runs_per_ip: int = 100
     groundwork_admin_token: str = ""
     # Demo sign-in: the web app signs a visitor in as the demo project's lead without a password.
     # On for development and the hosted demo; off for any real deployment.

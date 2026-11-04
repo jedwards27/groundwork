@@ -23,9 +23,12 @@ def _read(path: Path) -> dict[str, Any] | None:
 
 
 def _write(path: Path, doc: dict[str, Any]) -> None:
-    tmp = path.with_suffix(".tmp")
-    tmp.write_text(json.dumps(doc, indent=2, default=str))
-    os.chmod(tmp, 0o600)
+    """Write a whole file at once, readable only by this user. Each write has its own temporary
+    file, so two writers never share one."""
+    tmp = path.with_name(f".{path.name}.{secrets.token_hex(6)}.tmp")
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "w") as f:
+        f.write(json.dumps(doc, indent=2, default=str))
     tmp.replace(path)
 
 

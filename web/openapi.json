@@ -839,7 +839,7 @@
   "/runs/{run_id}/stream": {
    "get": {
     "summary": "Stream Run",
-    "description": "Server-sent events. Each step has an id; reconnect with Last-Event-ID to resume.",
+    "description": "Server-sent events. Each step has an id; reconnect with Last-Event-ID to resume. The stream\nends when the run does, when it waits for Claude's report, or after STREAM_FOR seconds, so a\nstuck run can't hold a connection open.",
     "operationId": "stream_run_runs__run_id__stream_get",
     "parameters": [
      {

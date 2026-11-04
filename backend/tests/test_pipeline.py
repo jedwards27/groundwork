@@ -253,6 +253,21 @@ def test_mandate_change_redecides_open_actions_only(api, seeded):
     assert a["a2"]["state"] == "executed" and a["a7"]["state"] == "pending"  # legal stays with a person
     assert api.get("/sites/lake-mariner/mandate").json()["version"] == 2
     assert api.get("/sites/lake-mariner/ledger/verify").json()["ok"]
+    # A re-decision is recorded in the same shape as a first decision, plus what it replaced.
+    with owner_session() as s:
+        first, again = (
+            s.execute(
+                select(m.LedgerEntry.payload).where(
+                    m.LedgerEntry.org_id == seeded["org_a"],
+                    m.LedgerEntry.entry_type == "decided",
+                    m.LedgerEntry.payload["ref"].astext == "a2",
+                    m.LedgerEntry.payload["mandate_version"].astext == str(v),
+                )
+            ).scalar_one()
+            for v in (1, 2)
+        )
+    assert set(again) == set(first) | {"redecided", "previous_decision"}
+    assert again["previous_decision"] == "ask" and again["decision"] == "auto"
 
 
 def test_scorecard_and_replay(api):

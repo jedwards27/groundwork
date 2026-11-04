@@ -26,7 +26,7 @@ WHAT_THIS_DOES_NOT_PROVE = [
     "That anything happened outside this system: executors run in dry run, so 'executed' means the action was "
     "cleared and recorded, not that a counterparty received it.",
     "That the chain was not rebuilt from scratch: compare head_hash with a copy published earlier.",
-    "Who a demo persona really is: identity assurance is shown separately.",
+    "Who the demo's person really is: identity assurance is shown separately.",
 ]
 
 
@@ -86,7 +86,7 @@ def attestation(s: Session, site_key: str, mandate: Any) -> dict[str, Any]:
         "proposal_deltas": deltas,
         "model_ids": model_ids,
         "dry_run": cfg.dry_run,
-        "identity_assurance": "demo personas (anyone with the link can act as them)"
+        "identity_assurance": "the demo's one person (anyone with the link can act as them)"
         if cfg.groundwork_hosted
         else "dev tokens signed with the local secret",
         "signer": f"operator-dev-key:{key_id(cfg.groundwork_dev_hmac_secret) if cfg.groundwork_dev_hmac_secret else 'none'}",

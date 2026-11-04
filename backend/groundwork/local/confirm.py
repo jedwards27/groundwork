@@ -32,6 +32,11 @@ def decide(draft_id: str, verdict: Literal["confirm", "reject"], typed: str | No
     who = me()
     if who is None:
         raise ConfirmError("Run setup in Claude first, so drafts are confirmed by a named person.")
+    with drafts.one_at_a_time():
+        return _decide(draft_id, verdict, typed, who.name)
+
+
+def _decide(draft_id: str, verdict: Literal["confirm", "reject"], typed: str | None, by: str) -> str:
     try:
         d = drafts.get(draft_id)
     except (FileNotFoundError, KeyError) as exc:
@@ -39,7 +44,7 @@ def decide(draft_id: str, verdict: Literal["confirm", "reject"], typed: str | No
     if d["status"] != "pending":
         return f"That draft is already {d['status']}."
     if verdict == "reject":
-        drafts.resolve(draft_id, "rejected", who.name)
+        drafts.resolve(draft_id, "rejected", by)
         return "Rejected; nothing changed."
     if d["kind"] == "delete" and (typed or "").strip() != d["project"]:
         raise ConfirmError(f"Type {d['project']} to delete it.")
@@ -55,9 +60,9 @@ def decide(draft_id: str, verdict: Literal["confirm", "reject"], typed: str | No
         "delete": _confirm_delete,
     }[d["kind"]]
     try:
-        return confirm(d, who.name)
+        return confirm(d, by)
     except edits.EditProblem as exc:
-        drafts.resolve(d["id"], "rejected", who.name, why=str(exc))
+        drafts.resolve(d["id"], "rejected", by, why=str(exc))
         return f"Not changed: {exc}. The project changed since this draft; ask Claude to draft it again."
 
 

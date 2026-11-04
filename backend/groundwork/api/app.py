@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 from sse_starlette.sse import EventSourceResponse
 
 from groundwork import __version__
+from groundwork.api import limits
 from groundwork.api.auth import Identity
 from groundwork.api.deps import db, identity
 from groundwork.api.home import router as home_router
@@ -215,6 +216,7 @@ def play_event(
     site: str,
     body: PlayEvent,
     background: BackgroundTasks,
+    request: Request,
     who: Identity = Depends(identity),
     x_anthropic_api_key: str | None = Header(default=None, include_in_schema=False),
 ) -> RunStarted:
@@ -227,6 +229,9 @@ def play_event(
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "On your own computer, Claude in the app plans; no key is needed.")
         if not VISITOR_KEY.match(key):
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "That doesn't look like a Claude API key (it starts with sk-ant-).")
+    cfg = get_settings()
+    if cfg.groundwork_hosted:
+        limits.claim(request, "runs", cfg.groundwork_runs_per_ip, "You've played the demo's emails a lot today. Try again tomorrow.")
     # The run row must be committed before the background task looks for it, so this handler opens
     # (and closes) its own transaction instead of using the request-scoped session.
     try:
@@ -255,6 +260,9 @@ def get_run(run_id: uuid.UUID, who: Identity = Depends(identity)) -> RunView:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "no such run") from exc
 
 
+STREAM_FOR = 300.0  # seconds; a live run with Claude planning and reporting takes one or two minutes
+
+
 @app.get("/runs/{run_id}/stream")
 async def stream_run(
     run_id: uuid.UUID,
@@ -262,12 +270,15 @@ async def stream_run(
     who: Identity = Depends(identity),
     last_event_id: str | None = Header(default=None),
 ) -> EventSourceResponse:
-    """Server-sent events. Each step has an id; reconnect with Last-Event-ID to resume."""
+    """Server-sent events. Each step has an id; reconnect with Last-Event-ID to resume. The stream
+    ends when the run does, when it waits for Claude's report, or after STREAM_FOR seconds, so a
+    stuck run can't hold a connection open."""
     try:
         await run_in_threadpool(_run_view, who.org_id, run_id)
     except KeyError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "no such run") from exc
     start_after = int(last_event_id) if last_event_id and last_event_id.isdigit() else 0
+    deadline = asyncio.get_running_loop().time() + STREAM_FOR
 
     async def gen() -> AsyncIterator[dict[str, str]]:
         sent = start_after
@@ -280,7 +291,7 @@ async def stream_run(
                 if step["i"] > sent:
                     sent = step["i"]
                     yield {"id": str(step["i"]), "event": "step", "data": json.dumps(step)}
-            if rv.status in ("done", "failed"):
+            if rv.status in ("done", "failed", "waiting_model") or asyncio.get_running_loop().time() > deadline:
                 yield {"event": "end", "data": rv.model_dump_json()}
                 return
             await asyncio.sleep(0.25)
@@ -559,6 +570,8 @@ def _demo_sign_in(request: Request, fresh: bool) -> dict[str, Any]:
     if cfg.groundwork_sandboxes:
         current = demo[0].org_id if demo and sandboxes.live(demo[0].org_id) else None
         if current is None or fresh:
+            if cfg.groundwork_hosted:
+                limits.claim(request, "sandboxes", cfg.groundwork_sandboxes_per_ip, "You've started the demo over a lot today. Try again tomorrow.")
             try:
                 org_id = sandboxes.create()
             except sandboxes.SandboxLimit as exc:

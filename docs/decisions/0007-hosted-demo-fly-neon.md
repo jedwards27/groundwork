@@ -22,7 +22,7 @@
 - **Hosted mode.**
   - The API opens a connection per request (`GROUNDWORK_DB_NULLPOOL`), so Neon can scale to zero.
   - The API refuses to start if a secret is weak, missing or a dev default.
-  - Every visitor's demo login gets a **sandbox**: a private copy of the demo org, stored as an org of its own (migration 0004 adds `org.expires_at`). Row-level security keeps visitors apart exactly as it keeps customers apart. Switching persona keeps the visitor's sandbox, "Start over" replaces it, and it is deleted, ledger and all, after 12 hours.
+  - Every visitor's demo login gets a **sandbox**: a private copy of the demo org, stored as an org of its own (migration 0004 adds `org.expires_at`). Row-level security keeps visitors apart exactly as it keeps customers apart. Signing in again keeps the visitor's sandbox, starting the tour replaces it, and it is deleted, ledger and all, after 12 hours. (Update, Nov 4, 2026: the demo has one person, so there is no persona to switch. Each visitor address also has a daily share of the caps, so one script can't use them all.)
   - It caps runs, live planner calls and new sandboxes per day across all visitors. The counts live in `daily_usage`, a counters-only table, so deleting a sandbox never resets a cap.
   - It sweeps expired sandboxes and reseeds the shared fixture nightly from inside the API process.
   - Dry run is forced on, tokens live one hour, and the tamper endpoint is refused.

@@ -9,21 +9,20 @@ Groundwork's local mode keeps project data on your machine except for one destin
 - The site's items, links, dates, statuses and forecast (the planner's context).
 - The text of the event being played.
 - The mandate (the grant of authority) in the informed arm; the never-list and the owner's goals in the blind arm.
-- The tail of the site's ledger: action titles, decisions and outcomes.
-- In slice 4, the text and pages of documents you load for extraction.
+- The tail of the site's ledger: action titles, decisions and outcomes, including whether an ask was approved or declined (not who decided).
 
-**Never sent anywhere:** approvals and who made them, signing secrets and tokens, people's email addresses (addresses inside forwarded messages are replaced with "[address withheld]" before a model sees them, and a test checks the prompt), database credentials, the full ledger, and anything from another org.
+**Never sent anywhere:** who approved or declined an ask, signing secrets and tokens, people's email addresses (addresses inside forwarded messages are replaced with "[address withheld]" before a model sees them, and a test checks the prompt), database credentials, the full ledger, and anything from another org.
 
 **Also sent, when live:** the text of outbound messages and drafts the planner proposes, to the Haiku classifier; the plan and the ledger entry types for its actions, to the Haiku reporter.
 
 Without an API key nothing is sent; the hand-written simulated planner runs instead, under a banner that says so.
 
-**Retention.** Under Anthropic's commercial terms, API inputs and outputs are not used for training and are retained for a limited period; zero-data-retention is available by agreement for production. *Verify the current terms before submission:* https://www.anthropic.com/legal/commercial-terms. Zero-data-retention is a production option, out of scope for v1.
+**Retention.** Under Anthropic's commercial terms, API inputs and outputs are not used for training and are retained for a limited period; zero-data-retention is available by agreement for production. Current terms: https://www.anthropic.com/legal/commercial-terms. Zero-data-retention is a production option, out of scope for v1.
 
 ## Install-time network (no project data)
 
 - Python packages from PyPI (`uv sync`), the web app's packages from the npm registry (`npm ci`), and Python itself if uv downloads it.
-- Docker image pulls from Docker Hub (`postgres:16`, `python:3.13-slim`, `node:22-alpine`) and the uv image from GitHub's container registry, if you use the Docker profile.
+- Docker image pulls from Docker Hub (`postgres:16`, `python:3.13-slim`, `node:24-alpine`) and the uv image from GitHub's container registry, if you use the Docker profile.
 - Homebrew or nodejs.org, if `make doctor` suggests installing Postgres or Node.
 - Nothing for the browser tests by default: they use your installed Google Chrome. Playwright's own Chromium is downloaded only if you choose it (`npx playwright install chromium`).
 
@@ -47,7 +46,7 @@ The hosted demo holds only the synthetic and public Lake Mariner fixture. It is 
 
 - **Fly.io, Ashburn (`iad`):** one public machine serving the web app and its API (ADR 0009). Fly keeps the request logs.
 - **Neon, AWS US East 1:** the database. Connections use TLS.
-- **Secrets:** stored as Fly secrets. The API machine holds the database URLs, the signing secret, the admin token and, if set, the Anthropic API key. The web machine holds only the admin token. They are generated into a gitignored `.env.hosted` and never printed.
-- **Anthropic's API:** receives what is listed above, only when a key is set, and capped per day. After the cap the simulated planner runs with its banner.
+- **Secrets:** stored as Fly secrets. The one machine holds the database URLs, the signing secret, the admin token and, if set, the Anthropic API key. They are generated into a gitignored `.env.hosted` and never printed.
+- **Anthropic's API:** receives what is listed above, only when the server's key is set (capped per day; after the cap the simulated planner runs with its banner) or a visitor adds their own key for their own runs.
 
-Dry run is forced on regardless of configuration. The API refuses to start on development secrets or passwords. Each visitor works in a private sandbox copy of the fixture, deleted with its ledger 12 hours after it was created. Expired sandboxes are swept and the shared fixture is reloaded every night at 08:00 UTC.
+Dry run is forced on regardless of configuration. The API refuses to start on development secrets or passwords. Each visitor works in a private sandbox copy of the fixture, which expires 12 hours after it was created and is then deleted, ledger and all, at the next sweep. Expired sandboxes are swept and the shared fixture is reloaded every night at 08:00 UTC.
