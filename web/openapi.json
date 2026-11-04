@@ -285,6 +285,69 @@
     }
    }
   },
+  "/projects/{key}/steps/{item}": {
+   "post": {
+    "summary": "Step Status",
+    "description": "Cancel a step (descoped: kept on record, ignored by the forecast) or bring it back. The person\nacting in the app; a ledger record says who.",
+    "operationId": "step_status_projects__key__steps__item__post",
+    "parameters": [
+     {
+      "name": "key",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Key"
+      }
+     },
+     {
+      "name": "item",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Item"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/StepStatus"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": {
+          "type": "string"
+         },
+         "title": "Response Step Status Projects  Key  Steps  Item  Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/projects/preview": {
    "post": {
     "summary": "Preview",
@@ -3603,6 +3666,20 @@
      "glossary"
     ],
     "title": "SiteView"
+   },
+   "StepStatus": {
+    "properties": {
+     "status": {
+      "type": "string",
+      "pattern": "^(cancelled|not_started|in_progress)$",
+      "title": "Status"
+     }
+    },
+    "type": "object",
+    "required": [
+     "status"
+    ],
+    "title": "StepStatus"
    },
    "ValidationError": {
     "properties": {

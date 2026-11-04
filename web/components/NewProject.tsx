@@ -17,7 +17,7 @@ import { ApiError, send } from "@/lib/client";
 import { fmtLong, lateness, TEMPLATE_LABEL } from "@/lib/format";
 import type { Session } from "@/lib/types";
 import { newProject as say } from "@/copy/newProject";
-import { Chip, Muted, Page, Section } from "./ui";
+import { Chip, Muted, Page, Rich, Section } from "./ui";
 
 type Role = "contractor" | "designer" | "consultant" | "vendor" | "landlord" | "lender" | "ahj" | "agency" | "regulator" | "developer" | "operator" | "community";
 type Status = "not_started" | "in_progress" | "done" | "cancelled";
@@ -278,6 +278,24 @@ export function NewProject({ session }: { session: Session }) {
     />
   );
 
+  // The hosted demo has one made-up project; real ones run on the person's own computer.
+  if (session.health.hosted)
+    return (
+      <Page>
+        <div data-testid="demo-only" className={css({ display: "grid", gap: theme.sizing.scale400, maxWidth: "560px" })}>
+          <HeadingSmall margin={0}>{say.demoOnly.title}</HeadingSmall>
+          <ParagraphSmall margin={0}>
+            <Rich text={say.demoOnly.body} />
+          </ParagraphSmall>
+          <div>
+            <Button kind={KIND.secondary} size={SIZE.compact} onClick={() => navigate("/")}>
+              {say.demoOnly.back}
+            </Button>
+          </div>
+        </div>
+      </Page>
+    );
+
   return (
     <Page>
       <div className={css({ display: "flex", alignItems: "center", gap: theme.sizing.scale400, flexWrap: "wrap" })}>
@@ -289,7 +307,7 @@ export function NewProject({ session }: { session: Session }) {
         </span>
       </div>
       <Muted>
-        {say.intro} {session.local ? say.whereItLives.local : say.whereItLives.hosted}
+        {say.intro} {session.local ? say.whereItLives.local : say.whereItLives.dev}
       </Muted>
 
       <Section title={say.project.title}>

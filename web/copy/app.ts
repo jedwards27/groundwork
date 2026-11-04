@@ -5,6 +5,18 @@
 export const app = {
   name: "Groundwork",
 
+  // The hosted site is a demo; real projects run on your own computer.
+  demo: {
+    tag: "Demo",
+    tagTip: "A demo with one made-up project. Real projects run on your own computer.",
+    banner: `You're trying a demo with a made-up project, Lake Mariner. To use Groundwork on your own projects, [run it on your computer](https://github.com/jedwards27/groundwork#try-it-in-the-claude-app-the-plugin).`,
+  },
+  // On your own computer (the plugin): this copy is yours.
+  yours: {
+    tag: "On this computer",
+    tagTip: "Your projects and their ledgers live on this computer. Lake Mariner is the demo.",
+  },
+
   shell: {
     unreachableTitle: "Groundwork isn't reachable",
     unreachableBody: "Start it with `make api` (or open it from Claude), then reload.",
@@ -18,8 +30,20 @@ export const app = {
   account: {
     fallbackName: "You",
     onThisComputer: "On this computer",
-    demo: "Demo account",
-    demoWithExpiry: (left: string) => `Demo account (deleted in ${left})`,
+    demo: "Demo",
+    demoWithExpiry: (left: string) => `Demo (resets in ${left})`,
+    // Your own Anthropic API key, for this browser tab only (the hosted demo and make dev).
+    useKey: "Use your own API key",
+    forgetKey: "Forget the API key",
+    keyTitle: "Watch Claude plan, live",
+    keyBody:
+      "The demo plays a written plan, so no AI model runs. Add your own Anthropic API key and Claude plans each email you play from now on, billed to your key. The tour's email keeps its written plan.",
+    keyPrivacy: "The key stays in this tab's memory and goes with each Play. It's never saved; reloading the tab forgets it.",
+    keyPlaceholder: "sk-ant-…",
+    keyUse: "Use for this tab",
+    keyCancel: "Cancel",
+    keyOn: "Live",
+    keyOnTip: "Claude plans the emails you play in this tab, with your API key.",
     underAnHour: "under an hour",
     hours: (h: number) => `${h} hours`,
   },

@@ -1,6 +1,9 @@
 import { useStyletron } from "baseui";
 import { ButtonGroup, MODE } from "baseui/button-group";
-import { Button, SIZE } from "baseui/button";
+import { Button, KIND, SIZE } from "baseui/button";
+import { toaster } from "baseui/toast";
+import { useQueryClient } from "@tanstack/react-query";
+import { send } from "@/lib/client";
 import { TableBuilder, TableBuilderColumn } from "baseui/table-semantic";
 import { useMemo, useState } from "react";
 import { fmt } from "@/lib/format";
@@ -26,10 +29,25 @@ const FILTERS: { label: string; test: (r: Row) => boolean }[] = [
 const STATUS_ORDER: Record<string, number> = { in_progress: 0, not_started: 1, done: 2, cancelled: 3 };
 
 // Every step in the project, done and cancelled ones included, as a table you can sort and filter.
-export function StepsTab({ chain, site }: { chain: ChainView; site: SiteView }) {
+export function StepsTab({ chain, site, mine }: { chain: ChainView; site: SiteView; mine: boolean }) {
   const [css, theme] = useStyletron();
   const [filter, setFilter] = useState(0);
   const [q, setQ] = useState("");
+  const qc = useQueryClient();
+  const [busy, setBusy] = useState<string | null>(null);
+  // Cancel a step (descoped) or bring it back: the person acting in the app, on their own computer.
+  const setStatus = async (item: string, status: "cancelled" | "not_started") => {
+    setBusy(item);
+    try {
+      const r = await send<{ message: string }>("POST", `projects/${site.key}/steps/${item}`, { status });
+      toaster.info(r.message, {});
+      await qc.invalidateQueries();
+    } catch (e) {
+      toaster.negative((e as Error).message, {});
+    } finally {
+      setBusy(null);
+    }
+  };
   const [sort, setSort] = useState<{ col: Col; dir: "ASC" | "DESC" }>({ col: "date", dir: "ASC" });
   const titles = useMemo(() => new Map(chain.items.map((i) => [i.key, i.title])), [chain]);
   const rows: Row[] = useMemo(() => {
@@ -130,6 +148,24 @@ export function StepsTab({ chain, site }: { chain: ChainView; site: SiteView }) 
               </div>
             )}
           </TableBuilderColumn>
+          {mine ? (
+            <TableBuilderColumn<Row> header="" id="act">
+              {(r) =>
+                r.status === "done" || r.key === chain.milestone.item ? null : (
+                  <Button
+                    kind={KIND.tertiary}
+                    size={SIZE.mini}
+                    isLoading={busy === r.key}
+                    title={r.status === "cancelled" ? undefined : say.cancelTip}
+                    onClick={() => void setStatus(r.key, r.status === "cancelled" ? "not_started" : "cancelled")}
+                    data-testid={`${r.status === "cancelled" ? "restore" : "cancel"}-${r.key}`}
+                  >
+                    {r.status === "cancelled" ? say.restore : say.cancel}
+                  </Button>
+                )
+              }
+            </TableBuilderColumn>
+          ) : null}
         </TableBuilder>
       </div>
       {pager}

@@ -31,8 +31,19 @@ async function tab(page: Page, name: string): Promise<void> {
   await page.getByRole("tab", { name: new RegExp(`^${name}`) }).click();
 }
 
+// The demo's extra messages aren't in the inbox until played; the tests play them through the API.
+const EXTRAS = new Set(["event-a", "event-b", "event-b-expedite", "injection-expedite-po", "injection-date-change"]);
+
 // Play a message from the inbox. Its steps stream into a drawer, which offers the decisions at the end.
 async function play(page: Page, eventKey: string): Promise<void> {
+  if (EXTRAS.has(eventKey)) {
+    const res = await page.request.post(`/api/sites/${SITE}/events`, { data: { event: eventKey }, headers: { origin: new URL(page.url()).origin } });
+    expect(res.ok(), `playing ${eventKey} returned ${res.status()}`).toBeTruthy();
+    const { run_id } = (await res.json()) as { run_id: string };
+    await expect.poll(async () => (await api<{ status: string }>(page, `runs/${run_id}`)).status, { timeout: 90_000 }).toBe("done");
+    await page.goto(`/projects/${SITE}/actions`);
+    return;
+  }
   await tab(page, "Inbox");
   await page.getByTestId(`play-${eventKey}`).click();
   const drawer = page.getByTestId("message-drawer");
@@ -161,7 +172,7 @@ test("two visitors at once each get a private copy", async ({ page, browser }) =
     await open(page, `/projects/${SITE}`);
     await open(bob, `/projects/${SITE}`);
     await page.getByTestId("you").click();
-    await expect(page.getByTestId("account-menu")).toContainText("(deleted in");
+    await expect(page.getByTestId("account-menu")).toContainText("(resets in");
     await page.keyboard.press("Escape");
     const start = await api<Chain>(bob, `sites/${SITE}/chain`);
     await play(page, "event-a");
@@ -177,7 +188,7 @@ test("two visitors at once each get a private copy", async ({ page, browser }) =
     await bob.goto("/");
     await bob.getByTestId("tutorial-card-start").click();
     await bob.getByTestId("tutorial-begin").click();
-    await expect(bob.getByTestId("tutorial-count")).toHaveText(/1 of 15/);
+    await expect(bob.getByTestId("tutorial-count")).toHaveText(/1 of 16/);
     const after = await api<Plan>(page, `sites/${SITE}/latest-plan`);
     expect(after.actions.map((a) => a.id)).toEqual(mine.actions.map((a) => a.id));
     expect((await api<Chain>(page, `sites/${SITE}/chain`)).milestone.forecast_finish).not.toBe(start.milestone.forecast_finish);
@@ -235,7 +246,7 @@ async function tutorial(page: Page): Promise<void> {
   await ui(page, "tutorial-begin").click();
 }
 
-const TOTAL = 15;
+const TOTAL = 16;
 const step = (page: Page, n: number) => expect(ui(page, "tutorial-count")).toHaveText(new RegExp(`${n} of ${TOTAL}`));
 
 // Every click below is a real click: it fails if the tutorial's panel covers what it points at.
@@ -300,19 +311,30 @@ async function clickThrough(page: Page): Promise<void> {
   await expect(page.locator('[data-testid^="ask-b"]')).toHaveCount(3, { timeout: 90_000 });
   await expect(ui(page, "runs").getByTestId("run")).toHaveCount(2);
   await ui(page, "tutorial-next").click();
+  // No model ran in the tour; it points at where your own API key goes.
+  await expect(ui(page, "tutorial-title")).toHaveText("Want to see Claude plan?");
+  await ui(page, "tutorial-next").click();
   await expect(ui(page, "tutorial-title")).toHaveText("That's the whole tour!");
   await expect(ui(page, "tutorial-finish")).toBeVisible();
   // In the browser (not the plugin's own app), the tour points to the plugin download.
-  await expect(ui(page, "tutorial-finish").getByRole("link", { name: "Download the Groundwork plugin" })).toHaveAttribute(
+  await expect(ui(page, "tutorial-finish").getByRole("link", { name: "download the plugin" })).toHaveAttribute(
     "href",
     "https://github.com/jedwards27/groundwork/releases/latest/download/groundwork-plugin.zip",
   );
+  if ((await health(page)).hosted) {
+    // The demo doesn't create projects: the way on is installing it.
+    await expect(ui(page, "tutorial-install")).toHaveAttribute("href", /#try-it-in-the-claude-app-the-plugin$/);
+    await ui(page, "tutorial-done").click();
+    await expect(ui(page, "tutorial")).toBeHidden();
+    return;
+  }
   await ui(page, "tutorial-new-project").click();
   await expect(page).toHaveURL(/\/projects\/new$/);
   await expect(ui(page, "tutorial")).toBeHidden();
 }
 
 test("the tutorial: you click through the app yourself, and it ends at your first project", async ({ page }) => {
+  test.setTimeout(180_000); // sixteen steps and a background run, slower over the network
   await tutorial(page);
   await clickThrough(page);
   // Finished once, home stops offering it; the account menu still has it.
@@ -322,6 +344,7 @@ test("the tutorial: you click through the app yourself, and it ends at your firs
 });
 
 test("the tutorial fits a narrow window: its panel never covers what it points at", async ({ page }) => {
+  test.setTimeout(180_000);
   await page.setViewportSize({ width: 575, height: 560 });
   await tutorial(page);
   await clickThrough(page);
@@ -358,6 +381,11 @@ test("closing the tutorial pauses it; opening it again picks up where you left o
 
 test("a new project from the website: check its forecast, then create it", async ({ page }) => {
   await open(page, "/projects/new");
+  if ((await health(page)).hosted) {
+    // The hosted demo has one made-up project; real ones run on your computer.
+    await expect(ui(page, "demo-only")).toBeVisible();
+    return;
+  }
   await ui(page, "use-example").click();
   await ui(page, "check-forecast").click();
   await expect(ui(page, "project-preview")).toContainText("Waiting on: Cabinets delivered");
@@ -395,6 +423,7 @@ test("every step: the Steps tab lists them all, and the chart can show the whole
 
 test("a new project's steps can be pasted from a spreadsheet", async ({ page }) => {
   await open(page, "/projects/new");
+  test.skip(!!(await health(page)).hosted, "the hosted demo doesn't create projects");
   await page.getByRole("button", { name: "Paste steps from a spreadsheet" }).click();
   await ui(page, "paste-steps").fill("Step\tOwner\tStatus\tDue\tWaits on\nPermit issued\tCity permits\tunder way\t2027-01-15\t\nCabinets installed\tBayside Builders\tnot started\t2/1/2027\tPermit issued\nno date\tBayside Builders\t\t\t");
   await ui(page, "paste-add").click();

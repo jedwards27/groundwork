@@ -119,6 +119,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/{key}/steps/{item}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Step Status
+         * @description Cancel a step (descoped: kept on record, ignored by the forecast) or bring it back. The person
+         *     acting in the app; a ledger record says who.
+         */
+        post: operations["step_status_projects__key__steps__item__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/projects/preview": {
         parameters: {
             query?: never;
@@ -1467,6 +1488,11 @@ export interface components {
             /** Archived At */
             archived_at?: string | null;
         };
+        /** StepStatus */
+        StepStatus: {
+            /** Status */
+            status: string;
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -1676,6 +1702,44 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["Delete"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    step_status_projects__key__steps__item__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                item: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StepStatus"];
             };
         };
         responses: {

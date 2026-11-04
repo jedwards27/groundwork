@@ -153,15 +153,48 @@ def delete(key: str, body: Delete, v: Viewer = Depends(viewer)) -> dict[str, str
     return {"message": f"Deleted {ref.name}."}
 
 
+DEMO_ONLY = "The hosted site is a demo of one made-up project. To track a project of your own, run Groundwork on your computer."
+
+
+def _not_on_the_demo() -> None:
+    """The public demo shows Lake Mariner only. Real projects live on the person's own computer."""
+    if get_settings().groundwork_hosted:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, DEMO_ONLY)
+
+
+class StepStatus(BaseModel):
+    status: str = Field(pattern="^(cancelled|not_started|in_progress)$")
+
+
+@router.post("/projects/{key}/steps/{item}")
+def step_status(key: str, item: str, body: StepStatus, v: Viewer = Depends(viewer)) -> dict[str, str]:
+    """Cancel a step (descoped: kept on record, ignored by the forecast) or bring it back. The person
+    acting in the app; a ledger record says who."""
+    from groundwork.db.session import org_session
+    from groundwork.service import edits
+
+    ref = _mine(v, key)
+    with org_session(ref.org_id) as s:
+        state = repo.load_state(s, key)
+    payload = {"why": "Changed in the app", "add": [], "change": [{"key": item, "status": body.status}], "remove": []}
+    try:
+        edits.apply_steps(ref.org_id, ref.site_id, state, payload, _by())
+    except edits.EditProblem as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+    return {"message": "Cancelled." if body.status == "cancelled" else "Restored."}
+
+
 @router.post("/projects/preview")
 def preview(body: NewProject, v: Viewer = Depends(viewer)) -> dict[str, Any]:
     """What the project would look like: its forecast and what sets the date. Nothing is saved."""
+    _not_on_the_demo()
     return svc.summary(_bundle(v, body), body.draft)
 
 
 @router.post("/projects")
 def create(body: NewProject, request: Request, response: Response, v: Viewer = Depends(viewer)) -> dict[str, Any]:
     """Create the project the person checked. A ledger record says who created it."""
+    _not_on_the_demo()
     cfg = get_settings()
     bundle = _bundle(v, body, keep=True)
     if svc.taken(bundle) and _local(v):

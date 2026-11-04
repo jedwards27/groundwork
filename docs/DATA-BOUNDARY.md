@@ -4,7 +4,7 @@ Groundwork's local mode keeps project data on your machine except for one destin
 
 ## Project data at run time
 
-**Sent to `api.anthropic.com`, only when `ANTHROPIC_API_KEY` is set, or when a visitor pastes their own key into a project's Settings (hosted demo or `make dev`; never in the plugin). A visitor's key stays in that browser tab's memory, goes with each Play, is used for that one run and is never stored:**
+**Sent to `api.anthropic.com`, only when `ANTHROPIC_API_KEY` is set, or when a visitor adds their own key from the account menu (hosted demo or `make dev`; never in the plugin). A visitor's key stays in that browser tab's memory, goes with each Play, is used for that one run and is never stored:**
 
 - The site's items, links, dates, statuses and forecast (the planner's context).
 - The text of the event being played.

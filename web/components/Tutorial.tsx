@@ -22,11 +22,11 @@ const STORE = "gw-tutorial";
 // Remembered for good once someone finishes, so home stops offering it.
 const DONE = "gw-tutorial-done";
 const P = `/projects/${DEMO_PROJECT}`;
-// The message the tour plays, and the ones its inbox leaves out until the tour is over: a second
-// telling of the same delay, the email the tour plays in the background later, the offer that follows
-// it, and the two injection tests.
+// The message the tour plays, and the demo messages the inbox leaves out unless they've been played:
+// a second telling of the same delay, the email the tour plays in the background, the offer that
+// follows it, and the two injection tests. They stay in the demo for the tests, evals and Claude.
 export const TOUR_MESSAGE = "demo-monday";
-export const TOUR_HIDES = new Set(["event-a", "event-b", "event-b-expedite", "injection-expedite-po", "injection-date-change"]);
+export const DEMO_EXTRAS = new Set(["event-a", "event-b", "event-b-expedite", "injection-expedite-po", "injection-date-change"]);
 
 interface Step {
   title: string;
@@ -48,6 +48,8 @@ interface Step {
   inDrawer?: boolean;
   // Reaching this step plays this message in the background, so a later page has something new on it.
   plays?: string;
+  // What the step says instead on the person's own computer.
+  localBody?: string;
   // Skip ahead to the plan if the tour's message was already played (say, before the tour began),
   // since there's nothing left to click here.
   skipIfPlayed?: boolean;
@@ -88,6 +90,8 @@ export const STEPS: Step[] = [
     plays: "event-b",
   },
   { ...say.home, route: "/", highlight: "needs-you" },
+  // No model ran in the tour; where to add your own key (or, on your computer, how Claude plans).
+  { ...say.model, route: "/", target: "you" },
   { ...say.end, route: "/", end: true },
 ];
 
@@ -250,6 +254,7 @@ export function TutorialProvider({ session, children }: { session: Session; chil
           step={state.step}
           review={state.step < state.max}
           local={session.local}
+          hosted={!!session.health.hosted}
           go={go}
           play={playInBackground}
           pause={() => set({ ...state, open: false })}
@@ -278,10 +283,11 @@ export function TutorialProvider({ session, children }: { session: Session; chil
   );
 }
 
-function Panel({ step, review, local, go, play, pause, finish }: {
+function Panel({ step, review, local, hosted, go, play, pause, finish }: {
   step: number;
   review: boolean;
   local: boolean;
+  hosted: boolean;
   go: (n: number) => void;
   play: (event: string) => void;
   pause: () => void;
@@ -415,9 +421,9 @@ function Panel({ step, review, local, go, play, pause, finish }: {
         </ModalHeader>
         <ModalBody>
           <ParagraphSmall marginTop={0}>
-            <Rich text={s.body} />
+            <Rich text={local && s.localBody ? s.localBody : s.body} />
           </ParagraphSmall>
-          <Finish local={local} done={finish} back={backLink} />
+          <Finish local={local} hosted={hosted} done={finish} back={backLink} />
         </ModalBody>
       </Modal>
     );
@@ -513,7 +519,7 @@ function Panel({ step, review, local, go, play, pause, finish }: {
         <LabelLarge data-testid="tutorial-title">{s.title}</LabelLarge>
         <div className={css({ flex: "1 1 auto", minHeight: 0, overflowY: "auto" })}>
           <ParagraphSmall margin={0}>
-            <Rich text={s.body} />
+            <Rich text={local && s.localBody ? s.localBody : s.body} />
           </ParagraphSmall>
         </div>
         {cta}
@@ -581,21 +587,28 @@ function Pointer({ el, text, below }: { el: HTMLElement; text: string; below?: b
 }
 
 // The end of the tour: start a project of your own, or keep exploring the demo.
-function Finish({ local, done, back }: { local: boolean; done: () => void; back: ReactNode }) {
+function Finish({ local, hosted, done, back }: { local: boolean; hosted: boolean; done: () => void; back: ReactNode }) {
   const [css, theme] = useStyletron();
   const navigate = useNavigate();
   return (
     <div className={css({ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: theme.sizing.scale500 })} data-testid="tutorial-finish">
       <div className={css({ display: "flex", gap: theme.sizing.scale300, flexWrap: "wrap" })}>
-        <Button
-          onClick={() => {
-            done();
-            navigate("/projects/new");
-          }}
-          data-testid="tutorial-new-project"
-        >
-          {t.finish.newProject}
-        </Button>
+        {hosted ? (
+          // The demo doesn't create projects: the next step is running it on your own computer.
+          <Button $as="a" href={t.finish.installUrl} target="_blank" rel="noreferrer" onClick={done} data-testid="tutorial-install">
+            {t.finish.install}
+          </Button>
+        ) : (
+          <Button
+            onClick={() => {
+              done();
+              navigate("/projects/new");
+            }}
+            data-testid="tutorial-new-project"
+          >
+            {t.finish.newProject}
+          </Button>
+        )}
         <Button kind={KIND.secondary} onClick={done} data-testid="tutorial-done">
           {t.finish.explore}
         </Button>

@@ -9,13 +9,12 @@ import { ParagraphSmall } from "baseui/typography";
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { send } from "@/lib/client";
-import { DEMO_PROJECT, fmtLong } from "@/lib/format";
-import { setKey, useKey } from "@/lib/key";
+import { DEMO_PROJECT, fmtLong, PROVENANCE_LABEL } from "@/lib/format";
 import type { CompareRow, MandateView, Me, PlanView, Session, SiteView } from "@/lib/types";
 import { project } from "@/copy/project";
 import { MandateTab } from "./MandateTab";
 import { VerifyRecord } from "./VerifyRecord";
-import { Chip, Muted, Section } from "./ui";
+import { Grow, Hint, Line, Muted, Row, Section } from "./ui";
 
 const say = project.settings;
 
@@ -38,8 +37,6 @@ export function SettingsTab({ site, mandate, compare, plan, me, mine, session }:
   const [deleting, setDeleting] = useState(false);
   const [typed, setTyped] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
-  const liveKey = useKey();
-  const [draftKey, setDraftKey] = useState("");
   useEffect(() => {
     setName(site.name);
     setLocation(site.location);
@@ -90,43 +87,18 @@ export function SettingsTab({ site, mandate, compare, plan, me, mine, session }:
         </Section>
       )}
 
-      {!session.local && (
-        <Section title={say.live} hint={say.liveHint} testId="settings-live">
-          <div className={css({ display: "grid", gap: theme.sizing.scale300, maxWidth: "480px" })}>
-            {liveKey ? (
-              <div className={css({ display: "flex", gap: theme.sizing.scale400, alignItems: "center", flexWrap: "wrap" })}>
-                <Chip kind="green" testId="live-on">{say.liveOn}</Chip>
-                <Button kind={KIND.secondary} size={SIZE.compact} onClick={() => setKey(null)} data-testid="live-forget">
-                  {say.liveForget}
-                </Button>
-              </div>
-            ) : (
-              <div className={css({ display: "flex", gap: theme.sizing.scale300, alignItems: "center", flexWrap: "wrap" })}>
-                <div className={css({ flex: "1 1 240px" })}>
-                  <Input
-                    type="password"
-                    value={draftKey}
-                    onChange={(e) => setDraftKey((e.target as HTMLInputElement).value)}
-                    placeholder={say.livePlaceholder}
-                    size="compact"
-                    overrides={{ Input: { props: { "data-testid": "live-key", autoComplete: "off", spellCheck: false } } }}
-                  />
-                </div>
-                <Button
-                  size={SIZE.compact}
-                  disabled={!draftKey.trim().startsWith("sk-ant-")}
-                  onClick={() => {
-                    setKey(draftKey);
-                    setDraftKey("");
-                  }}
-                  data-testid="live-use"
-                >
-                  {say.liveUse}
-                </Button>
-              </div>
-            )}
-            <Muted>{say.liveNote}</Muted>
-          </div>
+      {site.facts.length > 0 && (
+        <Section title={say.about} hint={site.attrs.blurb || undefined} testId="settings-about">
+          {site.facts.map((f) => (
+            <Row key={f.label}>
+              <Grow>
+                <Muted>{f.label}</Muted>
+                <Line>{f.value}</Line>
+              </Grow>
+              <Hint text={project.overview.about.source(PROVENANCE_LABEL[f.provenance] ?? f.provenance, f.source)} />
+            </Row>
+          ))}
+          <Muted>{say.workingFor(site.parties.find((p) => p.key === site.principal)?.name ?? site.principal)}</Muted>
         </Section>
       )}
 

@@ -193,6 +193,17 @@ function RunSteps({ run, simulated, onSeeActions }: { run: RunState; simulated: 
   const total = counts ? counts.auto + counts.ask + counts.refuse : 0;
   return (
     <Field label={status === "running" ? sayRun.working : status === "failed" ? sayRun.stopped : sayRun.done}>
+      {/* Finished: the result and the next click come first, so the drawer opens at the top. */}
+      {status === "done" && total > 0 && (
+        <div data-testid="run-done" className={css({ marginBottom: theme.sizing.scale500, padding: theme.sizing.scale500, borderRadius: theme.borders.radius300, background: theme.colors.backgroundSecondary, display: "grid", gap: theme.sizing.scale400 })}>
+          <ParagraphSmall margin={0}>{sayRun.finished(total)}</ParagraphSmall>
+          <div>
+            <Button size={SIZE.compact} onClick={onSeeActions} data-testid="see-actions">
+              {sayRun.seeSteps(total)}
+            </Button>
+          </div>
+        </div>
+      )}
       {simulated && (
         <Muted testId="simulated-run">{sayRun.simulated}</Muted>
       )}
@@ -210,16 +221,6 @@ function RunSteps({ run, simulated, onSeeActions }: { run: RunState; simulated: 
         })}
         {working && visible.length === 0 && <Spinner $size="18px" $borderWidth="2px" />}
       </ol>
-      {status === "done" && total > 0 && (
-        <div data-testid="run-done" className={css({ marginTop: theme.sizing.scale500, padding: theme.sizing.scale500, borderRadius: theme.borders.radius300, background: theme.colors.backgroundSecondary, display: "grid", gap: theme.sizing.scale400 })}>
-          <ParagraphSmall margin={0}>{sayRun.finished(total)}</ParagraphSmall>
-          <div>
-            <Button size={SIZE.compact} onClick={onSeeActions} data-testid="see-actions">
-              {sayRun.seeSteps(total)}
-            </Button>
-          </div>
-        </div>
-      )}
       {status === "done" && total === 0 && <Muted testId="run-done">{sayRun.nothingToDo}</Muted>}
       {status === "failed" && <Muted testId="run-interrupted">{sayRun.interrupted}</Muted>}
     </Field>

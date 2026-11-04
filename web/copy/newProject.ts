@@ -7,8 +7,13 @@ export const newProject = {
   intro: "Anything that waits on other organizations: a remodel, a store opening, a grid connection.",
   whereItLives: {
     local: "It's yours, on this computer.",
-    hosted:
-      "In this demo it lives in your private copy and is deleted with it. For a real project, run Groundwork on your own computer, so its data stays there.",
+    dev: "It's yours, in this computer's database.",
+  },
+  // The hosted demo doesn't create projects.
+  demoOnly: {
+    title: "Real projects run on your computer",
+    body: `This site is a demo with one made-up project. To track a project of your own, [download the plugin](https://github.com/jedwards27/groundwork/releases/latest/download/groundwork-plugin.zip) for the Claude app and follow the [install steps](https://github.com/jedwards27/groundwork#try-it-in-the-claude-app-the-plugin). Your project's data stays on your computer.`,
+    back: "Back to the demo",
   },
 
   project: {

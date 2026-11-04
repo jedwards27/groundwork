@@ -46,20 +46,6 @@ export function Overview({ chain, site, plan }: { chain: ChainView; site: SiteVi
         <Panel title={<Titled title={say.calendar.title} about={say.calendar.about} />}>
           <Calendar chain={chain} site={site} />
         </Panel>
-        {site.facts.length > 0 && (
-          <Panel title={<Titled title={say.about.title} about={site.attrs.blurb || say.about.aboutFallback} />}>
-            {site.facts.map((f) => (
-              <Row key={f.label}>
-                <Grow>
-                  <Muted>{f.label}</Muted>
-                  <Line>{f.value}</Line>
-                </Grow>
-                <Hint text={say.about.source(PROVENANCE_LABEL[f.provenance] ?? f.provenance, f.source)} />
-              </Row>
-            ))}
-            <Muted>{say.about.workingFor(party(site.principal))}</Muted>
-          </Panel>
-        )}
       </Accordion>
     </div>
   );

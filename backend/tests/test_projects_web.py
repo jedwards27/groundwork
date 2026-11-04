@@ -131,3 +131,11 @@ def test_a_sign_in_whose_person_was_reloaded_away_counts_as_signed_out(visitor):
     assert visitor.get("/session").json()["signed_in"] is False
     assert visitor.get("/me").status_code == 401
     assert visitor.post("/session", headers=ORIGIN).status_code == 200 and visitor.get("/me").json()["person"] == "jordan"
+
+
+def test_the_public_demo_does_not_create_projects(visitor, env):
+    # The hosted profile refuses to start on development secrets, so it's switched on after start-up.
+    env(GROUNDWORK_DEMO_LOGIN="true", GROUNDWORK_HOSTED="true")
+    for path in ("/projects/preview", "/projects"):
+        r = visitor.post(path, json=kitchen(), headers=ORIGIN)
+        assert r.status_code == 403 and "your computer" in r.json()["detail"]

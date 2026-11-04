@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Groundwork: a spark over a ground line, in warm Claude-like colors. -->
+  <rect width="64" height="64" rx="14" fill="#D97757"/>
+  <g fill="#FAF6F0">
+    <polygon points="28.60,29.00 32.00,10.00 35.40,29.00"/><polygon points="29.60,26.60 41.90,19.10 34.40,31.40"/><polygon points="32.00,25.60 51.00,29.00 32.00,32.40"/><polygon points="34.40,26.60 41.90,38.90 29.60,31.40"/><polygon points="35.40,29.00 32.00,48.00 28.60,29.00"/><polygon points="34.40,31.40 22.10,38.90 29.60,26.60"/><polygon points="32.00,32.40 13.00,29.00 32.00,25.60"/><polygon points="29.60,31.40 22.10,19.10 34.40,26.60"/>
+    <circle cx="32" cy="29" r="4.2"/>
+    <rect x="12" y="50" width="40" height="4.5" rx="2.25"/>
+  </g>
+</svg>

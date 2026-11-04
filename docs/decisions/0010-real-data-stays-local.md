@@ -15,7 +15,7 @@ Two ways to hold real data were on the table:
 Option 2 for the prototype.
 
 - **Real projects run locally:** the Claude plugin (embedded Postgres under `~/.groundwork`, the web app on 127.0.0.1) or `make dev` (local Postgres). The README's "Keep your data on your laptop" section is the how-to.
-- **The hosted copy is the demo.** It holds only the synthetic and public Lake Mariner fixture and whatever a visitor types into their private copy, deleted with it. Its New project form says so and points real projects to the local install.
+- **The hosted copy is the demo.** It holds only the synthetic and public Lake Mariner fixture, in each visitor's own copy, deleted after 12 hours. Update (Nov 4, 2026): it no longer creates projects at all. A banner and a Demo tag say it's a demo, and the New project page and the tour's ending point to the local install instead.
 - **No identity provider in the prototype.** The Google sign-in branch is parked, not merged.
 
 ## Consequences

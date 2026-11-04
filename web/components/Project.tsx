@@ -20,7 +20,7 @@ import { LedgerTab } from "./LedgerTab";
 import { Overview } from "./Overview";
 import { SettingsTab } from "./SettingsTab";
 import { StepsTab } from "./StepsTab";
-import { TOUR_HIDES, useTutorial } from "./Tutorial";
+import { DEMO_EXTRAS, useTutorial } from "./Tutorial";
 import { Chip, Drawer, Field, Muted, Page, Quote } from "./ui";
 import { project as say } from "@/copy/project";
 import { tutorial as t } from "@/copy/tutorial";
@@ -121,10 +121,8 @@ export function Project({ session }: { session: Session }) {
   const party = (k: string) => s.parties.find((p) => p.key === k)?.name ?? k;
   const p = plan.data ?? null;
   const asks = p ? p.actions.filter((a) => a.state === "pending").length : 0;
-  // During the tour, the demo's inbox is shorter: what the tour doesn't use waits until it's over.
-  const touring = key === DEMO_PROJECT && tutorial.open;
-  const inbox = (events.data ?? []).filter((e) => !touring || !TOUR_HIDES.has(e.key) || e.status === "applied");
-  const later = (events.data ?? []).length - inbox.length;
+  // The demo's inbox keeps to the messages worth playing; the extras show once played.
+  const inbox = (events.data ?? []).filter((e) => key !== DEMO_PROJECT || !DEMO_EXTRAS.has(e.key) || e.status === "applied");
   const fresh = inbox.filter((e) => e.status !== "applied").length;
   const claudePlans = session.local && key !== DEMO_PROJECT;
   const mine = session.local && !session.health.hosted;
@@ -217,10 +215,10 @@ export function Project({ session }: { session: Session }) {
             <Overview chain={c} site={s} plan={p} />
           </Tab>
           <Tab key="steps" overrides={PANEL} title={title(say.tabs.steps, 0, "tab-steps")}>
-            <StepsTab chain={c} site={s} />
+            <StepsTab chain={c} site={s} mine={mine} />
           </Tab>
           <Tab key="inbox" overrides={PANEL} title={title(say.tabs.inbox, fresh, "tab-inbox")}>
-            <InboxTab events={inbox} note={later ? say.inbox.afterTour(later) : undefined} site={s} run={run} onPlay={play} claudePlans={claudePlans} onSeeActions={() => navigate(`/projects/${key}/actions`)} />
+            <InboxTab events={inbox} site={s} run={run} onPlay={play} claudePlans={claudePlans} onSeeActions={() => navigate(`/projects/${key}/actions`)} />
           </Tab>
           <Tab key="actions" overrides={PANEL} title={title(say.tabs.actions, asks, "tab-actions", true)}>
             <ActionsTab plan={p} site={s} chain={c} me={me.data ?? null} onOpenInbox={() => navigate(`/projects/${key}/inbox`)} />

@@ -278,3 +278,15 @@ def test_the_person_renames_a_project_in_its_settings(page):
         rec = s.execute(select(m.LedgerEntry).where(m.LedgerEntry.entry_type == "project_changed")).scalar_one()
     assert rec.payload["by"] == "Jude Test" and rec.payload["change"]["name"] == "Connaught Place (Monette)"
     assert client.post(f"/api/projects/{key}/details", json={"name": "Connaught Place (Monette)", "location": "Toronto"}, headers=ORIGIN).json()["message"] == "Nothing changed."
+
+
+def test_the_person_cancels_and_restores_a_step_in_the_app(page):
+    client, _ = page
+    tools.setup("Jude Test", "jude@example.test")
+    key = _create()
+    r = client.post(f"/api/projects/{key}/steps/rods", json={"status": "cancelled"}, headers=ORIGIN)
+    assert r.status_code == 200 and r.json()["message"] == "Cancelled."
+    assert {s["item"]: s["status"] for s in tools.steps(key)["steps"]}["rods"] == "cancelled"
+    assert client.post(f"/api/projects/{key}/steps/final", json={"status": "cancelled"}, headers=ORIGIN).status_code == 409
+    assert client.post(f"/api/projects/{key}/steps/rods", json={"status": "not_started"}, headers=ORIGIN).json()["message"] == "Restored."
+    assert {s["item"]: s["status"] for s in tools.steps(key)["steps"]}["rods"] == "not_started"

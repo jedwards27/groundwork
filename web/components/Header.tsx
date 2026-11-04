@@ -2,15 +2,20 @@ import { useQuery } from "@tanstack/react-query";
 import { useStyletron } from "baseui";
 import { Button, KIND, SIZE } from "baseui/button";
 import { ChevronDown } from "baseui/icon";
+import { Input } from "baseui/input";
 import { StatefulMenu } from "baseui/menu";
+import { Modal, ModalBody, ModalButton, ModalFooter, ModalHeader } from "baseui/modal";
+import { useState } from "react";
 import { PLACEMENT, StatefulPopover } from "baseui/popover";
 import { LabelLarge, LabelMedium, LabelSmall, ParagraphXSmall } from "baseui/typography";
 import { Link, useMatch, useNavigate } from "react-router";
 import { get } from "@/lib/client";
+import { setKey, useKey } from "@/lib/key";
 import type { Session, SiteView } from "@/lib/types";
 import { app } from "@/copy/app";
 import { tutorial as t } from "@/copy/tutorial";
 import { STEPS, useTutorial } from "./Tutorial";
+import { Chip } from "./ui";
 
 type Item = { id: string; label: string };
 
@@ -28,6 +33,11 @@ export function Header({ session }: { session: Session }) {
   const key = match?.params.key && match.params.key !== "new" ? match.params.key : undefined;
   const site = useQuery({ queryKey: ["site", key], queryFn: () => get<SiteView>(`sites/${key}`), enabled: !!key });
   const you = session.you;
+  // Your own API key is for the demo and make dev; on your computer, Claude in the app plans.
+  const liveKey = useKey();
+  const keyable = !session.local;
+  const [asking, setAsking] = useState(false);
+  const [draft, setDraft] = useState("");
   const name = you?.name ?? app.account.fallbackName;
   const about = session.local
     ? you?.email || app.account.onThisComputer
@@ -45,9 +55,16 @@ export function Header({ session }: { session: Session }) {
         ]
       : [{ id: "resume", label: t.menu.take }];
 
+  const allItems: Item[] = [
+    ...items,
+    ...(keyable ? [liveKey ? { id: "forget-key", label: app.account.forgetKey } : { id: "use-key", label: app.account.useKey }] : []),
+  ];
+
   const act = (id: string) => {
     if (id === "resume") tutorial.start();
     if (id === "restart") tutorial.restart();
+    if (id === "use-key") setAsking(true);
+    if (id === "forget-key") setKey(null);
   };
 
   const avatar = css({
@@ -86,12 +103,19 @@ export function Header({ session }: { session: Session }) {
         <Link to="/" className={css({ textDecoration: "none", color: "inherit" })} data-testid="home-link">
           <LabelLarge $style={{ fontWeight: 700 }}>{app.name}</LabelLarge>
         </Link>
+        {/* Which copy this is: the public demo, or yours on this computer. */}
+        {session.health.hosted ? (
+          <Chip kind="yellow" tip={app.demo.tagTip} testId="demo-tag">{app.demo.tag}</Chip>
+        ) : session.local ? (
+          <Chip kind="gray" tip={app.yours.tagTip} testId="yours-tag">{app.yours.tag}</Chip>
+        ) : null}
         {key && site.data && (
           <LabelMedium color={theme.colors.contentTertiary} className={css({ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "none", "@media (min-width: 640px)": { display: "block" } })}>
             / {site.data.name}
           </LabelMedium>
         )}
-        <div className={css({ marginLeft: "auto" })}>
+        <div className={css({ marginLeft: "auto", display: "flex", alignItems: "center", gap: theme.sizing.scale300 })}>
+          {liveKey && <Chip kind="green" tip={app.account.keyOnTip} testId="live-tag">{app.account.keyOn}</Chip>}
           <StatefulPopover
             placement={PLACEMENT.bottomRight}
             // One surface: the name block and the menu share a background, corners and border.
@@ -111,7 +135,7 @@ export function Header({ session }: { session: Session }) {
                   </div>
                 </div>
                 <StatefulMenu
-                  items={items}
+                  items={allItems}
                   onItemSelect={({ item }) => {
                     close();
                     act((item as Item).id);
@@ -130,6 +154,36 @@ export function Header({ session }: { session: Session }) {
           </StatefulPopover>
         </div>
       </div>
+      <Modal isOpen={asking} onClose={() => setAsking(false)} closeable autoFocus>
+        <ModalHeader>{app.account.keyTitle}</ModalHeader>
+        <ModalBody>
+          <ParagraphXSmall marginTop={0}>{app.account.keyBody}</ParagraphXSmall>
+          <Input
+            type="password"
+            value={draft}
+            onChange={(e) => setDraft((e.target as HTMLInputElement).value)}
+            placeholder={app.account.keyPlaceholder}
+            overrides={{ Input: { props: { "data-testid": "live-key", autoComplete: "off", spellCheck: false } } }}
+          />
+          <ParagraphXSmall marginBottom={0} color={theme.colors.contentTertiary}>{app.account.keyPrivacy}</ParagraphXSmall>
+        </ModalBody>
+        <ModalFooter>
+          <ModalButton kind={KIND.tertiary} onClick={() => setAsking(false)}>
+            {app.account.keyCancel}
+          </ModalButton>
+          <ModalButton
+            disabled={!draft.trim().startsWith("sk-ant-")}
+            onClick={() => {
+              setKey(draft);
+              setDraft("");
+              setAsking(false);
+            }}
+            data-testid="live-use"
+          >
+            {app.account.keyUse}
+          </ModalButton>
+        </ModalFooter>
+      </Modal>
     </header>
   );
 }

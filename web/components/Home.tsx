@@ -18,7 +18,8 @@ import { Accordion, Panel } from "baseui/accordion";
 import { home as say } from "@/copy/home";
 import { project } from "@/copy/project";
 import { tutorial as t } from "@/copy/tutorial";
-import { Chip, Drawer, Empty, Field, Grow, Line, Muted, Outgoing, Page, Row, Section } from "./ui";
+import { Chip, Drawer, Empty, Field, Grow, Line, Muted, Outgoing, Page, Rich, Row, Section } from "./ui";
+import { app } from "@/copy/app";
 
 // "Did 1 on its own, asked you about 1, denied 1", leaving out what's zero.
 function did(c: { allow: number; ask: number; deny: number }): string {
@@ -56,8 +57,14 @@ export function Home({ session }: { session: Session }) {
   const archived = h.archived ?? [];
   const runs = allRuns ? h.runs : h.runs.slice(0, 3);
   const demo = h.projects.some((p) => p.project === DEMO_PROJECT);
+  const hosted = !!session.health.hosted;
   return (
     <Page>
+      {hosted && (
+        <div data-testid="demo-banner" className={css({ ...theme.typography.ParagraphSmall, padding: `${theme.sizing.scale400} ${theme.sizing.scale600}`, marginBottom: theme.sizing.scale600, borderRadius: theme.borders.radius300, background: theme.colors.backgroundWarningLight, color: theme.colors.contentPrimary })}>
+          <Rich text={app.demo.banner} />
+        </div>
+      )}
       {demo && !tutorial.open && !tutorial.done && (
         <div
           data-testid="tutorial-card"
@@ -116,9 +123,11 @@ export function Home({ session }: { session: Session }) {
         title={say.projects.title}
         testId="projects"
         right={
-          <Button kind={KIND.secondary} size={SIZE.mini} onClick={() => navigate("/projects/new")} data-testid="new-project">
-            {say.projects.newProject}
-          </Button>
+          !hosted && (
+            <Button kind={KIND.secondary} size={SIZE.mini} onClick={() => navigate("/projects/new")} data-testid="new-project">
+              {say.projects.newProject}
+            </Button>
+          )
         }
       >
         {h.projects.length === 0 && <Empty>{say.projects.empty}</Empty>}

@@ -120,6 +120,11 @@ export const tutorial = {
       title: "Back home",
       body: "While you looked around, a second email came in: the building's main electrical equipment failed a factory test. Groundwork already did what your rules allow. What needs you waits here, and Activity, below, shows what it did.",
     },
+    model: {
+      title: "Want to see Claude plan?",
+      body: "This demo plays a written plan, so no AI model ran here. To watch Claude plan the demo's other emails, add your own Anthropic API key from the menu under your name. It stays in this tab and is never saved.",
+      localBody: "This demo plays a written plan. On your own projects, Claude in the app reads each email and writes the plan, and your rules decide each step the same way.",
+    },
     end: {
       title: "That's the whole tour!",
       body: "You've seen Groundwork read an email, plan what to do, check each step against your rules, wait for your approval and record it all.",
@@ -128,10 +133,13 @@ export const tutorial = {
 
   finish: {
     newProject: "Start your own project",
+    // On the hosted demo, the next step is installing it.
+    install: "Use it on your own project",
+    installUrl: "https://github.com/jedwards27/groundwork#try-it-in-the-claude-app-the-plugin",
     explore: "Keep exploring the demo",
     // Shown under the buttons: on your own computer (the plugin), or on the hosted demo.
     localNote: "Or, in Claude, run /groundwork:new-project and describe the project. Claude drafts it; you confirm it here.",
     hostedNote:
-      "Want a project's data to stay on your own computer? [Download the Groundwork plugin](https://github.com/jedwards27/groundwork/releases/latest/download/groundwork-plugin.zip) for the Claude app, which runs everything on your laptop. The [install steps](https://github.com/jedwards27/groundwork#try-it-in-the-claude-app-the-plugin) take a minute.",
+      "This site is a demo. For a real project, run Groundwork on your own computer: [download the plugin](https://github.com/jedwards27/groundwork/releases/latest/download/groundwork-plugin.zip) for the Claude app and follow the [install steps](https://github.com/jedwards27/groundwork#try-it-in-the-claude-app-the-plugin).",
   },
 };
