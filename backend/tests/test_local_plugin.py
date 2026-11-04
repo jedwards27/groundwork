@@ -616,3 +616,17 @@ def test_an_update_that_changes_the_demo_starts_it_fresh_and_leaves_your_project
             s.delete(org)
     assert seed_demo() == "loaded"
     assert _site("lake-mariner")[1] is not None
+
+
+def test_starting_the_demo_over_in_the_app_is_not_undone_by_the_next_launch(local):
+    """The tutorial's start button reloads the demo through reset_fixtures. That records the fixture's
+    fingerprint too, so the next Claude session keeps what the person did after starting over."""
+    from groundwork.local.runtime import seed_demo
+    from groundwork.service.reset import reset_fixtures
+
+    reset_fixtures()
+    assert _site("lake-mariner")[1] is not None
+    tools.play_message("lake-mariner", "demo-monday")
+    played = _site("lake-mariner")
+    assert seed_demo() == "current"
+    assert _site("lake-mariner") == played

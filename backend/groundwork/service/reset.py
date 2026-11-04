@@ -8,14 +8,14 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import structlog
-from sqlalchemy import select
+from sqlalchemy import select, update
 from starlette.concurrency import run_in_threadpool
 
 from groundwork.config import get_settings
 from groundwork.db import models as m
 from groundwork.db import repo
 from groundwork.db.session import owner_session
-from groundwork.ingest import load_site
+from groundwork.ingest import fixture_fingerprint, load_site
 from groundwork.service import sandboxes
 
 log = structlog.get_logger()
@@ -28,7 +28,15 @@ def reset_fixtures() -> dict[str, Any]:
     loaded: list[str] = []
     with owner_session() as s:
         for folder in sorted(p for p in cfg.groundwork_fixtures_dir.iterdir() if (p / "site.yaml").exists()):
-            repo.seed_bundle(s, load_site(folder))
+            bundle = load_site(folder)
+            org_id = repo.seed_bundle(s, bundle)
+            # Record which folder it came from, so the plugin's launch check (local/runtime.seed_demo)
+            # sees a demo started over in the app as current, and doesn't reload it again.
+            s.execute(
+                update(m.Site)
+                .where(m.Site.org_id == org_id, m.Site.key == bundle.site_key)
+                .values(fixture_fingerprint=fixture_fingerprint(folder))
+            )
             loaded.append(folder.name)
     removed = sandboxes.sweep()
     with owner_session() as s:
