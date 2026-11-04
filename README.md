@@ -6,7 +6,7 @@ It reads a project's paper trail (utility studies, permits, landlord decisions, 
 - The mandate says what it may do alone, what it must ask about, and what it may never do.
 - The gateway, code outside the model, decides allow, ask or deny for each action and shows the clause it relied on.
 - A named approval binds one person to one exact action.
-- The ledger records every step in a hash chain.
+- The ledger records every step in a hash chain, so when a date is disputed it shows who was asked for what, and when.
 - A receipt lets anyone re-check one ledger record by its hash.
 
 **What's real and what's simulated.**
