@@ -2,6 +2,8 @@
 
 **Status:** accepted (Nov 2, 2026)
 
+**Update (Nov 4, 2026):** ADR 0011 adds drafts for changing a project after it starts (its steps, details and parties) and for archiving or deleting one, confirmed in the same app.
+
 **Update (Nov 3, 2026):** ADR 0009 replaces the local page with the same web app the hosted demo uses, served on 127.0.0.1 by the plugin's server. Claude's links still carry the random token; following one signs the browser in. Approvals and confirmations still happen only there, and the demo has one person, its lead, instead of personas.
 
 ## Context

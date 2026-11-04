@@ -175,7 +175,7 @@ Opus 5.5 planning in both arms (the blind arm reads the informed arm's cache), H
 
 ## Load your own site
 
-A site is a folder: `site.yaml` (site, milestone, parties with roles and routing), `schedule.csv` (one row per item; predecessors in one column, e.g. `to_accept FS+15bd; meter`), optional `events.yaml`, `evidence/`, `inbox/` and `reference_projects.csv`. `fixtures/lake-mariner/` is the template and its README explains each file.
+A site is a folder: `site.yaml` (site, milestone, parties with roles and routing), `schedule.csv` (one row per item; predecessors in one column, e.g. `to_accept FS+15bd; meter`), optional `events.yaml`, `evidence/`, `inbox/` and `reference_projects.csv`. `fixtures/lake-mariner/` is the template and its README explains each file. A step's status is `not_started`, `in_progress`, `done` or `cancelled` (descoped: kept on record, ignored by the forecast). Put `true` in the optional `estimated` column when a date is a guess; a done step with no `actual_finish` keeps its planned date, marked as an estimate.
 
 ```bash
 make inspect SITE=path/to/your-site
@@ -185,10 +185,10 @@ It validates the folder, lists every problem at once if there are any, and other
 
 ## Docs
 
-- `docs/decisions/`: ADRs 0001 to 0010.
+- `docs/decisions/`: ADRs 0001 to 0011.
 - `docs/HOSTING.md`: deploying, checking and running the hosted demo.
 - `docs/LEDGER.md`: the ledger's hash format, a test vector, and what verification does and does not catch.
-- `docs/PRACTITIONER-QUESTIONS.md`: the 20 questions that confirm or correct the fixture's assumptions.
+- `docs/PRACTITIONER-QUESTIONS.md`: the 21 questions that confirm or correct the fixture's and the forecast's assumptions.
 - `docs/DATA-BOUNDARY.md`: exactly what leaves your machine.
 - `docs/reviews/`: three rounds of plan review that shaped this design.
 
