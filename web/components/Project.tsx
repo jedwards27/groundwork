@@ -215,7 +215,7 @@ export function Project({ session }: { session: Session }) {
           }}
         >
           <Tab key="overview" title={say.tabs.overview} overrides={PANEL}>
-            <Overview chain={c} site={s} plan={p} />
+            <Overview chain={c} site={s} />
           </Tab>
           <Tab key="steps" overrides={PANEL} title={title(say.tabs.steps, 0, "tab-steps")}>
             <StepsTab chain={c} site={s} mine={mine} />
