@@ -1,6 +1,6 @@
 # Groundwork
 
-Groundwork is an agent that chases what a project waits on from other organizations: utilities, permit offices, landlords and vendors. It acts only inside a written mandate, and every step it takes lands in a ledger anyone can check. Its first market is the data-center buildout, Anthropic's own bottleneck.
+Groundwork is an agent that chases what a project waits on from other organizations: utilities, permit offices, landlords and vendors. It acts only inside a written mandate, and every step it takes lands in a ledger anyone can check. Its first market is data-center construction.
 
 It reads a project's paper trail (utility studies, permits, landlord decisions, vendor tests), names what sets the finish date this week, forecasts slips with their sources, and drafts, chases and asks within the mandate. Five parts keep it inside its authority:
 - The mandate says what it may do alone, what it must ask about, and what it may never do.
@@ -14,7 +14,7 @@ It reads a project's paper trail (utility studies, permits, landlord decisions, 
 - Simulated: sending (everything runs in dry run, so nothing is sent), the demo's hand-written plan, and the demo's people, schedule and email, which are synthetic.
 - Claude writes the plans in the plugin, or when you add your own API key.
 
-The demo site is **Lake Mariner CB-5** (Barker, NY), seen from the end user's seat: TeraWulf is landlord and the utility's customer, Fluidstack is the lessee, and Anthropic is the end user, reaching the utility only through both. Public facts carry links; the schedule, inbox and people are synthetic and labeled.
+The demo site is **Lake Mariner CB-5** (Barker, NY), seen from the end user's seat: TeraWulf is landlord and the utility's customer, Fluidstack is the lessee, and the end user, an AI company, reaches the utility only through both. Public facts carry links; the schedule, inbox and people are synthetic and labeled.
 
 **Try it now:** https://groundwork-demo.fly.dev. Click **Start the tutorial** for a two-minute tour; there is no account to create. To run it yourself, see [Run it locally](#run-it-locally) (`make doctor`, then `make dev`) or the plugin below.
 
@@ -53,7 +53,7 @@ Everything stays in dry run. If Claude tries to send project mail through anothe
 
 For a real project, run Groundwork on your own computer. Both ways run all of it there: the server, the web app, the database and the ledger.
 
-- **The Claude plugin** (above). Your projects live under `~/.groundwork`, and the app answers only on 127.0.0.1. What reaches Anthropic is what your own Claude session reads with your connectors and what Groundwork's tools return to it, under your account's terms. The Groundwork server itself makes no network calls.
+- **The Claude plugin** (above). Your projects live under `~/.groundwork`, and the app answers only on 127.0.0.1. What leaves your computer is what your own Claude session reads with your connectors and what Groundwork's tools return to it, under your Claude account's terms. The Groundwork server itself makes no network calls.
 - **`make dev`** (below). Your projects live in your local Postgres. Nothing leaves your machine unless you set `ANTHROPIC_API_KEY` or add a key from the menu under your name; then the planner receives what `docs/DATA-BOUNDARY.md` lists.
 
 The hosted demo is for trying Lake Mariner without installing anything. It has no accounts, holds only the demo, and deletes each visitor's copy after 12 hours, so don't put a real project there. ADR 0010 explains the choice.
@@ -79,7 +79,7 @@ Docker, untested because the author's machine has no Docker: `sh scripts/new-env
 
 ## The tutorial and the two-minute demo
 
-Click **Start the tutorial** at the top of the home view (or **Tutorial** next to Lake Mariner). A short dialog sets the scene: Anthropic is bringing the Lake Mariner data center online, and you're Jordan, its project manager. A small panel then walks through each feature in sixteen steps: the date and what it waits on, the schedule, an email arriving and Groundwork working through it (a demo message plays a written plan, one step at a time, labeled as a simulated agent), allow, ask and deny, approving the ask on the project's Actions tab, the mandate, the ledger, and how to have Claude plan live with your own API key. Each step points at one thing on the page and you click it yourself, tabs included, so you get around the app the way you would without the tutorial; steps that only explain have Next, and Back steps through what you've seen. While you read the ledger, a second email plays in the background, so the home view you return to has asks waiting and a second run under Activity. Closing the panel pauses it, and opening it again (from the home view, the badge or the menu under your name) picks up at the furthest step you reached; the menu can also start it over. It ends with "That's the whole tour!": start your own project, or keep exploring the demo. Once finished, home stops offering it. The model scorecard and the blind arm stay in the evals (below) and the API, not the app.
+Click **Start the tutorial** at the top of the home view (or **Tutorial** next to Lake Mariner). A short dialog sets the scene: a data center is coming online at Lake Mariner, and you're Jordan, the project manager for the company that will use it. A small panel then walks through each feature in sixteen steps: the date and what it waits on, the schedule, an email arriving and Groundwork working through it (a demo message plays a written plan, one step at a time, labeled as a simulated agent), allow, ask and deny, approving the ask on the project's Actions tab, the mandate, the ledger, and how to have Claude plan live with your own API key. Each step points at one thing on the page and you click it yourself, tabs included, so you get around the app the way you would without the tutorial; steps that only explain have Next, and Back steps through what you've seen. While you read the ledger, a second email plays in the background, so the home view you return to has asks waiting and a second run under Activity. Closing the panel pauses it, and opening it again (from the home view, the badge or the menu under your name) picks up at the furthest step you reached; the menu can also start it over. It ends with "That's the whole tour!": start your own project, or keep exploring the demo. Once finished, home stops offering it. The model scorecard and the blind arm stay in the evals (below) and the API, not the app.
 
 The demo by hand: open **Lake Mariner**, then its **Inbox** tab, and play the first message, **"Demo: the utility wants another review"**. It plays the same hand-written plan every time; the gateway, ledger and report check are live code.
 

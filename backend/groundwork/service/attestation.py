@@ -94,7 +94,7 @@ def attestation(s: Session, site_key: str, mandate: Any) -> dict[str, Any]:
         "what_this_does_not_prove": WHAT_THIS_DOES_NOT_PROVE,
         "production_path": (
             "In production the signer is a key the app role cannot read (a KMS key held by the customer or by "
-            "Anthropic as attester), the head hash is published out of band daily, and an auditor or insurer "
+            "an independent attester), the head hash is published out of band daily, and an auditor or insurer "
             "re-runs verification from an export."
         ),
     }
